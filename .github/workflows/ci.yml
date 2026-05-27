@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter:
+    name: Flutter
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/customer_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze
+
+      - name: Detect Flutter tests
+        id: flutter-tests
+        shell: bash
+        run: |
+          if [ -d test ] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            echo "has_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Flutter test
+        if: steps.flutter-tests.outputs.has_tests == 'true'
+        run: flutter test
+
+  nextjs:
+    name: Next.js
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin_dashboard
+    env:
+      DASHBOARD_DEMO_PASSWORD: ci-demo-password
+      SESSION_SECRET: ci-session-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/admin_dashboard/package-lock.json
+
+      - name: Install Next.js dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Next.js lint
+        run: npm run lint
+
+      - name: Next.js build
+        run: npm run build
