@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(open:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "description": "Dangerous command warning: prints a caution when git push --force, git reset --hard, or rm -rf is detected. Does NOT block — user keeps full control",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=\"${CLAUDE_TOOL_INPUT:-}\"; if echo \"$input\" | grep -qE \"git push.*--force|git reset --hard|rm -rf\"; then echo \"⚠️  Dangerous command detected. Proceed with caution.\"; fi; exit 0'"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "figma@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
+  },
+  "effortLevel": "medium",
+  "autoUpdatesChannel": "latest",
+  "env": {
+    "ANTHROPIC_CUSTOM_MODEL_OPTION": "claude-opus-4-6",
+    "ANTHROPIC_CUSTOM_MODEL_OPTION_NAME": "Opus 4.6"
+  },
+  "model": "claude-opus-4-6"
+}

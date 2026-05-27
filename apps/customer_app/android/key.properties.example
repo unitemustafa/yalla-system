@@ -1,0 +1,4 @@
+storePassword=change-me
+keyPassword=change-me
+keyAlias=yallamarket
+storeFile=../release/yallamarket-upload-keystore.jks
