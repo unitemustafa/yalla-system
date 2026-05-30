@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/customer_app
+        working-directory: apps/yalla_market
 
     steps:
       - name: Checkout
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/admin_dashboard
+        working-directory: apps/yalla_admin
     env:
       DASHBOARD_DEMO_PASSWORD: ci-demo-password
       SESSION_SECRET: ci-session-secret
@@ -69,7 +69,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/admin_dashboard/package-lock.json
+          cache-dependency-path: apps/yalla_admin/package-lock.json
 
       - name: Install Next.js dependencies
         run: npm ci --no-audit --no-fund

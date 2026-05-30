@@ -2,8 +2,9 @@
 
 This workspace contains the current frontend work for Yalla Market:
 
-- Flutter Customer App
-- Next.js Admin Dashboard
+- Flutter Yalla Market
+- Flutter Yalla Home
+- Next.js Yalla Admin
 - Temporary demo/local data used for frontend development
 - No production backend yet
 
@@ -23,9 +24,10 @@ Backend work is postponed and will not be implemented in the current phase.
 
 ```text
 apps/
-  customer_app/      Flutter customer application
-  admin_dashboard/  Next.js admin dashboard
-  api/              Placeholder for future backend work
+  yalla_market/  Flutter Yalla Market application
+  yalla_home/    Flutter Yalla Home application
+  yalla_admin/   Next.js Yalla Admin dashboard
+  api/           Placeholder for future backend work
 
 packages/
   contracts/        Placeholder for future shared contracts
@@ -40,8 +42,8 @@ infra/
 
 The current phase is limited to frontend and dashboard cleanup:
 
-- Clean up and organize the Flutter Customer App.
-- Clean up and organize the Next.js Admin Dashboard.
+- Clean up and organize the Flutter Yalla Market.
+- Clean up and organize the Next.js Yalla Admin.
 - Keep demo/local data clearly separated from future production integration.
 - Avoid adding backend implementation until the backend phase is explicitly started.
 
@@ -49,10 +51,19 @@ Future backend, shared contracts, API client, database, and infrastructure work 
 
 ## Common Commands
 
-Customer app:
+Yalla Market app:
 
 ```bash
-cd apps/customer_app
+cd apps/yalla_market
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Home app:
+
+```bash
+cd apps/yalla_home
 flutter pub get
 flutter analyze
 flutter test
@@ -61,7 +72,7 @@ flutter test
 Admin dashboard:
 
 ```bash
-cd apps/admin_dashboard
+cd apps/yalla_admin
 npm install
 npm run lint
 npm run dev
@@ -69,12 +80,12 @@ npm run dev
 
 ## Architecture Notes
 
-- Shared Flutter foundations live under `apps/customer_app/lib/core`.
-- Flutter domain areas live under `apps/customer_app/lib/features`.
-- Store catalog demo/reference data lives with the store feature in `apps/customer_app/lib/features/store/data/catalog`.
-- Dashboard routes live under `apps/admin_dashboard/app`.
-- Dashboard implementation lives under `apps/admin_dashboard/features/dashboard`.
-- Dashboard auth screens live under `apps/admin_dashboard/features/auth`.
+- Shared Flutter foundations live under `apps/yalla_market/lib/core`.
+- Flutter domain areas live under `apps/yalla_market/lib/features`.
+- Store catalog demo/reference data lives with the store feature in `apps/yalla_market/lib/features/store/data/catalog`.
+- Dashboard routes live under `apps/yalla_admin/app`.
+- Dashboard implementation lives under `apps/yalla_admin/features/dashboard`.
+- Dashboard auth screens live under `apps/yalla_admin/features/auth`.
 - Generic reusable dashboard primitives stay inside the dashboard feature until another app needs them.
 - Placeholder backend folders under `apps/api` are not active implementation.
 - Placeholder package folders under `packages` are not currently consumed by the apps.
