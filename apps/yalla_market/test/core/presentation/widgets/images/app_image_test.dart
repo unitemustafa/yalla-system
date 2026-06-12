@@ -75,13 +75,8 @@ void main() {
       expect(resizeImage.imageProvider, isA<MemoryImage>());
     });
 
-    testWidgets('keeps explicit cache size when HD images are enabled', (
-      tester,
-    ) async {
+    testWidgets('keeps explicit cache size for network images', (tester) async {
       const imageUrl = 'https://cdn.example.com/products/thumb.png';
-      AppPreferencesController.instance.value = const AppPreferences(
-        hdImages: true,
-      );
 
       await tester.pumpWidget(
         _wrap(

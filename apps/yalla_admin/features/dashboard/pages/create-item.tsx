@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import type { ChangeEvent, ComponentType, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,12 +22,18 @@ import {
   Shirt,
   SlidersHorizontal,
   Sparkles,
-  Trash2,
   Utensils,
   X,
 } from "lucide-react";
 
-import { Button, Input, Switch } from "../primitives";
+import {
+  addonRows,
+  categoryRows,
+  type AddonRow,
+  type CategoryRow,
+  type ItemRow,
+} from "../data";
+import { AppSelect, Button, Input, Switch } from "../primitives";
 import { deliveryCityOptions } from "../reference-data";
 import { cn } from "@/lib/utils";
 
@@ -70,18 +77,30 @@ type VariantField = {
   options: VariantOption[];
 };
 
-type CustomField = {
-  id: string;
-  name: string;
-  values: string[];
-  selected: string[];
-};
-
 type ProductImage = {
   id: string;
   name: string;
   url: string;
 };
+
+type ProductAddonSelection = {
+  enabled: boolean;
+  category: string;
+  selectedIds: string[];
+};
+
+const popularColorOptions: VariantOption[] = [
+  { value: "black", label: { ar: "أسود", en: "Black" }, color: "#020617" },
+  { value: "white", label: { ar: "أبيض", en: "White" }, color: "#ffffff" },
+  { value: "red", label: { ar: "أحمر", en: "Red" }, color: "#ef4444" },
+  { value: "emerald", label: { ar: "أخضر", en: "Emerald" }, color: "#10b981" },
+  { value: "blue", label: { ar: "أزرق", en: "Blue" }, color: "#2563eb" },
+  { value: "yellow", label: { ar: "أصفر", en: "Yellow" }, color: "#facc15" },
+  { value: "pink", label: { ar: "وردي", en: "Pink" }, color: "#ec4899" },
+  { value: "purple", label: { ar: "بنفسجي", en: "Purple" }, color: "#8b5cf6" },
+  { value: "gray", label: { ar: "رمادي", en: "Gray" }, color: "#64748b" },
+  { value: "cream", label: { ar: "كريمي", en: "Cream" }, color: "#f8ead2" },
+];
 
 const copy = {
   ar: {
@@ -89,6 +108,9 @@ const copy = {
     subtitle: "لوحة تحكم ديناميكية تضبط المتغيرات حسب صنف المنتج.",
     back: "إلغاء",
     save: "حفظ المنتج",
+    saving: "Saving...",
+    saveError: "Could not save the product. Please try again.",
+    productCode: "Product code",
     basicInfo: "Basic Info",
     variants: "Product Variants",
     attributes: "Options / Attributes",
@@ -105,11 +127,32 @@ const copy = {
     imageAlt: "معاينة صورة المنتج",
     region: "المنطقة",
     allRegions: "كل المناطق",
-    category: "تصنيف المنتج",
-    subcategory: "التصنيف الفرعي",
+    category: "فئة",
+    subcategory: "فئة ثانوية",
+    chooseCategory: "اختيار الفئة",
+    chooseSubcategory: "اختيار الفئة الثانوية",
+    categorySubgroups: "الفئات الثانوية",
+    visibleCategorySubgroups: "اختار الفئة الثانوية من الفئات الموجودة في صفحة الفئات",
+    addons: "الإضافات",
+    addonCategory: "تصنيف الإضافات",
+    allAddonCategories: "كل التصنيفات",
+    openAddons: "اختيار الإضافات",
+    selectedAddons: "الإضافات المختارة",
+    addonsEnabled: "تفعيل الإضافات للعميل",
+    addonsDisabled: "الإضافات غير مفعلة للعميل",
+    noAddonsSelected: "لم يتم اختيار إضافات",
+    visibleAddons: "الإضافات التي ستظهر للعميل",
+    selectAll: "اختيار الكل",
+    clearAll: "إلغاء الكل",
+    apply: "تم",
     categorySignal: "الحقول تتغير تلقائيًا",
     addNewValue: "إضافة قيمة جديدة",
     newValuePlaceholder: "اكتب قيمة جديدة",
+    addValueTitle: "إضافة قيمة",
+    popularColors: "الألوان المشهورة",
+    colorName: "اسم اللون",
+    colorValue: "قيمة اللون",
+    colorValuePlaceholder: "مثال: #10b981",
     add: "إضافة",
     customFields: "حقول مخصصة",
     fieldName: "اسم الحقل",
@@ -117,14 +160,14 @@ const copy = {
     fieldNamePlaceholder: "مثال: الخامة",
     fieldValuePlaceholder: "مثال: قطن",
     price: "السعر",
-    stock: "المخزون",
+    stock: "خصم +",
     available: "متاح للبيع",
     featured: "منتج مميز",
     selectedData: "البيانات المختارة",
     empty: "غير محدد",
     productFallback: "منتج جديد",
     previewCategory: "صنف",
-    previewStock: "المخزون",
+    previewStock: "خصم",
     previewPrice: "السعر",
     noCustomFields: "أضف حقولًا مخصصة لهذا الصنف.",
     modalNote: "تم عرض البيانات فقط بدون إرسالها لأي باك.",
@@ -134,6 +177,8 @@ const copy = {
     subtitle: "A dynamic dashboard that adapts variants to the product type.",
     back: "Cancel",
     save: "Save product",
+    saving: "Saving...",
+    saveError: "Could not save the product. Please try again.",
     basicInfo: "Basic Info",
     variants: "Product Variants",
     attributes: "Options / Attributes",
@@ -150,11 +195,32 @@ const copy = {
     imageAlt: "Product image preview",
     region: "Region",
     allRegions: "All regions",
-    category: "Product category",
-    subcategory: "Subcategory",
+    category: "Category",
+    subcategory: "Secondary category",
+    chooseCategory: "Choose category",
+    chooseSubcategory: "Choose secondary category",
+    categorySubgroups: "Secondary categories",
+    visibleCategorySubgroups: "Choose a secondary category from the categories page",
+    addons: "Add-ons",
+    addonCategory: "Add-on group",
+    allAddonCategories: "All groups",
+    openAddons: "Choose add-ons",
+    selectedAddons: "Selected add-ons",
+    addonsEnabled: "Enable add-ons for customers",
+    addonsDisabled: "Add-ons are disabled for customers",
+    noAddonsSelected: "No add-ons selected",
+    visibleAddons: "Add-ons visible to customers",
+    selectAll: "Select all",
+    clearAll: "Clear all",
+    apply: "Done",
     categorySignal: "Fields update automatically",
     addNewValue: "Add a new value",
     newValuePlaceholder: "Type a new value",
+    addValueTitle: "Add value",
+    popularColors: "Popular colors",
+    colorName: "Color name",
+    colorValue: "Color value",
+    colorValuePlaceholder: "Example: #10b981",
     add: "Add",
     customFields: "Custom fields",
     fieldName: "Field name",
@@ -162,22 +228,20 @@ const copy = {
     fieldNamePlaceholder: "Example: Material",
     fieldValuePlaceholder: "Example: Cotton",
     price: "Price",
-    stock: "Stock",
+    stock: "Discount +",
     available: "Available",
     featured: "Featured product",
     selectedData: "Selected data",
     empty: "Not set",
     productFallback: "New product",
     previewCategory: "Category",
-    previewStock: "Stock",
+    previewStock: "Discount",
     previewPrice: "Price",
     noCustomFields: "Add custom fields for this category.",
-    modalNote: "Data is previewed only and is not sent to any backend.",
+    modalNote: "Product saved. The code was generated automatically.",
+    productCode: "Product code",
   },
 } satisfies Record<Language, Record<string, string>>;
-
-const inputClass =
-  "h-10 w-full rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15";
 
 const textAreaClass =
   "min-h-[124px] w-full resize-none rounded-md border border-border bg-input px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15";
@@ -269,7 +333,6 @@ const variantDefinitions: Record<CategoryKey, VariantField[]> = {
         { value: "men", label: { ar: "رجالي", en: "Men" } },
         { value: "women", label: { ar: "حريمي", en: "Women" } },
         { value: "kids", label: { ar: "أطفال", en: "Kids" } },
-        { value: "unisex", label: { ar: "يونيسكس", en: "Unisex" } },
       ],
     },
   ],
@@ -353,7 +416,7 @@ const defaultSelections: Record<CategoryKey, Record<string, string[]>> = {
   clothing: {
     color: ["emerald"],
     size: ["m"],
-    fit: ["unisex"],
+    fit: ["men"],
   },
   vegetables: {
     weight: ["basket"],
@@ -369,14 +432,18 @@ const defaultSelections: Record<CategoryKey, Record<string, string[]>> = {
 };
 
 const initialCategory: CategoryKey = "vegetables";
+const initialSecondaryCategory =
+  categoryRows.find((row) => row.name === "خضار")?.name ??
+  categoryRows[0]?.name ??
+  "general";
 
 const initialForm: ProductForm = {
   name: "",
   description: "",
   category: initialCategory,
-  subcategory: "baskets",
+  subcategory: initialSecondaryCategory,
   price: "120",
-  stock: "8",
+  stock: "0",
   available: true,
   featured: false,
 };
@@ -390,6 +457,41 @@ function cloneSelections(category: CategoryKey) {
 
 function categoryConfig(category: CategoryKey) {
   return productCategories.find((item) => item.id === category) ?? productCategories[0];
+}
+
+function categoryKeyFromItem(item: ItemRow): CategoryKey {
+  const normalizedCategory = item.category.trim().toLocaleLowerCase("ar-EG");
+  const matchedCategory = productCategories.find((category) =>
+    [category.id, category.label.ar, category.label.en].some(
+      (value) => value.trim().toLocaleLowerCase("ar-EG") === normalizedCategory,
+    ),
+  );
+
+  return matchedCategory?.id ?? initialCategory;
+}
+
+function priceInputValue(price: string) {
+  return price
+    .replace(/\s*EGP\s*$/i, "")
+    .replace(/\s*\u062c\u0646\u064a\u0647\s*$/i, "")
+    .trim() || "0";
+}
+
+function stockInputValue(calories: string) {
+  return calories.match(/\d+/)?.[0] ?? "0";
+}
+
+function productFormFromItem(item: ItemRow): ProductForm {
+  return {
+    name: item.name,
+    description: item.description,
+    category: categoryKeyFromItem(item),
+    subcategory: item.subcategory || initialSecondaryCategory,
+    price: priceInputValue(item.price),
+    stock: stockInputValue(item.calories),
+    available: item.active,
+    featured: item.featured !== "\u0644\u0627",
+  };
 }
 
 function optionLabel(
@@ -408,10 +510,58 @@ function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 10000)}`;
 }
 
+function uniqueAddonCategories(rows: AddonRow[]) {
+  return Array.from(new Set(rows.map((addon) => addon.category).filter(Boolean)));
+}
+
+function addonDisplayName(addon: AddonRow, language: Language) {
+  return language === "ar" ? addon.nameAr : addon.name;
+}
+
+function categoryRowDisplayName(row: CategoryRow) {
+  return row.nameAr && row.nameAr !== "—" ? row.nameAr : row.name;
+}
+
+function categoryRowSections(row?: CategoryRow) {
+  return row?.sections.length ? row.sections.join(", ") : "";
+}
+
+function addonSelectionSummary({
+  enabled,
+  selectedAddons,
+  t,
+  language,
+}: {
+  enabled: boolean;
+  selectedAddons: AddonRow[];
+  t: typeof copy[Language];
+  language: Language;
+}) {
+  if (!enabled) {
+    return t.addonsDisabled;
+  }
+
+  if (!selectedAddons.length) {
+    return t.noAddonsSelected;
+  }
+
+  return selectedAddons
+    .map((addon) => addonDisplayName(addon, language))
+    .join(", ");
+}
+
 export function CreateItemPage() {
   const language: Language = "ar";
   const direction: Direction = "rtl";
+  const params = useParams<{ itemId?: string | string[] }>();
+  const rawItemId = params?.itemId;
+  const editItemId = Array.isArray(rawItemId) ? rawItemId[0] : rawItemId;
+  const isEditing = Boolean(editItemId);
   const t = copy[language];
+  const pageTitle = isEditing ? "\u062a\u0639\u062f\u064a\u0644 \u0645\u0646\u062a\u062c" : t.title;
+  const pageSubtitle = isEditing
+    ? "\u0639\u062f\u0651\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0646\u062a\u062c \u0648\u0627\u0644\u0633\u0639\u0631 \u0648\u0627\u0644\u062a\u0635\u0646\u064a\u0641."
+    : t.subtitle;
   const [selectedRegion, setSelectedRegion] = useState(t.allRegions);
   const [form, setForm] = useState<ProductForm>(initialForm);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string[]>>(
@@ -420,16 +570,106 @@ export function CreateItemPage() {
   const [customVariantOptions, setCustomVariantOptions] = useState<
     Record<string, VariantOption[]>
   >({});
-  const [variantDrafts, setVariantDrafts] = useState<Record<string, string>>({});
-  const [customFields, setCustomFields] = useState<CustomField[]>([]);
-  const [customFieldDraft, setCustomFieldDraft] = useState({ name: "", value: "" });
-  const [customValueDrafts, setCustomValueDrafts] = useState<Record<string, string>>({});
+  const [variantValueField, setVariantValueField] = useState<VariantField | null>(
+    null,
+  );
+  const [variantValueName, setVariantValueName] = useState("");
+  const [variantColorValue, setVariantColorValue] = useState("#10b981");
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const productImagesRef = useRef<ProductImage[]>([]);
   const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [createdCode, setCreatedCode] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [editProductCode, setEditProductCode] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [addonsDialogOpen, setAddonsDialogOpen] = useState(false);
+  const [productAddons, setProductAddons] = useState<ProductAddonSelection>({
+    enabled: true,
+    category: "all",
+    selectedIds: [],
+  });
+
+  useEffect(() => {
+    if (!editItemId) {
+      return;
+    }
+
+    let alive = true;
+
+    async function loadEditableItem() {
+      setSaveError("");
+
+      try {
+        const response = await fetch("/api/dashboard/items");
+
+        if (!response.ok) {
+          throw new Error("Failed to load product");
+        }
+
+        const data = (await response.json()) as { items: ItemRow[] };
+        const item = data.items.find((currentItem) => currentItem.id === editItemId);
+
+        if (!alive) {
+          return;
+        }
+
+        if (!item) {
+          setSaveError("\u062a\u0639\u0630\u0631 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c.");
+          return;
+        }
+
+        const nextForm = productFormFromItem(item);
+        setForm(nextForm);
+        setSelectedVariants(cloneSelections(nextForm.category));
+        setEditProductCode(item.code ?? item.id);
+        setProductImages(
+          item.image
+            ? [
+                {
+                  id: `existing-${item.id}`,
+                  name: "\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629",
+                  url: item.image,
+                },
+              ]
+            : [],
+        );
+        setSelectedImageIndex(0);
+      } catch {
+        if (alive) {
+          setSaveError("\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0646\u062a\u062c.");
+        }
+      }
+    }
+
+    loadEditableItem();
+
+    return () => {
+      alive = false;
+    };
+  }, [editItemId]);
 
   const activeCategory = categoryConfig(form.category);
+  const addonCategoryOptions = useMemo(() => uniqueAddonCategories(addonRows), []);
+  const selectedAddonRows = useMemo(
+    () =>
+      addonRows.filter((addon) => productAddons.selectedIds.includes(addon.id)),
+    [productAddons.selectedIds],
+  );
+  const selectedAddonSummary = addonSelectionSummary({
+    enabled: productAddons.enabled,
+    selectedAddons: selectedAddonRows,
+    t,
+    language,
+  });
+  const selectedSecondaryCategory =
+    categoryRows.find((row) => row.name === form.subcategory) ?? categoryRows[0];
+  const selectedSecondaryCategoryName = selectedSecondaryCategory
+    ? categoryRowDisplayName(selectedSecondaryCategory)
+    : form.subcategory || t.empty;
+  const selectedSecondaryCategorySections =
+    categoryRowSections(selectedSecondaryCategory) || t.empty;
   const activeFields = useMemo(
     () =>
       variantDefinitions[form.category].map((field) => ({
@@ -459,19 +699,16 @@ export function CreateItemPage() {
     [activeFields, language, selectedVariants, t.empty],
   );
 
-  const customFieldSummary = customFields.map((field) => ({
-    label: field.name,
-    value: field.selected.join(", ") || t.empty,
-  }));
-
-  const selectedData = [...variantSummary, ...customFieldSummary];
+  const selectedData = [
+    {
+      label: t.subcategory,
+      value: selectedSecondaryCategoryName,
+    },
+    { label: t.addons, value: selectedAddonSummary },
+    ...variantSummary,
+  ];
   const productName = form.name.trim() || t.productFallback;
   const productDescription = form.description.trim() || t.descriptionPlaceholder;
-  const selectedSubcategory = optionLabel(
-    activeCategory.subcategories,
-    form.subcategory,
-    language,
-  );
   const selectedProductImage = productImages[selectedImageIndex];
 
   useEffect(
@@ -493,14 +730,21 @@ export function CreateItemPage() {
   }
 
   function changeCategory(category: CategoryKey) {
-    const nextCategory = categoryConfig(category);
-
     setForm((currentForm) => ({
       ...currentForm,
       category,
-      subcategory: nextCategory.subcategories[0]?.value ?? "general",
     }));
-    setSelectedVariants(cloneSelections(category));
+    setSelectedVariants((currentSelections) =>
+      form.category === category ? currentSelections : cloneSelections(category),
+    );
+  }
+
+  function changeSecondaryCategory(subcategory: string) {
+    updateForm("subcategory", subcategory);
+  }
+
+  function updateProductAddons(nextSelection: ProductAddonSelection) {
+    setProductAddons(nextSelection);
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -578,9 +822,26 @@ export function CreateItemPage() {
     }));
   }
 
-  function addVariantValue(field: VariantField) {
+  function openVariantValueDialog(field: VariantField) {
+    setVariantValueField(field);
+    setVariantValueName("");
+    setVariantColorValue(
+      field.input === "swatch"
+        ? field.options.find((option) => option.color)?.color ?? "#10b981"
+        : "",
+    );
+  }
+
+  function closeVariantValueDialog() {
+    setVariantValueField(null);
+    setVariantValueName("");
+    setVariantColorValue("#10b981");
+  }
+
+  function addVariantValue(field: VariantField, label: string, color?: string) {
     const key = variantKey(form.category, field.id);
-    const rawValue = (variantDrafts[key] ?? "").trim();
+    const rawValue = label.trim();
+    const rawColor = color?.trim();
 
     if (!rawValue) {
       return;
@@ -589,13 +850,13 @@ export function CreateItemPage() {
     const option: VariantOption = {
       value: createId("custom-option"),
       label: { ar: rawValue, en: rawValue },
+      color: field.input === "swatch" && rawColor ? rawColor : undefined,
     };
 
     setCustomVariantOptions((currentOptions) => ({
       ...currentOptions,
       [key]: [...(currentOptions[key] ?? []), option],
     }));
-    setVariantDrafts((currentDrafts) => ({ ...currentDrafts, [key]: "" }));
     setSelectedVariants((currentSelections) => ({
       ...currentSelections,
       [field.id]:
@@ -603,76 +864,56 @@ export function CreateItemPage() {
           ? [...(currentSelections[field.id] ?? []), option.value]
           : [option.value],
     }));
+    closeVariantValueDialog();
   }
 
-  function addCustomField() {
-    const name = customFieldDraft.name.trim();
-    const value = customFieldDraft.value.trim();
-
-    if (!name || !value) {
-      return;
-    }
-
-    setCustomFields((currentFields) => [
-      ...currentFields,
-      {
-        id: createId("custom-field"),
-        name,
-        values: [value],
-        selected: [value],
-      },
-    ]);
-    setCustomFieldDraft({ name: "", value: "" });
-  }
-
-  function toggleCustomFieldValue(fieldId: string, value: string) {
-    setCustomFields((currentFields) =>
-      currentFields.map((field) => {
-        if (field.id !== fieldId) {
-          return field;
-        }
-
-        const selected = field.selected.includes(value)
-          ? field.selected.filter((item) => item !== value)
-          : [...field.selected, value];
-
-        return { ...field, selected };
-      }),
-    );
-  }
-
-  function addCustomFieldValue(fieldId: string) {
-    const value = (customValueDrafts[fieldId] ?? "").trim();
-
-    if (!value) {
-      return;
-    }
-
-    setCustomFields((currentFields) =>
-      currentFields.map((field) =>
-        field.id === fieldId
-          ? {
-              ...field,
-              values: field.values.includes(value) ? field.values : [...field.values, value],
-              selected: field.selected.includes(value)
-                ? field.selected
-                : [...field.selected, value],
-            }
-          : field,
-      ),
-    );
-    setCustomValueDrafts((currentDrafts) => ({ ...currentDrafts, [fieldId]: "" }));
-  }
-
-  function removeCustomField(fieldId: string) {
-    setCustomFields((currentFields) =>
-      currentFields.filter((field) => field.id !== fieldId),
-    );
-  }
-
-  function openConfirmation(event: React.FormEvent<HTMLFormElement>) {
+  async function openConfirmation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setConfirmationOpen(true);
+
+    if (saving) {
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+
+    try {
+      const endpoint = editItemId
+        ? `/api/dashboard/items/${encodeURIComponent(editItemId)}`
+        : "/api/dashboard/items";
+      const response = await fetch(endpoint, {
+        method: editItemId ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          image: selectedProductImage?.url.startsWith("http")
+            ? selectedProductImage.url
+            : undefined,
+          name: productName,
+          description: productDescription,
+          category: activeCategory.label[language],
+          subcategory: selectedSecondaryCategoryName,
+          calories: form.stock ? `Discount: ${form.stock}%` : "",
+          price: form.price,
+          featured: form.featured,
+          active: form.available,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save product");
+      }
+
+      const data = (await response.json()) as {
+        item: { code?: string; id: string };
+      };
+
+      setCreatedCode(data.item.code ?? data.item.id);
+      setConfirmationOpen(true);
+    } catch {
+      setSaveError(t.saveError);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -688,12 +929,18 @@ export function CreateItemPage() {
             <span>{t.categorySignal}</span>
           </div>
           <h1 className="mt-2 text-2xl font-semibold leading-8 md:text-3xl md:leading-9">
-            {t.title}
+            {pageTitle}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            {t.subtitle}
+            {pageSubtitle}
           </p>
         </div>
+
+        {saveError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+            {saveError}
+          </div>
+        ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <RegionSelect
@@ -708,9 +955,13 @@ export function CreateItemPage() {
             <X className="size-4" />
             {t.back}
           </Link>
-          <Button type="submit" className="h-10">
+          <Button type="submit" className="h-10" disabled={saving}>
             <Save className="size-4" />
-            {t.save}
+            {saving
+              ? t.saving
+              : isEditing
+                ? "\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644"
+                : t.save}
           </Button>
         </div>
       </div>
@@ -837,37 +1088,99 @@ export function CreateItemPage() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <LabelText label={t.category}>
-                <SelectShell>
-                  <select
-                    className={cn(inputClass, "appearance-none pe-9")}
-                    onChange={(event) =>
-                      changeCategory(event.target.value as CategoryKey)
-                    }
-                    value={form.category}
-                  >
-                    {productCategories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.label[language]}
-                      </option>
-                    ))}
-                  </select>
-                </SelectShell>
+                <div
+                  aria-label={t.category}
+                  className="grid grid-cols-2 gap-3"
+                  role="radiogroup"
+                >
+                  {productCategories.map((category) => {
+                    const CategoryIcon = category.icon;
+                    const selected = form.category === category.id;
+
+                    return (
+                      <button
+                        key={category.id}
+                        aria-checked={selected}
+                        className={cn(
+                          "flex min-h-20 min-w-0 items-center gap-3 rounded-lg border bg-card p-3 text-start text-sm shadow-sm shadow-black/5 outline-none ring-1 ring-transparent transition hover:-translate-y-0.5 hover:border-primary/35 hover:bg-accent/45 hover:shadow-md focus:border-primary focus:ring-2 focus:ring-primary/15 dark:shadow-none",
+                          selected &&
+                            "border-primary bg-primary/10 text-primary ring-2 ring-primary/20 shadow-primary/10",
+                        )}
+                        onClick={() => changeCategory(category.id)}
+                        role="radio"
+                        type="button"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition",
+                            selected && "bg-primary text-primary-foreground",
+                          )}
+                        >
+                          <CategoryIcon className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-foreground">
+                            {category.label[language]}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {category.description[language]}
+                          </span>
+                        </span>
+                        {selected ? (
+                          <Check className="size-4 shrink-0 text-primary" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
               </LabelText>
 
               <LabelText label={t.subcategory}>
-                <SelectShell>
-                  <select
-                    className={cn(inputClass, "appearance-none pe-9")}
-                    onChange={(event) => updateForm("subcategory", event.target.value)}
-                    value={form.subcategory}
-                  >
-                    {activeCategory.subcategories.map((subcategory) => (
-                      <option key={subcategory.value} value={subcategory.value}>
-                        {subcategory.label[language]}
-                      </option>
-                    ))}
-                  </select>
-                </SelectShell>
+                <button
+                  type="button"
+                  onClick={() => setCategoryDialogOpen(true)}
+                  className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-border bg-input px-3 py-2 text-start text-sm shadow-sm outline-none transition hover:border-primary/40 hover:bg-accent/50 focus:border-primary focus:ring-2 focus:ring-primary/15"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-foreground">
+                      {selectedSecondaryCategoryName}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {selectedSecondaryCategorySections}
+                    </span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+                    <Layers3 className="size-3.5" />
+                    {t.chooseSubcategory}
+                  </span>
+                </button>
+              </LabelText>
+
+              <LabelText label={t.addons}>
+                <button
+                  type="button"
+                  onClick={() => setAddonsDialogOpen(true)}
+                  className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-border bg-input px-3 py-2 text-start text-sm shadow-sm outline-none transition hover:border-primary/40 hover:bg-accent/50 focus:border-primary focus:ring-2 focus:ring-primary/15"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-foreground">
+                      {productAddons.enabled
+                        ? selectedAddonRows.length
+                          ? `${selectedAddonRows.length} ${t.selectedAddons}`
+                          : t.noAddonsSelected
+                        : t.addonsDisabled}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      {selectedAddonRows.length
+                        ? selectedAddonSummary
+                        : t.visibleAddons}
+                    </span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+                    <Plus className="size-3.5" />
+                    {t.openAddons}
+                  </span>
+                </button>
               </LabelText>
             </div>
           </Section>
@@ -882,13 +1195,6 @@ export function CreateItemPage() {
               </StatusPill>
             }
           >
-            <CategorySelector
-              categories={productCategories}
-              language={language}
-              selectedCategory={form.category}
-              onChange={changeCategory}
-            />
-
             {activeFields.length ? (
               <div className="grid gap-4">
                 {activeFields.map((field) => (
@@ -896,18 +1202,11 @@ export function CreateItemPage() {
                     key={field.id}
                     field={field}
                     language={language}
-                    onAddValue={() => addVariantValue(field)}
-                    onDraftChange={(value) =>
-                      setVariantDrafts((currentDrafts) => ({
-                        ...currentDrafts,
-                        [variantKey(form.category, field.id)]: value,
-                      }))
-                    }
+                    onOpenAddValue={() => openVariantValueDialog(field)}
                     onSelect={selectVariant}
                     onToggle={toggleVariant}
                     selectedValues={selectedVariants[field.id] ?? []}
                     t={t}
-                    valueDraft={variantDrafts[variantKey(form.category, field.id)] ?? ""}
                   />
                 ))}
               </div>
@@ -934,45 +1233,13 @@ export function CreateItemPage() {
               <LabelText label={t.stock}>
                 <Input
                   className="h-10"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   onChange={(event) => updateForm("stock", event.target.value)}
                   value={form.stock}
                 />
               </LabelText>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <ToggleRow
-                checked={form.available}
-                icon={<PackageCheck className="size-4 text-primary" />}
-                label={t.available}
-                onChange={(checked) => updateForm("available", checked)}
-              />
-              <ToggleRow
-                checked={form.featured}
-                icon={<Sparkles className="size-4 text-amber-500" />}
-                label={t.featured}
-                onChange={(checked) => updateForm("featured", checked)}
-              />
-            </div>
-
-            <CustomFieldsEditor
-              customFieldDraft={customFieldDraft}
-              customFields={customFields}
-              customValueDrafts={customValueDrafts}
-              onAddCustomField={addCustomField}
-              onAddCustomFieldValue={addCustomFieldValue}
-              onCustomDraftChange={setCustomFieldDraft}
-              onCustomValueDraftChange={(fieldId, value) =>
-                setCustomValueDrafts((currentDrafts) => ({
-                  ...currentDrafts,
-                  [fieldId]: value,
-                }))
-              }
-              onRemoveCustomField={removeCustomField}
-              onToggleCustomValue={toggleCustomFieldValue}
-              t={t}
-            />
           </Section>
         </div>
 
@@ -990,7 +1257,6 @@ export function CreateItemPage() {
             selectedImageIndex={selectedImageIndex}
             selectedRegion={selectedRegion}
             selectedVariants={selectedVariants}
-            selectedSubcategory={selectedSubcategory}
             title={productName}
             t={t}
           />
@@ -1000,15 +1266,59 @@ export function CreateItemPage() {
       {confirmationOpen ? (
         <ConfirmationDialog
           activeCategory={activeCategory}
-          customFields={customFieldSummary}
+          createdCode={createdCode || editProductCode}
           form={form}
           imageNames={productImages.map((image, index) => `${index + 1}. ${image.name}`)}
           language={language}
           onClose={() => setConfirmationOpen(false)}
+          selectedSecondaryCategoryName={selectedSecondaryCategoryName}
           selectedRegion={selectedRegion}
-          selectedSubcategory={selectedSubcategory}
+          selectedAddonSummary={selectedAddonSummary}
           t={t}
           variantSummary={variantSummary}
+        />
+      ) : null}
+      {categoryDialogOpen ? (
+        <SecondaryCategoryPickerDialog
+          categories={categoryRows}
+          onChange={changeSecondaryCategory}
+          onClose={() => setCategoryDialogOpen(false)}
+          selectedSubcategory={form.subcategory}
+          t={t}
+        />
+      ) : null}
+      {variantValueField ? (
+        <VariantValueDialog
+          colorValue={variantColorValue}
+          field={variantValueField}
+          language={language}
+          name={variantValueName}
+          onClose={closeVariantValueDialog}
+          onColorChange={setVariantColorValue}
+          onNameChange={setVariantValueName}
+          onSubmit={() =>
+            addVariantValue(
+              variantValueField,
+              variantValueName,
+              variantColorValue,
+            )
+          }
+          onUsePopularColor={(option) => {
+            setVariantValueName(option.label[language]);
+            setVariantColorValue(option.color ?? "#10b981");
+          }}
+          t={t}
+        />
+      ) : null}
+      {addonsDialogOpen ? (
+        <AddonsPickerDialog
+          addonCategoryOptions={addonCategoryOptions}
+          addons={addonRows}
+          language={language}
+          onChange={updateProductAddons}
+          onClose={() => setAddonsDialogOpen(false)}
+          selection={productAddons}
+          t={t}
         />
       ) : null}
     </form>
@@ -1090,60 +1400,247 @@ function LabelText({ children, label }: { children: ReactNode; label: string }) 
   );
 }
 
-function SelectShell({ children }: { children: ReactNode }) {
+function SecondaryCategoryPickerDialog({
+  categories,
+  onChange,
+  onClose,
+  selectedSubcategory,
+  t,
+}: {
+  categories: CategoryRow[];
+  onChange: (subcategory: string) => void;
+  onClose: () => void;
+  selectedSubcategory: string;
+  t: typeof copy[Language];
+}) {
   return (
-    <div className="relative">
-      {children}
-      <ChevronDown className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/45 px-4 py-6 backdrop-blur-sm">
+      <div
+        aria-labelledby="product-category-title"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg border bg-background text-foreground shadow-2xl"
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+          <div>
+            <h2 id="product-category-title" className="text-lg font-semibold">
+              {t.categorySubgroups}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t.visibleCategorySubgroups}
+            </p>
+          </div>
+          <button
+            aria-label={t.close}
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[66vh] overflow-y-auto p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            {categories.map((category) => {
+              const selected = selectedSubcategory === category.name;
+              const categoryName = categoryRowDisplayName(category);
+              const sections = categoryRowSections(category);
+
+              return (
+                <button
+                  key={category.index}
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex w-full items-start justify-between gap-3 rounded-lg border bg-card p-3 text-start shadow-sm transition hover:border-primary/50 hover:bg-accent/40",
+                    selected && "border-primary bg-primary/10 ring-2 ring-primary/10",
+                  )}
+                  onClick={() => onChange(category.name)}
+                  type="button"
+                >
+                  <span className="flex min-w-0 items-start gap-3">
+                    <span className="size-12 shrink-0 overflow-hidden rounded-md border bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Dashboard seed data uses remote category thumbnails. */}
+                      <img
+                        alt=""
+                        className="h-full w-full object-cover"
+                        src={category.image}
+                      />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">
+                        {categoryName}
+                      </span>
+                      {sections ? (
+                        <span className="mt-2 flex flex-wrap gap-1.5">
+                          {category.sections.map((section) => (
+                            <span
+                              key={`${category.index}-${section}`}
+                              className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"
+                            >
+                              {section}
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  {selected ? (
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                      <Check className="size-3.5" />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-end border-t px-5 py-4">
+          <Button onClick={onClose} type="button">
+            <Check className="size-4" />
+            {t.apply}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function CategorySelector({
-  categories,
+function VariantValueDialog({
+  colorValue,
+  field,
   language,
-  onChange,
-  selectedCategory,
+  name,
+  onClose,
+  onColorChange,
+  onNameChange,
+  onSubmit,
+  onUsePopularColor,
+  t,
 }: {
-  categories: ProductCategory[];
+  colorValue: string;
+  field: VariantField;
   language: Language;
-  onChange: (category: CategoryKey) => void;
-  selectedCategory: CategoryKey;
+  name: string;
+  onClose: () => void;
+  onColorChange: (value: string) => void;
+  onNameChange: (value: string) => void;
+  onSubmit: () => void;
+  onUsePopularColor: (option: VariantOption) => void;
+  t: typeof copy[Language];
 }) {
-  return (
-    <div className="grid gap-3 md:grid-cols-4">
-      {categories.map((category) => {
-        const Icon = category.icon;
-        const selected = selectedCategory === category.id;
+  const isColorField = field.input === "swatch";
+  const canSubmit = name.trim().length > 0;
 
-        return (
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/45 px-4 py-6 backdrop-blur-sm">
+      <div
+        aria-labelledby="variant-value-title"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-lg border bg-background text-foreground shadow-2xl"
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+          <div>
+            <h2 id="variant-value-title" className="text-lg font-semibold">
+              {t.addValueTitle}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {field.label[language]}
+            </p>
+          </div>
           <button
-            key={category.id}
-            aria-pressed={selected}
-            className={cn(
-              "min-h-[96px] rounded-lg border bg-background p-3 text-start shadow-sm transition hover:border-primary/50 hover:bg-accent/50",
-              selected && "border-primary bg-primary/10 ring-2 ring-primary/10",
-            )}
-            onClick={() => onChange(category.id)}
+            aria-label={t.close}
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+            onClick={onClose}
             type="button"
           >
-            <div className="flex items-start justify-between gap-3">
-              <span className="flex size-9 items-center justify-center rounded-md bg-muted text-primary">
-                <Icon className="size-5" />
-              </span>
-              {selected ? (
-                <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Check className="size-3.5" />
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-3 font-semibold">{category.label[language]}</div>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {category.description[language]}
-            </p>
+            <X className="size-4" />
           </button>
-        );
-      })}
+        </div>
+
+        <div className="grid gap-5 p-5">
+          {isColorField ? (
+            <div>
+              <div className="mb-3 text-sm font-semibold">{t.popularColors}</div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {popularColorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-md border bg-card px-3 py-2 text-start transition hover:border-primary/50 hover:bg-accent/50"
+                    onClick={() => onUsePopularColor(option)}
+                    type="button"
+                  >
+                    <span className="font-semibold">
+                      {option.label[language]}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <span dir="ltr">{option.color}</span>
+                      <span
+                        className="size-6 rounded-full border border-border"
+                        style={{ backgroundColor: option.color }}
+                      />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className={cn("grid gap-4", isColorField && "sm:grid-cols-2")}>
+            <LabelText label={isColorField ? t.colorName : t.addNewValue}>
+              <Input
+                autoFocus
+                className="h-10"
+                onChange={(event) => onNameChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && canSubmit && !isColorField) {
+                    event.preventDefault();
+                    onSubmit();
+                  }
+                }}
+                placeholder={t.newValuePlaceholder}
+                value={name}
+              />
+            </LabelText>
+
+            {isColorField ? (
+              <LabelText label={t.colorValue}>
+                <div className="grid grid-cols-[minmax(0,1fr)_44px] gap-2">
+                  <Input
+                    className="h-10"
+                    dir="ltr"
+                    onChange={(event) => onColorChange(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && canSubmit) {
+                        event.preventDefault();
+                        onSubmit();
+                      }
+                    }}
+                    placeholder={t.colorValuePlaceholder}
+                    value={colorValue}
+                  />
+                  <span
+                    className="h-10 rounded-md border border-border"
+                    style={{ backgroundColor: colorValue || "#e2e8f0" }}
+                  />
+                </div>
+              </LabelText>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <Button onClick={onClose} type="button" variant="outline">
+            {t.close}
+          </Button>
+          <Button disabled={!canSubmit} onClick={onSubmit} type="button">
+            <Plus className="size-4" />
+            {t.add}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1151,23 +1648,19 @@ function CategorySelector({
 function VariantFieldEditor({
   field,
   language,
-  onAddValue,
-  onDraftChange,
+  onOpenAddValue,
   onSelect,
   onToggle,
   selectedValues,
   t,
-  valueDraft,
 }: {
   field: VariantField;
   language: Language;
-  onAddValue: () => void;
-  onDraftChange: (value: string) => void;
+  onOpenAddValue: () => void;
   onSelect: (field: VariantField, value: string) => void;
   onToggle: (field: VariantField, value: string) => void;
   selectedValues: string[];
   t: typeof copy[Language];
-  valueDraft: string;
 }) {
   return (
     <div className="rounded-lg border bg-background p-4">
@@ -1220,19 +1713,17 @@ function VariantFieldEditor({
             })}
           </div>
         ) : field.input === "select" ? (
-          <SelectShell>
-            <select
-              className={cn(inputClass, "appearance-none pe-9")}
-              onChange={(event) => onSelect(field, event.target.value)}
-              value={selectedValues[0] ?? ""}
-            >
-              {field.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label[language]}
-                </option>
-              ))}
-            </select>
-          </SelectShell>
+          <AppSelect
+            ariaLabel={field.label[language]}
+            className="h-10 bg-input text-foreground"
+            contentClassName="z-[60]"
+            onValueChange={(value) => onSelect(field, value)}
+            options={field.options.map((option) => ({
+              value: option.value,
+              label: option.label[language],
+            }))}
+            value={selectedValues[0] ?? field.options[0]?.value}
+          />
         ) : field.input === "radio" ? (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {field.options.map((option) => (
@@ -1303,181 +1794,213 @@ function VariantFieldEditor({
         )}
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <Input
-          className="h-10"
-          onChange={(event) => onDraftChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              onAddValue();
-            }
-          }}
-          placeholder={t.newValuePlaceholder}
-          value={valueDraft}
-        />
-        <Button className="h-10" onClick={onAddValue} type="button" variant="outline">
+      <div className="mt-4">
+        <Button className="h-10" onClick={onOpenAddValue} type="button" variant="outline">
           <Plus className="size-4" />
-          {t.add}
+          {t.addNewValue}
         </Button>
       </div>
     </div>
   );
 }
 
-function ToggleRow({
-  checked,
-  icon,
-  label,
+function AddonsPickerDialog({
+  addonCategoryOptions,
+  addons,
+  language,
   onChange,
-}: {
-  checked: boolean;
-  icon: ReactNode;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex min-h-14 items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-md bg-muted">
-          {icon}
-        </span>
-        <span className="font-medium">{label}</span>
-      </div>
-      <Switch checked={checked} onCheckedChange={onChange} />
-    </div>
-  );
-}
-
-function CustomFieldsEditor({
-  customFieldDraft,
-  customFields,
-  customValueDrafts,
-  onAddCustomField,
-  onAddCustomFieldValue,
-  onCustomDraftChange,
-  onCustomValueDraftChange,
-  onRemoveCustomField,
-  onToggleCustomValue,
+  onClose,
+  selection,
   t,
 }: {
-  customFieldDraft: { name: string; value: string };
-  customFields: CustomField[];
-  customValueDrafts: Record<string, string>;
-  onAddCustomField: () => void;
-  onAddCustomFieldValue: (fieldId: string) => void;
-  onCustomDraftChange: (draft: { name: string; value: string }) => void;
-  onCustomValueDraftChange: (fieldId: string, value: string) => void;
-  onRemoveCustomField: (fieldId: string) => void;
-  onToggleCustomValue: (fieldId: string, value: string) => void;
+  addonCategoryOptions: string[];
+  addons: AddonRow[];
+  language: Language;
+  onChange: (selection: ProductAddonSelection) => void;
+  onClose: () => void;
+  selection: ProductAddonSelection;
   t: typeof copy[Language];
 }) {
+  const visibleAddons = addons.filter(
+    (addon) => selection.category === "all" || addon.category === selection.category,
+  );
+  const selectedIds = new Set(selection.selectedIds);
+  const selectedCount = selection.selectedIds.length;
+
+  function updateSelection(nextSelection: Partial<ProductAddonSelection>) {
+    onChange({ ...selection, ...nextSelection });
+  }
+
+  function toggleAddon(addonId: string) {
+    const nextIds = new Set(selection.selectedIds);
+
+    if (nextIds.has(addonId)) {
+      nextIds.delete(addonId);
+    } else {
+      nextIds.add(addonId);
+    }
+
+    updateSelection({ selectedIds: Array.from(nextIds) });
+  }
+
+  function selectVisibleAddons() {
+    updateSelection({
+      selectedIds: Array.from(
+        new Set([...selection.selectedIds, ...visibleAddons.map((addon) => addon.id)]),
+      ),
+    });
+  }
+
+  function clearSelectedAddons() {
+    updateSelection({ selectedIds: [] });
+  }
+
   return (
-    <div className="rounded-lg border bg-background p-4">
-      <div className="flex items-center gap-2 font-semibold">
-        <Plus className="size-4 text-primary" />
-        {t.customFields}
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <LabelText label={t.fieldName}>
-          <Input
-            className="h-10"
-            onChange={(event) =>
-              onCustomDraftChange({ ...customFieldDraft, name: event.target.value })
-            }
-            placeholder={t.fieldNamePlaceholder}
-            value={customFieldDraft.name}
-          />
-        </LabelText>
-        <LabelText label={t.fieldValue}>
-          <Input
-            className="h-10"
-            onChange={(event) =>
-              onCustomDraftChange({ ...customFieldDraft, value: event.target.value })
-            }
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onAddCustomField();
-              }
-            }}
-            placeholder={t.fieldValuePlaceholder}
-            value={customFieldDraft.value}
-          />
-        </LabelText>
-        <Button className="mt-7 h-10" onClick={onAddCustomField} type="button">
-          <Plus className="size-4" />
-          {t.add}
-        </Button>
-      </div>
-
-      {customFields.length ? (
-        <div className="mt-4 grid gap-3">
-          {customFields.map((field) => (
-            <div key={field.id} className="rounded-lg border bg-card p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="font-semibold">{field.name}</div>
-                <button
-                  aria-label={t.close}
-                  className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-destructive"
-                  onClick={() => onRemoveCustomField(field.id)}
-                  type="button"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {field.values.map((value) => {
-                  const selected = field.selected.includes(value);
-
-                  return (
-                    <button
-                      key={value}
-                      aria-pressed={selected}
-                      className={cn(
-                        "inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition",
-                        selected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "bg-background text-muted-foreground hover:bg-accent",
-                      )}
-                      onClick={() => onToggleCustomValue(field.id, value)}
-                      type="button"
-                    >
-                      {selected ? <Check className="size-4" /> : null}
-                      {value}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                  className="h-9"
-                  onChange={(event) =>
-                    onCustomValueDraftChange(field.id, event.target.value)
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      onAddCustomFieldValue(field.id);
-                    }
-                  }}
-                  placeholder={t.newValuePlaceholder}
-                  value={customValueDrafts[field.id] ?? ""}
-                />
-                <Button
-                  className="h-9"
-                  onClick={() => onAddCustomFieldValue(field.id)}
-                  type="button"
-                  variant="outline"
-                >
-                  <Plus className="size-4" />
-                  {t.add}
-                </Button>
-              </div>
-            </div>
-          ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/45 px-4 py-6 backdrop-blur-sm">
+      <div
+        aria-labelledby="product-addons-title"
+        aria-modal="true"
+        className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-lg border bg-background text-foreground shadow-2xl"
+        role="dialog"
+      >
+        <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+          <div>
+            <h2 id="product-addons-title" className="text-lg font-semibold">
+              {t.addons}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t.visibleAddons}
+            </p>
+          </div>
+          <button
+            aria-label={t.close}
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-accent-foreground"
+            onClick={onClose}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
         </div>
-      ) : null}
+
+        <div className="max-h-[66vh] overflow-y-auto p-5">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <LabelText label={t.addonCategory}>
+              <AppSelect
+                ariaLabel={t.addonCategory}
+                className="h-10 bg-input text-foreground"
+                contentClassName="z-[70]"
+                onValueChange={(category) => updateSelection({ category })}
+                options={[
+                  { value: "all", label: t.allAddonCategories },
+                  ...addonCategoryOptions.map((category) => ({
+                    value: category,
+                    label: category,
+                  })),
+                ]}
+                value={selection.category}
+              />
+            </LabelText>
+
+            <div className="flex h-10 items-center justify-between gap-3 rounded-md border bg-card px-3">
+              <span className="text-sm font-semibold">{t.addonsEnabled}</span>
+              <Switch
+                checked={selection.enabled}
+                onCheckedChange={(enabled) => updateSelection({ enabled })}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-muted-foreground">
+              {selectedCount ? `${selectedCount} ${t.selectedAddons}` : t.noAddonsSelected}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                disabled={!selection.enabled || visibleAddons.length === 0}
+                onClick={selectVisibleAddons}
+                type="button"
+                variant="outline"
+              >
+                <Check className="size-4" />
+                {t.selectAll}
+              </Button>
+              <Button
+                disabled={!selection.enabled || selectedCount === 0}
+                onClick={clearSelectedAddons}
+                type="button"
+                variant="outline"
+              >
+                <X className="size-4" />
+                {t.clearAll}
+              </Button>
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              "mt-4 grid gap-3",
+              !selection.enabled && "pointer-events-none opacity-55",
+            )}
+          >
+            {visibleAddons.map((addon) => {
+              const selected = selectedIds.has(addon.id);
+
+              return (
+                <button
+                  key={addon.id}
+                  aria-pressed={selected}
+                  className={cn(
+                    "flex min-h-[76px] items-center gap-3 rounded-md border bg-card p-3 text-start transition hover:border-primary/50 hover:bg-accent/45",
+                    selected && "border-primary bg-primary/10 ring-2 ring-primary/10",
+                  )}
+                  onClick={() => toggleAddon(addon.id)}
+                  type="button"
+                >
+                  <span
+                    className={cn(
+                      "flex size-6 shrink-0 items-center justify-center rounded-md border",
+                      selected
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background",
+                    )}
+                  >
+                    {selected ? <Check className="size-4" /> : null}
+                  </span>
+                  <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Dashboard add-on rows use remote demo image URLs. */}
+                    <img
+                      alt=""
+                      className="size-full object-contain"
+                      src={addon.image}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">
+                      {addonDisplayName(addon, language)}
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <span className="rounded-md bg-muted px-2 py-1">
+                        {addon.category}
+                      </span>
+                      <span dir="ltr">{addon.price}</span>
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t px-5 py-4">
+          <div className="truncate text-sm text-muted-foreground">
+            {selection.enabled ? t.visibleAddons : t.addonsDisabled}
+          </div>
+          <Button onClick={onClose} type="button">
+            <Check className="size-4" />
+            {t.apply}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1495,7 +2018,6 @@ function LivePreview({
   selectedImageIndex,
   selectedRegion,
   selectedVariants,
-  selectedSubcategory,
   t,
   title,
 }: {
@@ -1511,13 +2033,12 @@ function LivePreview({
   selectedImageIndex: number;
   selectedRegion: string;
   selectedVariants: Record<string, string[]>;
-  selectedSubcategory: string;
   t: typeof copy[Language];
   title: string;
 }) {
   const Icon = activeCategory.icon;
   const priceText = `EGP ${form.price || t.empty}`;
-  const stockText = form.stock || "0";
+  const discountText = form.stock ? `${form.stock}%` : "0%";
   const statusText = form.available ? "متوفر" : t.empty;
   const selectedImage = productImages[selectedImageIndex];
   const thumbnailSlots = productImages.length ? productImages : [null, null, null, null];
@@ -1643,15 +2164,12 @@ function LivePreview({
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-black text-emerald-400">{statusText}</span>
-                  <span className="font-bold text-white/55">المخزون</span>
+                  <span className="font-bold text-white/55">الحالة</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-black text-emerald-400">{stockText}</span>
-                  <span className="font-bold text-white/55">الكمية المتاحة</span>
+                  <span className="font-black text-primary">{discountText}</span>
+                  <span className="font-bold text-white/55">خصم +</span>
                 </div>
-                <p className="text-end text-xs font-semibold leading-5 text-white/45">
-                  متوفر حاليًا بعدد {stockText} قطعة.
-                </p>
               </div>
             </div>
 
@@ -1680,7 +2198,6 @@ function LivePreview({
         <div className="grid gap-2 text-sm">
           <SummaryRow label={t.category} value={activeCategory.label[language]} />
           <SummaryRow label={t.region} value={selectedRegion} />
-          <SummaryRow label={t.subcategory} value={selectedSubcategory} />
           {selectedData.map((item) => (
             <SummaryRow key={`${item.label}-${item.value}`} {...item} />
           ))}
@@ -1780,38 +2297,41 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function ConfirmationDialog({
   activeCategory,
-  customFields,
+  createdCode,
   form,
   imageNames,
   language,
   onClose,
+  selectedSecondaryCategoryName,
+  selectedAddonSummary,
   selectedRegion,
-  selectedSubcategory,
   t,
   variantSummary,
 }: {
   activeCategory: ProductCategory;
-  customFields: Array<{ label: string; value: string }>;
+  createdCode: string;
   form: ProductForm;
   imageNames: string[];
   language: Language;
   onClose: () => void;
+  selectedSecondaryCategoryName: string;
+  selectedAddonSummary: string;
   selectedRegion: string;
-  selectedSubcategory: string;
   t: typeof copy[Language];
   variantSummary: Array<{ label: string; value: string }>;
 }) {
   const rows = [
+    ...(createdCode ? [{ label: t.productCode, value: createdCode }] : []),
     { label: t.productName, value: form.name.trim() || t.empty },
     { label: t.description, value: form.description.trim() || t.empty },
     { label: t.image, value: imageNames.join(", ") || t.empty },
     { label: t.region, value: selectedRegion },
     { label: t.category, value: activeCategory.label[language] },
-    { label: t.subcategory, value: selectedSubcategory },
+    { label: t.subcategory, value: selectedSecondaryCategoryName },
+    { label: t.addons, value: selectedAddonSummary },
     { label: t.price, value: form.price || t.empty },
-    { label: t.stock, value: form.stock || t.empty },
+    { label: t.stock, value: form.stock ? `${form.stock}%` : t.empty },
     ...variantSummary,
-    ...customFields,
   ];
 
   return (
@@ -1827,7 +2347,11 @@ function ConfirmationDialog({
             <h2 id="confirm-product-title" className="text-lg font-semibold">
               {t.confirmation}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t.modalNote}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {createdCode
+                ? "Product saved. The code was generated automatically."
+                : t.modalNote}
+            </p>
           </div>
           <button
             aria-label={t.close}

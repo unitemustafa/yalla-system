@@ -14,6 +14,19 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/dashboard/
   const { itemId } = await ctx.params;
   const body = await request.json().catch(() => ({}));
   const item = await updateItem(itemId, {
+    image: typeof body.image === "string" ? body.image : undefined,
+    name: typeof body.name === "string" ? body.name : undefined,
+    description:
+      typeof body.description === "string" ? body.description : undefined,
+    category: typeof body.category === "string" ? body.category : undefined,
+    subcategory:
+      typeof body.subcategory === "string" ? body.subcategory : undefined,
+    calories: typeof body.calories === "string" ? body.calories : undefined,
+    price: typeof body.price === "string" ? body.price : undefined,
+    featured:
+      typeof body.featured === "boolean" || typeof body.featured === "string"
+        ? body.featured
+        : undefined,
     active: typeof body.active === "boolean" ? body.active : undefined,
   });
 

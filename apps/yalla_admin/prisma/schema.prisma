@@ -9,6 +9,7 @@ datasource db {
 
 model DashboardItem {
   id          String   @id
+  code        String   @unique
   position    Int
   image       String
   name        String
@@ -42,82 +43,4 @@ model DashboardOrder {
   updatedAt DateTime @updatedAt
 
   @@map("dashboard_orders")
-}
-
-model Theme {
-  id                    String               @id @default(cuid())
-  name                  String
-  slug                  String               @unique
-  description           String
-  occasion              String
-  status                String               @default("inactive")
-  primaryColor          String
-  secondaryColor        String
-  backgroundColor       String
-  textColor             String
-  buttonColor           String
-  headerNavigationColor String
-  darkPrimaryColor      String?
-  darkSecondaryColor    String?
-  darkBackgroundColor   String?
-  darkTextColor         String?
-  darkButtonColor       String?
-  darkHeaderNavColor    String?
-  welcomeMessage        String?
-  autoActivate          Boolean              @default(false)
-  revertToDefault       Boolean              @default(true)
-  startAt               DateTime?
-  endAt                 DateTime?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
-  assets                ThemeAsset[]
-  targets               ThemeTarget[]
-  activeSettings        ActiveThemeSetting[]
-
-  @@index([status])
-  @@index([autoActivate, startAt, endAt])
-  @@map("themes")
-}
-
-model ThemeAsset {
-  id        String   @id @default(cuid())
-  themeId   String
-  type      String
-  url       String
-  alt       String?
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  theme     Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
-
-  @@index([themeId])
-  @@index([type])
-  @@map("theme_assets")
-}
-
-model ThemeTarget {
-  id        String   @id @default(cuid())
-  themeId   String
-  target    String
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  theme     Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
-
-  @@unique([themeId, target])
-  @@index([target])
-  @@map("theme_targets")
-}
-
-model ActiveThemeSetting {
-  id                String   @id @default(cuid())
-  target            String   @unique
-  themeId           String?
-  source            String   @default("manual")
-  fallbackThemeSlug String   @default("default")
-  activatedAt       DateTime @default(now())
-  expiresAt         DateTime?
-  updatedAt         DateTime @updatedAt
-  theme             Theme?   @relation(fields: [themeId], references: [id], onDelete: SetNull)
-
-  @@index([themeId])
-  @@map("active_theme_settings")
 }

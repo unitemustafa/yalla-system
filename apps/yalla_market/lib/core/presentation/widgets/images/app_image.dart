@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../icons/app_icons.dart';
-import '../../../preferences/app_preferences_controller.dart';
 
 class AppImage extends StatelessWidget {
   const AppImage({
@@ -42,35 +41,30 @@ class AppImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppPreferences>(
-      valueListenable: AppPreferencesController.instance,
-      builder: (context, preferences, _) {
-        final image = _buildImage(context, hdImages: preferences.hdImages);
-        final clipped = borderRadius == null
-            ? image
-            : ClipRRect(
-                borderRadius: borderRadius!,
-                clipBehavior: Clip.hardEdge,
-                child: image,
-              );
+    final image = _buildImage(context);
+    final clipped = borderRadius == null
+        ? image
+        : ClipRRect(
+            borderRadius: borderRadius!,
+            clipBehavior: Clip.hardEdge,
+            child: image,
+          );
 
-        if (backgroundColor == null) return clipped;
+    if (backgroundColor == null) return clipped;
 
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: borderRadius,
-          ),
-          child: clipped,
-        );
-      },
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: borderRadius,
+      ),
+      child: clipped,
     );
   }
 
-  Widget _buildImage(BuildContext context, {required bool hdImages}) {
+  Widget _buildImage(BuildContext context) {
     final pickedBytes = bytes;
-    final effectiveCacheWidth = _effectiveCacheWidth(context, hdImages);
-    final effectiveCacheHeight = _effectiveCacheHeight(context, hdImages);
+    final effectiveCacheWidth = _effectiveCacheWidth(context);
+    final effectiveCacheHeight = _effectiveCacheHeight(context);
 
     if (pickedBytes != null && pickedBytes.isNotEmpty) {
       return Image.memory(
@@ -167,17 +161,15 @@ class AppImage extends StatelessWidget {
     return uri.scheme == 'http' || uri.scheme == 'https';
   }
 
-  int? _effectiveCacheWidth(BuildContext context, bool hdImages) {
+  int? _effectiveCacheWidth(BuildContext context) {
     if (cacheWidth != null) return cacheWidth;
-    if (hdImages) return null;
     final imageWidth = width;
     if (imageWidth == null || imageWidth <= 0) return null;
     return (imageWidth * MediaQuery.devicePixelRatioOf(context)).round();
   }
 
-  int? _effectiveCacheHeight(BuildContext context, bool hdImages) {
+  int? _effectiveCacheHeight(BuildContext context) {
     if (cacheHeight != null) return cacheHeight;
-    if (hdImages) return null;
     final imageHeight = height;
     if (imageHeight == null || imageHeight <= 0) return null;
     return (imageHeight * MediaQuery.devicePixelRatioOf(context)).round();

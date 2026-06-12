@@ -7,7 +7,7 @@ import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../domain/entities/city_data.dart';
 import '../cubit/location_state.dart';
 
-class CitySelectionPanel extends StatelessWidget {
+class CitySelectionPanel extends StatefulWidget {
   const CitySelectionPanel({
     super.key,
     required this.state,
@@ -22,29 +22,63 @@ class CitySelectionPanel extends StatelessWidget {
   final bool compact;
 
   @override
+  State<CitySelectionPanel> createState() => _CitySelectionPanelState();
+}
+
+class _CitySelectionPanelState extends State<CitySelectionPanel> {
+  late final TextEditingController _customCityController;
+  bool _isOtherExpanded = false;
+  String? _customCityError;
+
+  @override
+  void initState() {
+    super.initState();
+    final selectedCity = widget.state.selectedCity;
+    final selectedCustomCity =
+        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
+
+    _isOtherExpanded = selectedCustomCity;
+    _customCityController = TextEditingController(
+      text: selectedCustomCity ? selectedCity.name : '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant CitySelectionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final selectedCity = widget.state.selectedCity;
+    final selectedCustomCity =
+        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
+
+    if (selectedCustomCity && oldWidget.state.selectedCity != selectedCity) {
+      _isOtherExpanded = true;
+      _customCityController.text = selectedCity.name;
+    }
+  }
+
+  @override
+  void dispose() {
+    _customCityController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDetecting = state is LocationDetecting;
-    final isSaving = state is LocationSaving;
-    final isBusy = isDetecting || isSaving || state is LocationLoading;
-    final error = state is LocationFailure
-        ? (state as LocationFailure).message
+    final isDetecting = widget.state is LocationDetecting;
+    final isSaving = widget.state is LocationSaving;
+    final isBusy = isDetecting || isSaving || widget.state is LocationLoading;
+    final error = widget.state is LocationFailure
+        ? (widget.state as LocationFailure).message
         : null;
+    final selectedCity = widget.state.selectedCity;
+    final selectedCustomCity =
+        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
 
     return Column(
-      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+      mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _LocationIntro(compact: compact),
-        const SizedBox(height: 18),
-        AppActionButton(
-          label: isDetecting
-              ? 'Detecting your location...'
-              : 'Use my current location',
-          icon: AppIcons.routing,
-          isLoading: isDetecting,
-          onPressed: isBusy ? null : onUseCurrentLocation,
-          variant: AppActionButtonVariant.outlined,
-        ),
+        _LocationIntro(compact: widget.compact),
         if (error != null) ...[
           const SizedBox(height: 12),
           _LocationError(message: error),
@@ -62,14 +96,64 @@ class CitySelectionPanel extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: _CityTile(
               city: city,
-              selected: state.selectedCity?.slug == city.slug,
+              selected: selectedCity?.slug == city.slug,
               disabled: isBusy,
-              onTap: () => onCitySelected(city),
+              onTap: () => _selectSupportedCity(city),
             ),
           ),
         ),
+        _CityTile(
+          city: const CityData(name: 'Other', slug: 'other'),
+          selected: selectedCustomCity || _isOtherExpanded,
+          disabled: isBusy,
+          onTap: _showOtherCity,
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _isOtherExpanded
+              ? Padding(
+                  key: const ValueKey('custom-city-section'),
+                  padding: const EdgeInsets.only(top: 10),
+                  child: _CustomCitySection(
+                    controller: _customCityController,
+                    errorText: _customCityError,
+                    enabled: !isBusy,
+                    isDetecting: isDetecting,
+                    isSaving: isSaving,
+                    onSave: _saveCustomCity,
+                    onUseCurrentLocation: widget.onUseCurrentLocation,
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('custom-city-empty')),
+        ),
       ],
     );
+  }
+
+  void _selectSupportedCity(CityData city) {
+    setState(() {
+      _isOtherExpanded = false;
+      _customCityError = null;
+    });
+    widget.onCitySelected(city);
+  }
+
+  void _showOtherCity() {
+    setState(() {
+      _isOtherExpanded = true;
+      _customCityError = null;
+    });
+  }
+
+  void _saveCustomCity() {
+    final city = CityData.fromCustomName(_customCityController.text);
+    if (city == null) {
+      setState(() => _customCityError = 'City name is required');
+      return;
+    }
+
+    setState(() => _customCityError = null);
+    widget.onCitySelected(city);
   }
 }
 
@@ -163,6 +247,85 @@ class _LocationError extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CustomCitySection extends StatelessWidget {
+  const _CustomCitySection({
+    required this.controller,
+    required this.errorText,
+    required this.enabled,
+    required this.isDetecting,
+    required this.isSaving,
+    required this.onSave,
+    required this.onUseCurrentLocation,
+  });
+
+  final TextEditingController controller;
+  final String? errorText;
+  final bool enabled;
+  final bool isDetecting;
+  final bool isSaving;
+  final VoidCallback onSave;
+  final VoidCallback onUseCurrentLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fillColor = isDark ? AppColors.darkCardColor : Colors.white;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.black.withValues(alpha: 0.08);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            if (enabled) onSave();
+          },
+          decoration: InputDecoration(
+            labelText: context.tr('Enter your city'),
+            errorText: errorText == null ? null : context.tr(errorText!),
+            filled: true,
+            fillColor: fillColor,
+            prefixIcon: const Icon(AppIcons.location_add, size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: borderColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        AppActionButton(
+          label: 'Save city',
+          icon: AppIcons.tick_circle,
+          isLoading: isSaving,
+          onPressed: enabled ? onSave : null,
+        ),
+        const SizedBox(height: 10),
+        AppActionButton(
+          label: isDetecting
+              ? 'Detecting your location...'
+              : 'Use my current location',
+          icon: AppIcons.routing,
+          isLoading: isDetecting,
+          onPressed: enabled ? onUseCurrentLocation : null,
+          variant: AppActionButtonVariant.outlined,
+        ),
+      ],
     );
   }
 }

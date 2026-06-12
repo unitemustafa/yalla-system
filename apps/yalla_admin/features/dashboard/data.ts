@@ -29,6 +29,7 @@ export const navGroups: NavGroup[] = [
         children: [
           { label: "كل المنتجات", href: "/items", page: "items" },
           { label: "إضافة منتج", href: "/items/create", page: "create-item" },
+          { label: "المحلات", href: "/items/shops", page: "shops" },
           { label: "الفئات", href: "/items/categories", page: "categories" },
           { label: "الإضافات", href: "/items/addons", page: "addons" },
         ],
@@ -38,6 +39,7 @@ export const navGroups: NavGroup[] = [
         icon: ShoppingCart,
         children: [
           { label: "كل الطلبات", href: "/orders", page: "orders" },
+          { label: "إنشاء طلب", href: "/orders/create", page: "create-order" },
         ],
       },
       {
@@ -75,25 +77,6 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
-export const pageTitles: Record<PageKey, string> = {
-  overview: "لوحة التحكم",
-  items: "المنتجات",
-  "create-item": "إضافة منتج",
-  categories: "الفئات",
-  addons: "الإضافات",
-  orders: "الطلبات",
-  "create-order": "إنشاء طلب",
-  "order-detail": "ORD-20260518-QYT6Y0",
-  offers: "العروض",
-  "create-offer": "إنشاء عرض",
-  "delivery-zone": "مناطق التوصيل",
-  couriers: "المندوبين",
-  customers: "المستخدمين",
-  account: "Account",
-  settings: "الإعدادات",
-  notifications: "Notifications",
-};
-
 const dashboardCrumb: BreadcrumbItem = { label: "لوحة التحكم", href: "/dashboard" };
 
 export const breadcrumbByPage: Record<PageKey, BreadcrumbItem[]> = {
@@ -103,6 +86,11 @@ export const breadcrumbByPage: Record<PageKey, BreadcrumbItem[]> = {
     dashboardCrumb,
     { label: "المنتجات", href: "/items" },
     { label: "إضافة منتج" },
+  ],
+  shops: [
+    dashboardCrumb,
+    { label: "المنتجات", href: "/items" },
+    { label: "المحلات" },
   ],
   categories: [
     dashboardCrumb,
@@ -155,6 +143,7 @@ export function pageFromPathname(pathname: string): PageKey {
   }
   if (pathname === "/items") return "items";
   if (pathname === "/items/create") return "create-item";
+  if (pathname === "/items/shops") return "shops";
   if (pathname === "/items/categories") return "categories";
   if (pathname === "/items/addons") return "addons";
   if (pathname.startsWith("/items/edit")) return "items";
@@ -175,6 +164,7 @@ export function pageFromPathname(pathname: string): PageKey {
 export type ItemRow = {
   index: string;
   id: string;
+  code?: string;
   image: string;
   name: string;
   description: string;
@@ -185,6 +175,99 @@ export type ItemRow = {
   featured: string;
   active: boolean;
 };
+
+export type AddonRow = {
+  index: string;
+  id: string;
+  image: string;
+  name: string;
+  nameAr: string;
+  price: string;
+  category: string;
+};
+
+export const addonRows: AddonRow[] = [
+  {
+    index: "1",
+    id: "addon-extra-cheese",
+    image:
+      "https://bucket.ammenu.com/yalla-market/items/1778576027822-i19a0pn483.webp",
+    name: "Extra Cheese",
+    nameAr: "جبنة زيادة",
+    price: "15 EGP",
+    category: "جبن",
+  },
+  {
+    index: "2",
+    id: "addon-mix-sauce",
+    image:
+      "https://bucket.ammenu.com/yalla-market/items/1778575947135-br72ie6ml76.webp",
+    name: "Sauce Mix",
+    nameAr: "مكس صوصات",
+    price: "8 EGP",
+    category: "صوصات",
+  },
+  {
+    index: "3",
+    id: "addon-cola-can",
+    image:
+      "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090694513-5coutf286d4.webp",
+    name: "Cola Can",
+    nameAr: "كانز كولا",
+    price: "25 EGP",
+    category: "مشروبات",
+  },
+  {
+    index: "4",
+    id: "addon-seafood-rice",
+    image:
+      "https://bucket.ammenu.com/yalla-market/items/1778543523226-l45rdot2sp.webp",
+    name: "Seafood Rice",
+    nameAr: "طبق أرز سي فود",
+    price: "30 EGP",
+    category: "أطباق جانبية",
+  },
+  {
+    index: "5",
+    id: "addon-tahini-salad",
+    image:
+      "https://bucket.ammenu.com/yalla-market/items/1778543836496-todyjtnpxyd.webp",
+    name: "Tahini & Salad",
+    nameAr: "طحينة وسلطة",
+    price: "12 EGP",
+    category: "سلطات وصوصات",
+  },
+  {
+    index: "6",
+    id: "addon-extra-bread",
+    image:
+      "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090828091-y6lokne97v.webp",
+    name: "Extra Bread",
+    nameAr: "عيش زيادة",
+    price: "5 EGP",
+    category: "مخبوزات",
+  },
+  {
+    index: "7",
+    id: "addon-grilling",
+    image:
+      "https://bucket.ammenu.com/yalla-market/items/1778544524971-c0nqlzwbv1m.webp",
+    name: "Grilling",
+    nameAr: "شوي",
+    price: "20 EGP",
+    category: "طريقة التحضير",
+  },
+  {
+    index: "8",
+    id: "addon-family-packaging",
+    image:
+      "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775094922280-7qvy2avjibh.webp",
+    name: "Family Packaging",
+    nameAr: "تغليف عائلي",
+    price: "10 EGP",
+    category: "تغليف",
+  },
+];
 
 export const itemRows: ItemRow[] = [
   {
@@ -469,34 +552,12 @@ export const itemRows: ItemRow[] = [
   },
 ];
 
-export const categories: Array<[string, string, string, string, string, boolean]> = [
-  ["1", "مطاعم", "—", "لا", "192", true],
-  ["2", "خضار", "", "نعم", "16", true],
-  ["3", "فواكه", "—", "لا", "17", true],
-  ["4", "اسماك", "—", "لا", "93", true],
-  ["5", "سوبر ماركت", "—", "لا", "230", true],
-  ["6", "حلويات", "—", "لا", "41", false],
-  ["7", "عطارة", "—", "لا", "87", true],
-  ["8", "دواجن", "—", "لا", "62", true],
-  ["9", "مطعم السعاده", "—", "لا", "28", true],
-  ["10", "دعايا واعلان", "—", "لا", "14", true],
-  ["11", "لحوم فريش", "—", "لا", "53", true],
-  ["12", "منتجات البان", "—", "لا", "36", true],
-  ["13", "مخبوزات", "—", "لا", "45", true],
-  ["14", "كافيه", "—", "لا", "29", true],
-  ["15", "مسليات", "—", "لا", "58", true],
-  ["16", "صيدليه", "—", "لا", "18", false],
-  ["17", "النظافه والعنايه الشخصيه", "—", "لا", "74", true],
-  ["18", "ادوات مكتبيه", "—", "لا", "22", true],
-  ["19", "ملابس", "—", "لا", "61", true],
-  ["20", "احذيه", "—", "لا", "31", true],
-];
-
 export type CategoryRow = {
   index: string;
   image: string;
   name: string;
   nameAr: string;
+  sections: string[];
   active: boolean;
   featured: "نعم" | "لا";
   total: string;
@@ -509,6 +570,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775094922280-7qvy2avjibh.webp",
     name: "مطاعم",
     nameAr: "—",
+    sections: ["الأكل"],
     active: true,
     featured: "لا",
     total: "192",
@@ -519,6 +581,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1776772285429-yad13vx614f.webp",
     name: "خضار",
     nameAr: "",
+    sections: ["الأكل", "الطازج"],
     active: true,
     featured: "نعم",
     total: "16",
@@ -529,6 +592,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1776777321164-qaj9r6n4xei.webp",
     name: "فواكه",
     nameAr: "—",
+    sections: ["الأكل", "الطازج"],
     active: true,
     featured: "لا",
     total: "17",
@@ -539,6 +603,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775094278644-qcaasa5xn2o.webp",
     name: "لحوم فريش",
     nameAr: "—",
+    sections: ["الطازج"],
     active: true,
     featured: "لا",
     total: "3",
@@ -549,6 +614,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090694513-5coutf286d4.webp",
     name: "سوبر ماركت",
     nameAr: "—",
+    sections: ["الأكل"],
     active: true,
     featured: "لا",
     total: "182",
@@ -559,6 +625,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1776960858133-9yui4jx620c.webp",
     name: "طيور",
     nameAr: "",
+    sections: ["الطازج"],
     active: true,
     featured: "لا",
     total: "20",
@@ -569,6 +636,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1778580221710-ct7ky32ujwg.webp",
     name: "اسماك",
     nameAr: "—",
+    sections: ["الطازج"],
     active: true,
     featured: "لا",
     total: "0",
@@ -579,6 +647,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775094141955-m2oj8uvk2hp.webp",
     name: "منتجات البان",
     nameAr: "—",
+    sections: ["الأكل", "الطازج"],
     active: true,
     featured: "لا",
     total: "15",
@@ -589,6 +658,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090828091-y6lokne97v.webp",
     name: "مخبوزات",
     nameAr: "",
+    sections: ["الأكل"],
     active: true,
     featured: "نعم",
     total: "25",
@@ -599,6 +669,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775089514892-h8fxr5qphut.webp",
     name: "كافيه",
     nameAr: "",
+    sections: ["الأكل"],
     active: true,
     featured: "نعم",
     total: "85",
@@ -609,6 +680,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775096463284-um77ytblyrp.webp",
     name: "مسليات",
     nameAr: "",
+    sections: ["الأكل"],
     active: true,
     featured: "نعم",
     total: "12",
@@ -619,6 +691,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775095204171-2ghwtrpze2y.webp",
     name: "حلويات",
     nameAr: "—",
+    sections: ["الأكل"],
     active: true,
     featured: "لا",
     total: "71",
@@ -629,6 +702,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1777053824199-hc9zr2r06c5.webp",
     name: "الديكورات",
     nameAr: "",
+    sections: ["البيت"],
     active: true,
     featured: "لا",
     total: "18",
@@ -639,6 +713,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090504690-p2cz2a1ugz9.webp",
     name: "صيدليه",
     nameAr: "",
+    sections: ["التسوق"],
     active: true,
     featured: "نعم",
     total: "32",
@@ -649,6 +724,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775096533350-k0ksl11flm.webp",
     name: "النظافه والعنايه الشخصيه",
     nameAr: "",
+    sections: ["التسوق"],
     active: true,
     featured: "نعم",
     total: "223",
@@ -659,6 +735,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775094334940-w8f7zcf44m.webp",
     name: "ادوات مكتبيه",
     nameAr: "—",
+    sections: ["التسوق", "الخدمات"],
     active: true,
     featured: "لا",
     total: "4",
@@ -669,6 +746,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775056644283-y5x1zh1chq8.webp",
     name: "دعايا واعلان",
     nameAr: "—",
+    sections: ["الخدمات"],
     active: true,
     featured: "لا",
     total: "2",
@@ -679,6 +757,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775096390822-dwqrynjwein.webp",
     name: "ملابس",
     nameAr: "—",
+    sections: ["الموضة"],
     active: true,
     featured: "لا",
     total: "5",
@@ -689,6 +768,7 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090950985-a6tqfd1tzzj.webp",
     name: "ملابس رياضيه",
     nameAr: "—",
+    sections: ["الموضة"],
     active: true,
     featured: "لا",
     total: "27",
@@ -699,156 +779,12 @@ export const categoryRows: CategoryRow[] = [
       "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775056696552-1lbttlmwnoh.webp",
     name: "احذيه",
     nameAr: "",
+    sections: ["الموضة"],
     active: true,
     featured: "نعم",
     total: "46",
   },
 ];
-
-export const orders: Array<
-  [string, string, string, string, string, string, string, string, string]
-> = [
-  [
-    "1",
-    "ORD-20260518-QYT6Y0",
-    "حسن مسعد حسن",
-    "+201207721741",
-    "توصيل",
-    "مكتمل",
-    "80.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 7:10 م",
-  ],
-  [
-    "2",
-    "ORD-20260518-AOVT8F",
-    "محمد جلال",
-    "+201122401581",
-    "توصيل",
-    "مكتمل",
-    "230.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 6:04 م",
-  ],
-  [
-    "3",
-    "ORD-20260518-R1MJZZ",
-    "..ايمان ندا",
-    "+201115984254",
-    "توصيل",
-    "مكتمل",
-    "340.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 3:53 م",
-  ],
-  [
-    "4",
-    "ORD-20260518-EL02MB",
-    "امال السيد",
-    "+201228397463",
-    "توصيل",
-    "مكتمل",
-    "620.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 3:13 م",
-  ],
-  [
-    "5",
-    "ORD-20260518-TB3VXK",
-    "يحيي خشبه",
-    "+201127466586",
-    "توصيل",
-    "مكتمل",
-    "120.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 3:04 م",
-  ],
-  [
-    "6",
-    "ORD-20260518-VJC5YE",
-    "احمد مرسى",
-    "+201130309753",
-    "توصيل",
-    "مكتمل",
-    "975.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 2:21 م",
-  ],
-  [
-    "7",
-    "ORD-20260517-LWO9FE",
-    "ا احمد مرسى",
-    "+201130309753",
-    "توصيل",
-    "مؤكد",
-    "90.00 EGP",
-    "نقدي",
-    "الاثنين، 18 مايو 12:27 ص",
-  ],
-];
-
-export type OrderRow = {
-  index: string;
-  orderNumber: string;
-  customer: string;
-  phone: string;
-  type: string;
-  status: "مكتمل" | "قيد الانتظار" | "مؤكد";
-  total: string;
-  payment: string;
-  date: string;
-  time: string;
-};
-
-export const orderRows: OrderRow[] = [
-  {
-    index: "1",
-    orderNumber: "ORD-20260522-TBDO8R",
-    customer: "علياء الجوهري",
-    phone: "+201204819215",
-    type: "توصيل",
-    status: "مكتمل",
-    total: "114.00 EGP",
-    payment: "نقدي",
-    date: "الجمعة، 22 مايو",
-    time: "10:36 ص",
-  },
-  {
-    index: "2",
-    orderNumber: "ORD-20260522-YCFJWF",
-    customer: "ا احمد مرسى",
-    phone: "+201130309753",
-    type: "توصيل",
-    status: "مكتمل",
-    total: "400.00 EGP",
-    payment: "نقدي",
-    date: "الجمعة، 22 مايو",
-    time: "5:46 ص",
-  },
-  {
-    index: "3",
-    orderNumber: "ORD-20260522-YO7H77",
-    customer: "ا احمد مرسى",
-    phone: "+201130309753",
-    type: "توصيل",
-    status: "مكتمل",
-    total: "415.00 EGP",
-    payment: "نقدي",
-    date: "الجمعة، 22 مايو",
-    time: "5:38 ص",
-  },
-];
-
-export const customerRows = Array.from({ length: 589 }, (_, index) => {
-  return [
-    String(index + 1),
-    index === 1 ? "احمد علي" : `مستخدم ${String(3585 + index).slice(-4)}`,
-    `+2011${String(20143585 + index * 17321).slice(-8)}`,
-    "غير متاح",
-    "غير متاح",
-    `4/${7 + Math.floor(index / 2)}/2026`,
-  ];
-});
 
 export const topItems = [
   { name: "وش فخدة", revenue: 1700, sold: 4, orders: 4 },
@@ -857,3 +793,5 @@ export const topItems = [
   { name: "موز", revenue: 1280, sold: 34, orders: 23 },
   { name: "فراخ الامهات الحمرا", revenue: 1280, sold: 8, orders: 3 },
 ];
+
+

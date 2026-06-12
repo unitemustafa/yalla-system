@@ -1,6 +1,7 @@
 class ProductData {
   const ProductData({
     this.id,
+    this.code,
     this.slug,
     required this.image,
     required this.title,
@@ -15,6 +16,7 @@ class ProductData {
   });
 
   final String? id;
+  final String? code;
   final String? slug;
   final String image;
   final String title;
@@ -32,6 +34,10 @@ class ProductData {
 
     return ProductData(
       id: json['id']?.toString(),
+      code:
+          json['code']?.toString() ??
+          json['productCode']?.toString() ??
+          json['product_code']?.toString(),
       slug: json['slug']?.toString(),
       image: json['image']?.toString() ?? json['imageUrl']?.toString() ?? '',
       title: json['title']?.toString() ?? json['name']?.toString() ?? '',
@@ -49,6 +55,7 @@ class ProductData {
   Map<String, Object?> toJson() {
     return {
       'id': id,
+      'code': code,
       'slug': slug,
       'image': image,
       'title': title,
@@ -76,6 +83,7 @@ class ProductData {
     if (normalizedQuery.isEmpty) return true;
 
     return title.toLowerCase().contains(normalizedQuery) ||
+        (code?.toLowerCase().contains(normalizedQuery) ?? false) ||
         brand.toLowerCase().contains(normalizedQuery) ||
         tags.any((tag) => tag.toLowerCase().contains(normalizedQuery));
   }

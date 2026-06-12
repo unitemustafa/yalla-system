@@ -11,7 +11,7 @@ if (!demoPassword) {
 async function loginViaApi(page: Page) {
   const response = await page.request.post("/api/auth/login", {
     data: {
-      email: "admin@yalla.market",
+      email: "dashboard@admin.com",
       password: demoPassword,
     },
   });

@@ -5,7 +5,7 @@ export const authCookieMaxAge = 60 * 60 * 8;
 export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
 
 const demoAdmin = {
-  email: "admin@yalla.market",
+  email: "dashboard@admin.com",
   name: "Mohamed Abdeljalel",
   role: "manager",
 };

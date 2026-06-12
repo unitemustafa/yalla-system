@@ -23,8 +23,8 @@ http://localhost:3000
 بيانات الدخول التجريبية:
 
 ```text
-Email: admin@yalla.market
-Password: demo123
+Email: dashboard@admin.com
+Password: 01266666610
 ```
 
 Demo auth is only for this dashboard preview. There is no real backend user
@@ -32,7 +32,7 @@ database, hashed password storage, or roles system yet. Configure the demo
 password and session signing secret with environment variables:
 
 ```bash
-DASHBOARD_DEMO_PASSWORD=demo123
+DASHBOARD_DEMO_PASSWORD=01266666610
 SESSION_SECRET=replace-with-a-strong-random-secret
 ```
 

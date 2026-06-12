@@ -337,7 +337,7 @@ export function AccountPage() {
                 <div className="relative">
                   <Mail className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    className="ps-9"
+                    className="pe-9 text-right"
                     dir="ltr"
                     onChange={(event) => setEmail(event.target.value)}
                     type="email"

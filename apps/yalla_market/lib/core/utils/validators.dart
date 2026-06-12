@@ -83,4 +83,32 @@ class Validators {
     }
     return null;
   }
+
+  static String? egyptianMobile(String? value) {
+    final strings = AppTranslations.current;
+    if (value == null || value.trim().isEmpty) {
+      return strings.fieldRequired;
+    }
+    if (!isEgyptianMobileNumber(value)) {
+      return strings.invalidPhone;
+    }
+    return null;
+  }
+
+  static bool isEgyptianMobileNumber(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    var nationalNumber = digits;
+
+    if (nationalNumber.startsWith('0020')) {
+      nationalNumber = nationalNumber.substring(4);
+    } else if (nationalNumber.startsWith('20')) {
+      nationalNumber = nationalNumber.substring(2);
+    }
+
+    if (nationalNumber.length == 10 && nationalNumber.startsWith('1')) {
+      nationalNumber = '0$nationalNumber';
+    }
+
+    return RegExp(r'^01[0125]\d{8}$').hasMatch(nationalNumber);
+  }
 }

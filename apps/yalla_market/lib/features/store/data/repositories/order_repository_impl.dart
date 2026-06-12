@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
 import '../../domain/entities/order.dart';
@@ -5,6 +7,7 @@ import '../../domain/repositories/order_repository.dart';
 
 class OrderRepositoryImpl implements OrderRepository {
   final List<OrderData> _orders = [];
+  final Random _random = Random.secure();
 
   @override
   Future<ApiResult<OrderData>> createOrder({
@@ -36,7 +39,7 @@ class OrderRepositoryImpl implements OrderRepository {
       final total = subtotal + shippingFee + taxTotal - discountTotal;
       final order = OrderData(
         id: 'local-order-${now.microsecondsSinceEpoch}',
-        orderNumber: 'YM${now.millisecondsSinceEpoch.toString().substring(6)}',
+        orderNumber: _randomOrderNumber(now),
         status: OrderStatus.processing,
         placedAt: now,
         estimatedDeliveryAt: now.add(const Duration(days: 5)),
@@ -68,5 +71,21 @@ class OrderRepositoryImpl implements OrderRepository {
         UnknownFailure('Could not load your orders.'),
       );
     }
+  }
+
+  String _randomOrderNumber(DateTime now) {
+    final dateStamp =
+        '${now.year.toString().padLeft(4, '0')}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}';
+    return 'YM-$dateStamp-${_randomSegment()}';
+  }
+
+  String _randomSegment([int length = 6]) {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return List.generate(
+      length,
+      (_) => alphabet[_random.nextInt(alphabet.length)],
+    ).join();
   }
 }

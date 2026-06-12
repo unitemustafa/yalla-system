@@ -1,11 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import type { ComponentPropsWithoutRef, MouseEvent } from "react";
 import { useState } from "react";
+import { Select } from "radix-ui";
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  MoreHorizontal,
   Search,
 } from "lucide-react";
 
@@ -174,6 +179,98 @@ export function Input({
   );
 }
 
+type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+export function AppSelect({
+  value,
+  defaultValue,
+  onValueChange,
+  options,
+  placeholder = "اختر",
+  ariaLabel,
+  icon,
+  className,
+  contentClassName,
+  disabled,
+}: {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+  ariaLabel?: string;
+  icon?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <Select.Root
+      value={value}
+      defaultValue={defaultValue}
+      onValueChange={onValueChange}
+      disabled={disabled}
+    >
+      <Select.Trigger
+        aria-label={ariaLabel}
+        className={cn(
+          "group inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm outline-none transition hover:border-primary/40 hover:bg-accent/70 hover:text-accent-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 data-[state=open]:border-primary data-[state=open]:bg-accent data-[state=open]:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {icon ? (
+            <span className="shrink-0 text-muted-foreground transition-colors group-data-[state=open]:text-primary">
+              {icon}
+            </span>
+          ) : null}
+          <Select.Value className="truncate text-start" placeholder={placeholder} />
+        </span>
+        <Select.Icon asChild>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          align="start"
+          position="popper"
+          sideOffset={8}
+          className={cn(
+            "z-50 max-h-[300px] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border/80 bg-popover p-1 text-popover-foreground shadow-2xl shadow-black/20 outline-none",
+            contentClassName,
+          )}
+        >
+          <Select.ScrollUpButton className="flex h-7 items-center justify-center text-muted-foreground">
+            <ChevronUp className="size-4" />
+          </Select.ScrollUpButton>
+          <Select.Viewport>
+            {options.map((option) => (
+              <Select.Item
+                key={option.value}
+                value={option.value}
+                disabled={option.disabled}
+                className="relative flex h-10 cursor-default select-none items-center rounded-md py-2 pe-9 ps-3 text-sm font-medium outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary"
+              >
+                <Select.ItemText>{option.label}</Select.ItemText>
+                <Select.ItemIndicator className="absolute end-3 inline-flex size-4 items-center justify-center">
+                  <Check className="size-4" />
+                </Select.ItemIndicator>
+              </Select.Item>
+            ))}
+          </Select.Viewport>
+          <Select.ScrollDownButton className="flex h-7 items-center justify-center text-muted-foreground">
+            <ChevronDown className="size-4" />
+          </Select.ScrollDownButton>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  );
+}
+
 export function SelectBox({
   children,
   className,
@@ -195,6 +292,123 @@ export function SelectBox({
       <span className="truncate">{children}</span>
       <ChevronDown className="size-4 opacity-50" />
     </button>
+  );
+}
+
+type ActionMenuItem = {
+  label: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  href?: string;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  tone?: "default" | "danger";
+};
+
+export function ActionMenu({
+  open,
+  onToggle,
+  label,
+  title,
+  items,
+  align = "end",
+  triggerClassName,
+  menuClassName,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  title?: React.ReactNode;
+  items: ActionMenuItem[];
+  align?: "start" | "end" | "center";
+  triggerClassName?: string;
+  menuClassName?: string;
+}) {
+  return (
+    <div className="relative flex justify-end" onClick={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          "inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background/90 px-2 text-muted-foreground shadow-sm shadow-black/5 backdrop-blur transition-all hover:border-primary/25 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:bg-card/90",
+          open && "border-primary/40 bg-primary/10 text-primary shadow-primary/10",
+          triggerClassName,
+        )}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        <MoreHorizontal className="size-4" />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className={cn(
+            "absolute top-11 z-30 w-48 overflow-hidden rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-2xl shadow-black/20 backdrop-blur-md animate-in fade-in-0 zoom-in-95 dark:shadow-black/40",
+            align === "end" && "end-0",
+            align === "start" && "start-0",
+            align === "center" && "left-1/2 -translate-x-1/2",
+            menuClassName,
+          )}
+        >
+          {title ? (
+            <div className="mb-1 rounded-lg bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground">
+              {title}
+            </div>
+          ) : null}
+          {items.map((item, index) => {
+            const Icon = item.icon;
+            const itemClassName = cn(
+              "group flex h-10 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-sm font-semibold transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:outline-none",
+              item.tone === "danger" &&
+                "text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10",
+            );
+            const content = (
+              <>
+                <span className="truncate">{item.label}</span>
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:bg-background/80 group-hover:text-foreground",
+                    item.tone === "danger" &&
+                      "bg-destructive/10 text-destructive group-hover:bg-destructive/20 group-hover:text-destructive",
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                </span>
+              </>
+            );
+
+            return (
+              <div key={index}>
+                {item.href ? (
+                  <Link
+                    href={item.href}
+                    role="menuitem"
+                    className={itemClassName}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      item.onClick?.(event);
+                    }}
+                    className={itemClassName}
+                  >
+                    {content}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -393,17 +607,16 @@ export function FilterBar({
                   />
               </div>
               ) : field.options?.length ? (
-                <select
+                <AppSelect
                   defaultValue={field.value ?? field.options[0]}
                   disabled={field.disabled}
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-muted-foreground shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {field.options.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  options={field.options.map((option) => ({
+                    value: option,
+                    label: option,
+                  }))}
+                  className="h-10"
+                  ariaLabel={field.label}
+                />
               ) : (
                 <SelectBox className="h-10" disabled={field.disabled}>
                   {field.value ?? "الكل"}
@@ -423,6 +636,7 @@ export function DataTable({
   minWidth = 980,
   onRowClick,
   columnWidths,
+  getRowProps,
 }: {
   headers: React.ReactNode[];
   rows: React.ReactNode[][];
@@ -430,6 +644,9 @@ export function DataTable({
   minWidth?: number;
   onRowClick?: () => void;
   columnWidths?: number[];
+  getRowProps?: (
+    rowIndex: number,
+  ) => ComponentPropsWithoutRef<"tr"> | undefined;
 }) {
   const rowClass =
     rowHeight === "compact"
@@ -464,29 +681,35 @@ export function DataTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr
-              key={rowIndex}
-              onClick={onRowClick}
-              className={cn(
-                rowClass,
-                "border-b transition-colors hover:bg-muted/40",
-                onRowClick && "cursor-pointer",
-              )}
-            >
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={cellIndex}
-                  className={cn(
-                    "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-                    cellIndex === 0 && "p-0",
-                  )}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row, rowIndex) => {
+            const rowProps = getRowProps?.(rowIndex);
+
+            return (
+              <tr
+                key={rowIndex}
+                {...rowProps}
+                onClick={rowProps?.onClick ?? onRowClick}
+                className={cn(
+                  rowClass,
+                  "border-b transition-colors hover:bg-muted/40",
+                  onRowClick && "cursor-pointer",
+                  rowProps?.className,
+                )}
+              >
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={cellIndex}
+                    className={cn(
+                      "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+                      cellIndex === 0 && "p-0",
+                    )}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -496,13 +719,19 @@ export function DataTable({
 export function Pagination({
   text,
   pages,
+  previousDisabled = true,
   nextDisabled = false,
+  onPrevious,
+  onNext,
 }: {
   text: string;
   pages: string;
   perPage?: string;
   showPerPage?: boolean;
+  previousDisabled?: boolean;
   nextDisabled?: boolean;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }) {
   return (
     <div className="flex min-h-[53px] flex-col gap-3 px-0 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:py-0">
@@ -510,7 +739,13 @@ export function Pagination({
         <span>{text}</span>
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button variant="outline" size="icon" className="size-7" disabled>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-7"
+          disabled={previousDisabled}
+          onClick={onPrevious}
+        >
           <ChevronRight className="size-4" />
         </Button>
         <span>{pages}</span>
@@ -519,6 +754,7 @@ export function Pagination({
           size="icon"
           className="size-7"
           disabled={nextDisabled}
+          onClick={onNext}
         >
           <ChevronLeft className="size-4" />
         </Button>

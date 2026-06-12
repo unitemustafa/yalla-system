@@ -4,6 +4,7 @@ export type PageKey =
   | "overview"
   | "items"
   | "create-item"
+  | "shops"
   | "categories"
   | "addons"
   | "orders"

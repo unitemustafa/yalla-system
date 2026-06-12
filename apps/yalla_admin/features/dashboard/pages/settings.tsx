@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRef, useState } from "react";
 import {
   Check,
-  ChevronLeft,
   ImagePlus,
   Paintbrush,
   Palette,
@@ -128,24 +126,6 @@ export function SettingsPage() {
           </Button>
         }
       />
-
-      <Link
-        href="/settings/themes"
-        className="mt-6 flex items-center justify-between gap-4 rounded-lg border bg-card p-5 text-card-foreground shadow-sm transition-colors hover:bg-accent"
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Palette className="size-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-base font-bold">المظهر والثيمات</span>
-            <span className="mt-1 block text-sm text-muted-foreground">
-              إدارة الثيمات الموسمية وتطبيقها على التوصيل، الماركت، ولوحة التحكم.
-            </span>
-          </span>
-        </span>
-        <ChevronLeft className="size-5 shrink-0 text-muted-foreground" />
-      </Link>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[360px_1fr]">
         <Card className="overflow-hidden">

@@ -9,7 +9,6 @@ import {
   useDashboardI18n,
 } from "./i18n";
 import { useDashboardCustomization } from "./customization";
-import { useDashboardSeasonalTheme } from "./themes/use-dashboard-seasonal-theme";
 import { SnackbarProvider } from "./snackbar";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +33,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   } = useDashboardFrame();
   const { breadcrumbsForPage, direction, t } = useDashboardI18n();
   useDashboardCustomization();
-  useDashboardSeasonalTheme();
   const breadcrumbs = breadcrumbsForPage(activePage);
 
   return (

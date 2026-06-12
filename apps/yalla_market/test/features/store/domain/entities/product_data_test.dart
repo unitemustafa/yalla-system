@@ -8,6 +8,7 @@ void main() {
 
       final product = ProductData.fromJson({
         'id': 'product_1',
+        'code': 'PRD-A1B2C3',
         'imageUrl': imageUrl,
         'title': 'Running Shoe',
         'brand': 'Yalla',
@@ -15,6 +16,8 @@ void main() {
       });
 
       expect(product.image, imageUrl);
+      expect(product.code, 'PRD-A1B2C3');
+      expect(product.toJson()['code'], 'PRD-A1B2C3');
     });
 
     test('parses city metadata from API payloads', () {

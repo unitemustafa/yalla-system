@@ -73,7 +73,13 @@ export function UserDetailPage({
         </div>
 
         <div className="grid gap-0 md:grid-cols-3">
-          <DetailBlock icon={<Mail className="size-4" />} label="البريد الإلكتروني" value={user.email} dir="ltr" />
+          <DetailBlock
+            icon={<Mail className="size-4" />}
+            label="البريد الإلكتروني"
+            value={user.email}
+            extraValue={`@${user.username}`}
+            dir="ltr"
+          />
           <DetailBlock icon={<Phone className="size-4" />} label="رقم الهاتف" value={user.phone} dir="ltr" />
           <DetailBlock icon={<MapPin className="size-4" />} label="الموقع" value={user.location} />
         </div>
@@ -111,11 +117,13 @@ function DetailBlock({
   icon,
   label,
   value,
+  extraValue,
   dir,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  extraValue?: string;
   dir?: "ltr" | "rtl";
 }) {
   return (
@@ -125,8 +133,13 @@ function DetailBlock({
       </div>
       <div className="min-w-0">
         <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 truncate text-sm font-medium" dir={dir}>
-          {value}
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2" dir={dir}>
+          <span className="truncate text-sm font-medium">{value}</span>
+          {extraValue ? (
+            <span className="shrink-0 rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+              {extraValue}
+            </span>
+          ) : null}
         </div>
       </div>
     </div>

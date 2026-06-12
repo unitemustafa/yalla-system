@@ -15,7 +15,15 @@ class LocationRepositoryImpl implements LocationRepository {
   Future<ApiResult<CityData?>> getSelectedCity() async {
     try {
       final slug = await _preferences.getSelectedCitySlug();
-      return ApiResult.success(CityData.fromSlug(slug));
+      final supportedCity = CityData.fromSlug(slug);
+      if (supportedCity != null) return ApiResult.success(supportedCity);
+
+      final customName = await _preferences.getSelectedCityName();
+      if (slug == null || customName == null || customName.trim().isEmpty) {
+        return const ApiResult.success(null);
+      }
+
+      return ApiResult.success(CityData(name: customName.trim(), slug: slug));
     } catch (_) {
       return const ApiResult.failure(
         UnknownFailure('Could not load your selected city.'),
@@ -26,7 +34,7 @@ class LocationRepositoryImpl implements LocationRepository {
   @override
   Future<ApiResult<CityData>> saveSelectedCity(CityData city) async {
     try {
-      await _preferences.setSelectedCitySlug(city.slug);
+      await _preferences.setSelectedCity(city.slug, city.name);
       return ApiResult.success(city);
     } catch (_) {
       return const ApiResult.failure(
@@ -48,7 +56,7 @@ class LocationRepositoryImpl implements LocationRepository {
         );
       }
 
-      await _preferences.setSelectedCitySlug(city.slug);
+      await _preferences.setSelectedCity(city.slug, city.name);
       return ApiResult.success(city);
     } on LocationSelectionException catch (error) {
       return ApiResult.failure(ValidationFailure(error.message));

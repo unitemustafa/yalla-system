@@ -114,7 +114,7 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: AppActionButton(
-                              label: 'Save',
+                              label: 'Change',
                               icon: AppIcons.tick_circle,
                               isLoading: _isSaving,
                               onPressed: _save,
@@ -135,21 +135,58 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
 
   Widget _buildInput(bool isDark) {
     if (widget.field == EditableProfileField.gender) {
-      return DropdownButtonFormField<String>(
-        initialValue: _controller.text.isEmpty ? null : _controller.text,
-        validator: (value) => value == null || value.isEmpty
+      const options = ['Male', 'Female'];
+      return FormField<String>(
+        initialValue: options.contains(_controller.text)
+            ? _controller.text
+            : null,
+        validator: (value) => value == null || !options.contains(value)
             ? context.tr('Choose a gender option')
             : null,
-        decoration: _inputDecoration(isDark),
-        items: const ['Male', 'Female', 'Prefer not to say']
-            .map(
-              (value) => DropdownMenuItem(
-                value: value,
-                child: Text(context.tr(value)),
+        builder: (field) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: options
+                    .map(
+                      (value) => Expanded(
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.only(
+                            end: value == options.last ? 0 : 10,
+                          ),
+                          child: _GenderOptionTile(
+                            label: context.tr(value),
+                            icon: value == 'Male' ? Icons.male : Icons.female,
+                            selected: field.value == value,
+                            enabled: !_isSaving,
+                            isDark: isDark,
+                            onTap: () {
+                              _controller.text = value;
+                              field.didChange(value);
+                            },
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
-            )
-            .toList(),
-        onChanged: _isSaving ? null : (value) => _controller.text = value ?? '',
+              if (field.hasError) ...[
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 12),
+                  child: Text(
+                    field.errorText!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       );
     }
 
@@ -159,6 +196,12 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
       readOnly: widget.field == EditableProfileField.birthDate,
       validator: _validate,
       keyboardType: _keyboardType,
+      textDirection: widget.field == EditableProfileField.email
+          ? TextDirection.ltr
+          : null,
+      textAlign: widget.field == EditableProfileField.email
+          ? TextAlign.end
+          : TextAlign.start,
       textInputAction: TextInputAction.done,
       onTap: widget.field == EditableProfileField.birthDate
           ? _pickBirthDate

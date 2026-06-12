@@ -35,6 +35,7 @@ void main() {
           expect(order.total, 24);
           expect(order.itemCount, 2);
           expect(order.status, OrderStatus.processing);
+          expect(order.orderNumber, matches(RegExp(r'^YM-\d{8}-[A-Z2-9]{6}$')));
         },
         failure: (failure) => fail(failure.message),
       );

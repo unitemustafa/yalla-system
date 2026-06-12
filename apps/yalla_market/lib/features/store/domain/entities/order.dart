@@ -172,6 +172,10 @@ class OrderData {
       orderNumber:
           json['orderNumber']?.toString() ??
           json['order_number']?.toString() ??
+          json['orderCode']?.toString() ??
+          json['order_code']?.toString() ??
+          json['number']?.toString() ??
+          json['code']?.toString() ??
           '',
       status: _statusFromJson(json['status']),
       placedAt:
@@ -204,13 +208,9 @@ class OrderData {
   }
 
   String get statusLabel {
-    return switch (status) {
-      OrderStatus.pending => 'Pending',
-      OrderStatus.processing => 'Processing',
-      OrderStatus.shipped => 'Shipment on the way',
-      OrderStatus.delivered => 'Delivered',
-      OrderStatus.cancelled => 'Cancelled',
-    };
+    return status == OrderStatus.delivered
+        ? 'Delivered'
+        : 'Shipment on the way';
   }
 
   Map<String, Object?> toJson() {

@@ -8,6 +8,7 @@ class DemoOrderData {
     required this.shippingDate,
     required this.itemCount,
     required this.total,
+    required this.items,
   });
 
   final String status;
@@ -16,6 +17,21 @@ class DemoOrderData {
   final String shippingDate;
   final int itemCount;
   final String total;
+  final List<DemoOrderItemData> items;
+}
+
+class DemoOrderItemData {
+  const DemoOrderItemData({
+    required this.title,
+    required this.quantity,
+    this.brand = '',
+    this.total,
+  });
+
+  final String title;
+  final int quantity;
+  final String brand;
+  final String? total;
 }
 
 class DemoOrders {
@@ -23,7 +39,7 @@ class DemoOrders {
 
   static final all = [
     DemoOrderData(
-      status: 'Processing',
+      status: 'Shipment on the way',
       date: '01 Sep 2023',
       orderId: 'CWT0012',
       shippingDate: '09 Sep 2023',
@@ -33,6 +49,38 @@ class DemoOrders {
         fractionDigits: 2,
         trimTrailingZero: false,
       ),
+      items: [
+        DemoOrderItemData(
+          title: 'Cotton T-Shirt',
+          brand: 'Yalla Basics',
+          quantity: 1,
+          total: AppCurrency.format(
+            39,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Slim Fit Jeans',
+          brand: 'Denim Co.',
+          quantity: 1,
+          total: AppCurrency.format(
+            65,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Canvas Cap',
+          brand: 'Streetline',
+          quantity: 1,
+          total: AppCurrency.format(
+            25,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+      ],
     ),
     DemoOrderData(
       status: 'Shipment on the way',
@@ -45,6 +93,28 @@ class DemoOrders {
         fractionDigits: 2,
         trimTrailingZero: false,
       ),
+      items: [
+        DemoOrderItemData(
+          title: 'Running Sneakers',
+          brand: 'Fleet',
+          quantity: 1,
+          total: AppCurrency.format(
+            59.5,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Sports Socks',
+          brand: 'Fleet',
+          quantity: 1,
+          total: AppCurrency.format(
+            25,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+      ],
     ),
     DemoOrderData(
       status: 'Delivered',
@@ -57,6 +127,48 @@ class DemoOrders {
         fractionDigits: 2,
         trimTrailingZero: false,
       ),
+      items: [
+        DemoOrderItemData(
+          title: 'Oxford Shirt',
+          brand: 'Yalla Basics',
+          quantity: 2,
+          total: AppCurrency.format(
+            90,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Chino Pants',
+          brand: 'Urban Thread',
+          quantity: 1,
+          total: AppCurrency.format(
+            75,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Leather Belt',
+          brand: 'Urban Thread',
+          quantity: 1,
+          total: AppCurrency.format(
+            35,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Crew Socks',
+          brand: 'Fleet',
+          quantity: 1,
+          total: AppCurrency.format(
+            40,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+      ],
     ),
     DemoOrderData(
       status: 'Delivered',
@@ -69,6 +181,18 @@ class DemoOrders {
         fractionDigits: 2,
         trimTrailingZero: false,
       ),
+      items: [
+        DemoOrderItemData(
+          title: 'Everyday Backpack',
+          brand: 'Carry Lab',
+          quantity: 1,
+          total: AppCurrency.format(
+            59.99,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+      ],
     ),
     DemoOrderData(
       status: 'Delivered',
@@ -81,6 +205,38 @@ class DemoOrders {
         fractionDigits: 2,
         trimTrailingZero: false,
       ),
+      items: [
+        DemoOrderItemData(
+          title: 'Puffer Jacket',
+          brand: 'North Peak',
+          quantity: 1,
+          total: AppCurrency.format(
+            92,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Knit Beanie',
+          brand: 'North Peak',
+          quantity: 1,
+          total: AppCurrency.format(
+            24.2,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+        DemoOrderItemData(
+          title: 'Thermal Gloves',
+          brand: 'North Peak',
+          quantity: 2,
+          total: AppCurrency.format(
+            60,
+            fractionDigits: 2,
+            trimTrailingZero: false,
+          ),
+        ),
+      ],
     ),
   ];
 }

@@ -10,13 +10,16 @@ import {
   Button,
   Card,
   PageTitle,
+  Pagination,
 } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
 import { cn } from "@/lib/utils";
 
 const notificationsStorageKey = "yalla-notifications-state";
+const notificationsPageSize = 10;
 
 type DashboardNotification = (typeof initialNotifications)[number];
+type NotificationFilter = "all" | "unread" | "read";
 
 type PersistedNotificationsState = {
   deletedIds?: string[];
@@ -74,20 +77,42 @@ export function NotificationsPage() {
   const { t } = useDashboardI18n();
   const { showSnackbar } = useSnackbar();
   const [notifications, setNotifications] = useState(readStoredNotifications);
+  const [activeFilter, setActiveFilter] = useState<NotificationFilter>("all");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const hasNotifications = notifications.length > 0;
+  const displayedNotifications = notifications.filter((notification) => {
+    if (activeFilter === "unread") return !notification.read;
+    if (activeFilter === "read") return notification.read;
+    return true;
+  });
+  const hasDisplayedNotifications = displayedNotifications.length > 0;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(displayedNotifications.length / notificationsPageSize),
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * notificationsPageSize;
+  const pagedNotifications = displayedNotifications.slice(
+    pageStartIndex,
+    pageStartIndex + notificationsPageSize,
+  );
   const filters = [
-    { label: t("notifications.filter.all"), count: notifications.length, active: true },
     {
-      label: t("notifications.filter.unread"),
-      count: notifications.filter((notification) => !notification.read).length,
-      active: false,
+      id: "all" as const,
+      label: t("notifications.filter.all"),
+      count: notifications.length,
     },
     {
+      id: "unread" as const,
+      label: t("notifications.filter.unread"),
+      count: unreadCount,
+    },
+    {
+      id: "read" as const,
       label: t("notifications.filter.read"),
       count: notifications.filter((notification) => notification.read).length,
-      active: false,
     },
   ];
 
@@ -177,10 +202,14 @@ export function NotificationsPage() {
               <button
                 key={filter.label}
                 type="button"
-                aria-pressed={filter.active}
+                aria-pressed={activeFilter === filter.id}
+                onClick={() => {
+                  setActiveFilter(filter.id);
+                  setCurrentPage(1);
+                }}
                 className={cn(
                   "inline-flex h-8 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors md:flex-none",
-                  filter.active
+                  activeFilter === filter.id
                     ? "border-primary/30 bg-primary/10 text-primary"
                     : "bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
@@ -225,76 +254,96 @@ export function NotificationsPage() {
           </div>
         ) : null}
 
-        {hasNotifications ? (
-          <div className="divide-y">
-            {notifications.map((notification) => {
-              const Icon = notification.icon;
-              const copyKey = notificationCopyKey(notification.id);
-              const timeKey = notificationTimeKey(notification.id);
-              const categoryKey = notificationCategoryKey(notification.category);
+        {hasDisplayedNotifications ? (
+          <>
+            <div className="divide-y">
+              {pagedNotifications.map((notification) => {
+                const Icon = notification.icon;
+                const copyKey = notificationCopyKey(notification.id);
+                const timeKey = notificationTimeKey(notification.id);
+                const categoryKey = notificationCategoryKey(notification.category);
 
-              return (
-                <article
-                  key={notification.id}
-                  className={cn(
-                    "flex gap-4 px-5 py-4 transition-colors hover:bg-muted/35",
-                    !notification.read && "bg-primary/5",
-                  )}
-                >
-                  <span
+                return (
+                  <article
+                    key={notification.id}
                     className={cn(
-                      "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border",
-                      notification.read
-                        ? "bg-background text-muted-foreground"
-                        : "border-primary/25 bg-primary/10 text-primary",
+                      "flex gap-4 px-5 py-4 transition-colors hover:bg-muted/35",
+                      !notification.read && "bg-primary/5",
                     )}
                   >
-                    <Icon className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 text-start">
-                        <div className="flex items-center gap-2">
-                          {!notification.read ? (
-                            <Circle className="size-2.5 fill-primary text-primary" />
-                          ) : null}
-                          <h2 className="truncate text-sm font-semibold">
-                            {t(`notifications.${copyKey}.title`)}
-                          </h2>
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg border",
+                        notification.read
+                          ? "bg-background text-muted-foreground"
+                          : "border-primary/25 bg-primary/10 text-primary",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 text-start">
+                          <div className="flex items-center gap-2">
+                            {!notification.read ? (
+                              <Circle className="size-2.5 fill-primary text-primary" />
+                            ) : null}
+                            <h2 className="truncate text-sm font-semibold">
+                              {t(`notifications.${copyKey}.title`)}
+                            </h2>
+                          </div>
+                          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                            {t(`notifications.${copyKey}.message`)}
+                          </p>
                         </div>
-                        <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                          {t(`notifications.${copyKey}.message`)}
-                        </p>
+                        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                          <span>{t(`notifications.time.${timeKey}`)}</span>
+                          {notification.read ? (
+                            <CheckCheck className="size-3.5 text-emerald-500" />
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                        <span>{t(`notifications.time.${timeKey}`)}</span>
-                        {notification.read ? (
-                          <CheckCheck className="size-3.5 text-emerald-500" />
-                        ) : null}
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <Badge tone={notification.read ? "secondary" : "blue"}>
+                          {t(`notifications.category.${categoryKey}`)}
+                        </Badge>
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            notification.read
+                              ? "text-muted-foreground"
+                              : "text-primary",
+                          )}
+                        >
+                          {notification.read
+                            ? t("notifications.state.read")
+                            : t("notifications.state.unread")}
+                        </span>
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <Badge tone={notification.read ? "secondary" : "blue"}>
-                        {t(`notifications.category.${categoryKey}`)}
-                      </Badge>
-                      <span
-                        className={cn(
-                          "text-xs font-medium",
-                          notification.read
-                            ? "text-muted-foreground"
-                            : "text-primary",
-                        )}
-                      >
-                        {notification.read
-                          ? t("notifications.state.read")
-                          : t("notifications.state.unread")}
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="px-5">
+              <Pagination
+                text={`عرض ${pagedNotifications.length} من ${displayedNotifications.length} نتيجة`}
+                pages={`${safeCurrentPage} / ${totalPages}`}
+                previousDisabled={safeCurrentPage === 1}
+                nextDisabled={safeCurrentPage === totalPages}
+                onPrevious={() =>
+                  setCurrentPage((page) =>
+                    Math.max(1, Math.min(page, totalPages) - 1),
+                  )
+                }
+                onNext={() =>
+                  setCurrentPage((page) =>
+                    Math.min(totalPages, Math.min(page, totalPages) + 1),
+                  )
+                }
+              />
+            </div>
+          </>
         ) : (
           <div className="flex min-h-[320px] flex-col items-center justify-center px-6 py-12 text-center">
             <span className="flex size-12 items-center justify-center rounded-lg bg-muted text-muted-foreground">

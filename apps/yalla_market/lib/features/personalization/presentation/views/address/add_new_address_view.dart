@@ -5,6 +5,7 @@ import 'package:yalla_market/core/icons/app_icons.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/presentation/widgets/appbar/page_top_bar.dart';
 import '../../../../../core/presentation/widgets/buttons/app_action_button.dart';
+import '../../../../../core/utils/validators.dart';
 import 'address_entry.dart';
 
 class AddNewAddressView extends StatefulWidget {
@@ -77,12 +78,7 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
   }
 
   String? _validatePhone(String? value) {
-    final phone = value?.trim() ?? '';
-    if (phone.isEmpty) return context.tr('This field is required');
-    if (phone.replaceAll(RegExp(r'\D'), '').length < 8) {
-      return context.tr('Please enter a valid phone number');
-    }
-    return null;
+    return Validators.egyptianMobile(value);
   }
 
   @override

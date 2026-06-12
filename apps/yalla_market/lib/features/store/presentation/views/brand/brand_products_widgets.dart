@@ -95,17 +95,21 @@ class _LocalShopCard extends StatelessWidget {
     final panelColor = isDark ? AppColors.darkCardColor : Colors.white;
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.06);
+        : const Color(0xFFEDEFF3);
     final mutedColor = isDark
         ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
+        : const Color(0xFF9B9B9B);
     final accentColor = Color(shop.accentColorValue);
+    final previewColor = isDark
+        ? accentColor.withValues(alpha: 0.16)
+        : const Color(0xFFFDEDEE);
     final forwardIcon = Directionality.of(context) == TextDirection.rtl
         ? AppIcons.arrow_left_2
         : AppIcons.arrow_right_3;
+    final previewProducts = shop.products.take(3).toList(growable: false);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Material(
         color: panelColor,
         borderRadius: BorderRadius.circular(8),
@@ -113,16 +117,16 @@ class _LocalShopCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: borderColor),
               boxShadow: [
                 if (!isDark)
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.035),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: Colors.black.withValues(alpha: 0.055),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
                   ),
               ],
             ),
@@ -130,30 +134,35 @@ class _LocalShopCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    _ShopLogo(shop: shop, size: 50),
-                    const SizedBox(width: 12),
+                    _ShopLogo(
+                      shop: shop,
+                      size: 58,
+                      backgroundColor: previewColor,
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
                             shop.name,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.08,
+                                ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 5),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              _ShopMetaChip(
-                                icon: AppIcons.box,
-                                label: shop.productCountLabel,
-                                color: accentColor,
-                              ),
-                            ],
+                          const SizedBox(height: 8),
+                          _ShopMetaChip(
+                            icon: AppIcons.box,
+                            label: shop.productCountLabel,
+                            color: accentColor,
                           ),
                         ],
                       ),
@@ -163,9 +172,7 @@ class _LocalShopCard extends StatelessWidget {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(
-                          alpha: isDark ? 0.18 : 0.10,
-                        ),
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
@@ -176,46 +183,29 @@ class _LocalShopCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 18),
                 Row(
-                  children: shop.products
-                      .take(3)
-                      .map((product) {
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 8),
-                            child: Container(
-                              height: 76,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: accentColor.withValues(
-                                  alpha: isDark ? 0.14 : 0.08,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: AppImage(
-                                source: product.image,
-                                fit: BoxFit.contain,
-                                cacheWidth: 152,
-                                cacheHeight: 152,
-                              ),
-                            ),
+                  children: previewProducts
+                      .map(
+                        (product) => Expanded(
+                          child: _ShopPreviewTile(
+                            image: product.image,
+                            backgroundColor: previewColor,
                           ),
-                        );
-                      })
+                        ),
+                      )
                       .toList(growable: false),
                 ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
+                const SizedBox(height: 12),
+                Directionality(
+                  textDirection: TextDirection.rtl,
                   child: Text(
-                    shop.products
-                        .take(3)
-                        .map((product) => product.title)
-                        .join(' • '),
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    previewProducts.map((product) => product.title).join(' • '),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: mutedColor,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -224,6 +214,34 @@ class _LocalShopCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopPreviewTile extends StatelessWidget {
+  const _ShopPreviewTile({required this.image, required this.backgroundColor});
+
+  final String image;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Container(
+        height: 82,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: AppImage(
+          source: image,
+          fit: BoxFit.contain,
+          cacheWidth: 164,
+          cacheHeight: 164,
         ),
       ),
     );
@@ -291,10 +309,15 @@ class _ShopHeaderCard extends StatelessWidget {
 }
 
 class _ShopLogo extends StatelessWidget {
-  const _ShopLogo({required this.shop, required this.size});
+  const _ShopLogo({
+    required this.shop,
+    required this.size,
+    this.backgroundColor,
+  });
 
   final MarketShopData shop;
   final double size;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -306,7 +329,9 @@ class _ShopLogo extends StatelessWidget {
       height: size,
       padding: EdgeInsets.all(size * 0.18),
       decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: isDark ? 0.18 : 0.10),
+        color:
+            backgroundColor ??
+            accentColor.withValues(alpha: isDark ? 0.18 : 0.10),
         borderRadius: BorderRadius.circular(8),
       ),
       child: AppImage(

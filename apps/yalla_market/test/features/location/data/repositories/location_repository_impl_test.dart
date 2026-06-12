@@ -33,6 +33,30 @@ void main() {
       );
     });
 
+    test('saves and loads a custom selected city from preferences', () async {
+      final repository = LocationRepositoryImpl(
+        LocationPreferences(),
+        _FakeDeviceLocationDataSource(),
+      );
+
+      final saveResult = await repository.saveSelectedCity(
+        const CityData(name: 'Aswan', slug: 'aswan'),
+      );
+      final loadResult = await repository.getSelectedCity();
+
+      saveResult.when(
+        success: (city) => expect(city.name, 'Aswan'),
+        failure: (failure) => fail(failure.message),
+      );
+      loadResult.when(
+        success: (city) {
+          expect(city?.name, 'Aswan');
+          expect(city?.slug, 'aswan');
+        },
+        failure: (failure) => fail(failure.message),
+      );
+    });
+
     test(
       'uses current location and normalizes it to a supported city',
       () async {

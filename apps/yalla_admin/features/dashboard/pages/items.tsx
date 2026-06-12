@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ChevronDown,
   Check,
   CheckCircle,
   Copy,
@@ -12,14 +11,22 @@ import {
   Minus,
   Package,
   Plus,
-  Star,
   Trash2,
   XCircle,
 } from "lucide-react";
 
 import type { ItemRow } from "../data";
 import { DashboardImage } from "../dashboard-image";
-import { Badge, Button, Card, DataTable, PageTitle, Pagination, Switch } from "../primitives";
+import {
+  ActionMenu,
+  AppSelect,
+  Button,
+  Card,
+  DataTable,
+  PageTitle,
+  Pagination,
+  Switch,
+} from "../primitives";
 import { deliveryCityOptions } from "../reference-data";
 import { useItemTableState } from "../hooks";
 import { useSnackbar } from "../snackbar";
@@ -36,6 +43,8 @@ const defaultFilters: ItemFilters = {
   category: "all",
   status: "all",
 };
+
+const itemsPageSize = 10;
 
 const checkboxClass =
   "peer inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-border text-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground";
@@ -68,14 +77,14 @@ function formatItemPrice(price: string) {
 }
 
 function normalizeItemRow(row: ItemRow): ItemRow {
-  return { ...row, price: formatItemPrice(row.price) };
+  return { ...row, code: row.code ?? row.id, price: formatItemPrice(row.price) };
 }
 
 function matchesFilters(row: ItemRow, filters: ItemFilters) {
   const search = filters.search.trim().toLowerCase();
   const matchesSearch =
     !search ||
-    [row.name, row.description, row.category, formatItemPrice(row.price)]
+    [row.code, row.id, row.name, row.description, row.category, formatItemPrice(row.price)]
       .join(" ")
       .toLowerCase()
       .includes(search);
@@ -91,16 +100,14 @@ function matchesFilters(row: ItemRow, filters: ItemFilters) {
 function MetricCards({ rows }: { rows: ItemRow[] }) {
   const activeCount = rows.filter((row) => row.active).length;
   const inactiveCount = rows.length - activeCount;
-  const featuredCount = rows.filter((row) => row.featured !== "لا").length;
   const cards = [
     ["إجمالي المنتجات", String(rows.length), Package, "text-primary"],
     ["نشط", String(activeCount), CheckCircle, "text-green-500"],
     ["غير نشط", String(inactiveCount), XCircle, "text-destructive"],
-    ["مميز", String(featuredCount), Star, "text-amber-500"],
   ] as const;
 
   return (
-    <div className="mt-6 grid gap-3 md:grid-cols-4">
+    <div className="mt-6 grid gap-3 md:grid-cols-3">
       {cards.map(([label, value, Icon, tone]) => (
         <Card key={label} className="h-[75px]">
           <div className="flex items-center gap-3 p-4">
@@ -142,32 +149,35 @@ function ItemsFilters({
       </label>
       <label className="grid gap-2 text-sm">
         التصنيف
-        <select
+        <AppSelect
           value={filters.category}
-          onChange={(event) => onChange({ ...filters, category: event.target.value })}
+          onValueChange={(category) => onChange({ ...filters, category })}
+          options={[
+            { value: "all", label: "الكل" },
+            ...categories.map((category) => ({
+              value: category,
+              label: category,
+            })),
+          ]}
+          ariaLabel="التصنيف"
           className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
-        >
-          <option value="all">الكل</option>
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
+        />
       </label>
       <label className="grid gap-2 text-sm">
         الحالة
-        <select
+        <AppSelect
           value={filters.status}
-          onChange={(event) =>
-            onChange({ ...filters, status: event.target.value as ItemFilters["status"] })
+          onValueChange={(status) =>
+            onChange({ ...filters, status: status as ItemFilters["status"] })
           }
+          options={[
+            { value: "all", label: "الكل" },
+            { value: "active", label: "نشط" },
+            { value: "inactive", label: "غير نشط" },
+          ]}
+          ariaLabel="الحالة"
           className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
-        >
-          <option value="all">الكل</option>
-          <option value="active">نشط</option>
-          <option value="inactive">غير نشط</option>
-        </select>
+        />
       </label>
       <Button type="button" variant="outline" className="h-10 w-full" onClick={onReset}>
         إعادة ضبط
@@ -190,59 +200,40 @@ function RowActions({
   onDelete: () => void;
 }) {
   return (
-    <div className="relative flex justify-end">
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onOpen();
-        }}
-        className="rounded-md border px-4 py-1 font-bold hover:bg-muted"
-        aria-label={`إجراءات ${row.name}`}
-      >
-        ...
-      </button>
-      {open ? (
-        <div className="absolute left-0 top-[34px] z-20 w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
-          <div className="px-2 py-2 text-sm font-semibold">بيانات المنتج</div>
-          <div className="-mx-1 border-t" />
-          <Link
-            href={`/items/edit/${row.id}?returnTo=%2Fitems%3F`}
-            className="mt-1 flex h-10 items-center justify-between rounded-sm px-3 text-sm hover:bg-accent"
-          >
-            <span>تعديل</span>
-            <Edit className="size-3" />
-          </Link>
-          <div className="-mx-1 border-t" />
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDuplicate();
-            }}
-            className="flex h-10 w-full items-center justify-between rounded-sm px-3 text-sm hover:bg-accent"
-          >
-            <span>نسخ</span>
-            <Copy className="size-3" />
-          </button>
-          <div className="-mx-1 border-t" />
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete();
-            }}
-            className="flex h-10 w-full items-center justify-between rounded-sm px-3 text-sm text-destructive hover:bg-accent"
-          >
-            <span>حذف</span>
-            <Trash2 className="size-3" />
-          </button>
-        </div>
-      ) : null}
-    </div>
+    <ActionMenu
+      open={open}
+      onToggle={onOpen}
+      label={`\u0625\u062c\u0631\u0627\u0621\u0627\u062a ${row.name}`}
+      title={"\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0646\u062a\u062c"}
+      triggerClassName="h-8 w-12"
+      menuClassName="w-56"
+      items={[
+        {
+          label: "\u062a\u0639\u062f\u064a\u0644",
+          icon: Edit,
+          href: `/items/edit/${row.id}?returnTo=%2Fitems%3F`,
+        },
+        {
+          label: "\u0646\u0633\u062e",
+          icon: Copy,
+          onClick: () => {
+            onDuplicate();
+            onOpen();
+          },
+        },
+        {
+          label: "\u062d\u0630\u0641",
+          icon: Trash2,
+          onClick: () => {
+            onDelete();
+            onOpen();
+          },
+          tone: "danger",
+        },
+      ]}
+    />
   );
 }
-
 function DeleteDialog({
   itemName,
   onClose,
@@ -332,6 +323,9 @@ function ItemsMobileCards({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="truncate text-sm font-semibold">{row.name}</h3>
+                  <p className="mt-0.5 text-xs font-medium text-primary">
+                    {row.code ?? row.id}
+                  </p>
                   <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                     {row.description}
                   </p>
@@ -355,7 +349,6 @@ function ItemsMobileCards({
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
-                <Badge>{row.featured}</Badge>
                 <label className="flex items-center gap-2 text-xs font-medium">
                   نشط
                   <Switch
@@ -382,18 +375,23 @@ export function ItemsPage() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const visibleRows = useMemo(
     () => rows.filter((row) => matchesFilters(row, filters)).sort(compareItems),
     [filters, rows],
   );
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / itemsPageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * itemsPageSize;
+  const pagedRows = visibleRows.slice(pageStartIndex, pageStartIndex + itemsPageSize);
   const categories = useMemo(
     () => uniqueValues(rows, "category").sort(compareText),
     [rows],
   );
   const selectedState = useMemo(() => {
     if (
-      visibleRows.length > 0 &&
-      visibleRows.every((row) => selectedRows.has(row.index))
+      pagedRows.length > 0 &&
+      pagedRows.every((row) => selectedRows.has(row.index))
     ) {
       return "checked";
     }
@@ -403,7 +401,7 @@ export function ItemsPage() {
     }
 
     return "unchecked";
-  }, [selectedRows, visibleRows]);
+  }, [pagedRows, selectedRows]);
   const deleteRow = rows.find((row) => row.id === deleteId);
 
   useEffect(() => {
@@ -445,9 +443,11 @@ export function ItemsPage() {
 
   function toggleAllRows() {
     setSelectedRows((currentRows) =>
-      visibleRows.every((row) => currentRows.has(row.index))
-        ? new Set()
-        : new Set(visibleRows.map((row) => row.index)),
+      pagedRows.every((row) => currentRows.has(row.index))
+        ? new Set([...currentRows].filter(
+            (rowIndex) => !pagedRows.some((row) => row.index === rowIndex),
+          ))
+        : new Set([...currentRows, ...pagedRows.map((row) => row.index)]),
     );
   }
 
@@ -583,24 +583,20 @@ export function ItemsPage() {
         size="compact"
         actions={
           <>
-            <label className="relative inline-flex h-9 w-full min-w-0 sm:w-[178px]">
-              <span className="sr-only">اختيار المنطقة</span>
-              <MapPin className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <select
-                value={selectedRegion}
-                onChange={(event) => setSelectedRegion(event.target.value)}
-                className="h-9 w-full appearance-none rounded-md border border-border bg-background pe-8 ps-9 text-sm font-medium text-muted-foreground shadow-sm outline-none transition hover:bg-accent hover:text-accent-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
-                aria-label="اختيار المنطقة"
-              >
-                <option value="كل المناطق">كل المناطق</option>
-                {deliveryCityOptions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            </label>
+            <AppSelect
+              value={selectedRegion}
+              onValueChange={setSelectedRegion}
+              options={[
+                { value: "كل المناطق", label: "كل المناطق" },
+                ...deliveryCityOptions.map((region) => ({
+                  value: region,
+                  label: region,
+                })),
+              ]}
+              ariaLabel="اختيار المنطقة"
+              icon={<MapPin className="size-4" />}
+              className="w-full sm:w-[178px]"
+            />
             <Link
               href="/items/create"
               className="inline-flex h-9 w-[122px] items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
@@ -623,10 +619,14 @@ export function ItemsPage() {
         <ItemsFilters
           categories={categories}
           filters={filters}
-          onChange={setFilters}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            setCurrentPage(1);
+          }}
           onReset={() => {
             setFilters(defaultFilters);
             setSelectedRows(new Set());
+            setCurrentPage(1);
           }}
         />
         {loading ? (
@@ -635,7 +635,7 @@ export function ItemsPage() {
           </div>
         ) : visibleRows.length ? (
           <ItemsMobileCards
-            rows={visibleRows}
+            rows={pagedRows}
             selectedRows={selectedRows}
             openRow={openRow}
             onToggleRow={toggleRow}
@@ -651,10 +651,9 @@ export function ItemsPage() {
         )}
         <div className="mt-4 hidden overflow-hidden rounded-md border transition-opacity duration-200 lg:block">
           <DataTable
-            minWidth={990}
+            minWidth={1070}
             columnWidths={[
-              48, 40, 64, 252, 16, 233.71875, 71.25, 73.875, 73.609375,
-              52, 63.828125,
+              48, 40, 64, 286, 116, 276, 88, 90, 62, 70,
             ]}
             rowHeight="tall"
             headers={[
@@ -683,17 +682,14 @@ export function ItemsPage() {
               "#",
               "",
               "الاسم",
-              <div key="id" className="hidden">
-                ID
-              </div>,
+              "Code",
               "الوصف",
               "التصنيف",
               "السعر",
-              "منتج مميز",
               "نشط",
               "",
             ]}
-            rows={(loading ? [] : visibleRows).map((row, rowPosition) => [
+            rows={(loading ? [] : pagedRows).map((row, rowPosition) => [
               <div key={`check-wrap-${row.index}`} className="flex items-center ps-4 py-3.5">
                 <button
                   type="button"
@@ -711,7 +707,7 @@ export function ItemsPage() {
                   {selectedRows.has(row.index) ? <Check className="size-3" /> : null}
                 </button>
               </div>,
-              rowPosition + 1,
+              pageStartIndex + rowPosition + 1,
               <div key={`img-wrap-${row.index}`} className="flex w-12 items-center justify-center">
                 <DashboardImage
                   alt={row.name}
@@ -726,8 +722,10 @@ export function ItemsPage() {
               <div key={`name-${row.index}`} className="flex flex-col gap-0.5">
                 <span>{row.name}</span>
               </div>,
-              <div key={`id-${row.index}`} className="hidden items-center justify-start gap-2">
-                <span>{row.id}</span>
+              <div key={`code-${row.index}`} className="flex min-w-0 items-center justify-start gap-2">
+                <span className="truncate font-medium text-primary">
+                  {row.code ?? row.id}
+                </span>
               </div>,
               <div key={`description-${row.index}`} className="flex flex-col gap-0.5">
                 <p>{row.description}</p>
@@ -739,7 +737,6 @@ export function ItemsPage() {
                 <span>{formatItemPrice(row.price).split(" ")[0]}</span>
                 <span>{formatItemPrice(row.price).split(" ")[1]}</span>
               </div>,
-              <Badge key={`featured-${row.index}`}>{row.featured}</Badge>,
               <div key={`active-wrap-${row.index}`} className="flex items-center">
                 <Switch
                   key={`active-${row.index}`}
@@ -768,9 +765,18 @@ export function ItemsPage() {
           ) : null}
         </div>
         <Pagination
-          text={`عرض ${visibleRows.length} من ${rows.length} نتيجة`}
-          pages="1 / 1"
-          nextDisabled
+          text={`عرض ${pagedRows.length} من ${visibleRows.length} نتيجة`}
+          pages={`${safeCurrentPage} / ${totalPages}`}
+          previousDisabled={safeCurrentPage === 1}
+          nextDisabled={safeCurrentPage === totalPages}
+          onPrevious={() =>
+            setCurrentPage((page) => Math.max(1, Math.min(page, totalPages) - 1))
+          }
+          onNext={() =>
+            setCurrentPage((page) =>
+              Math.min(totalPages, Math.min(page, totalPages) + 1),
+            )
+          }
         />
       </div>
 

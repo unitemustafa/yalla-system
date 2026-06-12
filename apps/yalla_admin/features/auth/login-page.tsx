@@ -45,11 +45,6 @@ function LoginPageContent({
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "reset">("login");
-  const [resetEmail, setResetEmail] = useState("admin@yalla.market");
-  const [resetPending, setResetPending] = useState(false);
-  const [resetMessage, setResetMessage] = useState("");
-  const [resetError, setResetError] = useState("");
   const stats = [
     { label: "طلبات اليوم", value: String(snapshot.todayOrders), icon: PackageCheck },
     { label: "فروع نشطة", value: String(snapshot.activeBranches), icon: Store },
@@ -94,40 +89,16 @@ function LoginPageContent({
     router.refresh();
   }
 
-  async function handlePasswordReset(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setResetError("");
-    setResetMessage("");
-    setResetPending(true);
-
-    const response = await fetch("/api/auth/forgot-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: resetEmail }),
-    });
-
-    setResetPending(false);
-
-    if (!response.ok) {
-      setResetError("اكتب بريد إلكتروني صحيح عشان نقدر نجهز الاستعادة.");
-      return;
-    }
-
-    setResetMessage(
-      "تم تجهيز تعليمات استعادة كلمة المرور لهذا البريد. هذه لوحة تجريبية فقط، استخدم كلمة المرور التجريبية المضبوطة في البيئة.",
-    );
-  }
-
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+    <main className="relative h-dvh overflow-hidden bg-background text-foreground">
       {showSplash ? <LoginSplash onDone={finishSplash} /> : null}
 
       <div className="absolute left-4 top-4 z-20">
         <ThemeToggle />
       </div>
 
-      <div className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(440px,560px)]">
-        <section className="relative hidden overflow-hidden bg-primary px-10 py-10 text-primary-foreground lg:flex lg:flex-col lg:justify-between xl:px-14">
+      <div className="grid h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(440px,560px)]">
+        <section className="relative hidden overflow-hidden bg-primary px-10 py-8 text-primary-foreground lg:flex lg:flex-col lg:justify-between xl:px-14">
           <div className="absolute inset-0 opacity-[0.12] [background-image:linear-gradient(to_left,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:54px_54px]" />
           <div className="absolute inset-x-0 bottom-0 h-56 bg-[linear-gradient(to_top,hsl(190_88%_8%/0.28),transparent)]" />
 
@@ -229,7 +200,7 @@ function LoginPageContent({
 
         </section>
 
-        <section className="flex min-h-screen items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
+        <section className="flex h-dvh items-center justify-center overflow-hidden px-5 py-8 sm:px-8 lg:px-12">
           <div className="w-full max-w-md">
             <div className="mb-9 flex items-center gap-3 lg:hidden">
               <Image
@@ -248,21 +219,16 @@ function LoginPageContent({
 
             <div className="mb-8">
               <p className="mb-3 inline-flex rounded-md bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                {authMode === "login" ? "دخول المدير" : "استعادة الحساب"}
+                دخول المدير
               </p>
               <h2 className="text-3xl font-extrabold leading-tight">
-                {authMode === "login"
-                  ? "أهلا بيك، كمّل إدارة متجرك"
-                  : "استرجع الوصول لحسابك"}
+                أهلا بيك، كمّل إدارة متجرك
               </h2>
               <p className="mt-3 text-base leading-7 text-muted-foreground">
-                {authMode === "login"
-                  ? "ادخل بياناتك للوصول للطلبات، المنتجات، الفروع، والتقارير من لوحة واحدة."
-                  : "اكتب البريد الإلكتروني المرتبط بالحساب وسنجهز تعليمات الاستعادة."}
+                ادخل بياناتك للوصول للطلبات، المنتجات، الفروع، والتقارير من لوحة واحدة.
               </p>
             </div>
 
-            {authMode === "login" ? (
             <form onSubmit={handleSubmit} className="space-y-5">
               <label className="block text-sm font-bold">
                 البريد الإلكتروني
@@ -271,7 +237,7 @@ function LoginPageContent({
                   <input
                     name="email"
                     type="email"
-                    defaultValue="admin@yalla.market"
+                    defaultValue="dashboard@admin.com"
                     required
                     className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
                     autoComplete="email"
@@ -320,30 +286,6 @@ function LoginPageContent({
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
-                  <input
-                    name="remember"
-                    type="checkbox"
-                    className="size-4 rounded border-border accent-primary"
-                    defaultChecked
-                  />
-                  تذكرني
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("reset");
-                    setError("");
-                    setResetMessage("");
-                    setResetError("");
-                  }}
-                  className="font-bold text-primary hover:underline"
-                >
-                  نسيت كلمة المرور؟
-                </button>
-              </div>
-
               <button
                 type="submit"
                 disabled={pending}
@@ -353,68 +295,6 @@ function LoginPageContent({
                 <ArrowLeft className="size-5" />
               </button>
             </form>
-            ) : (
-              <form onSubmit={handlePasswordReset} className="space-y-5">
-                <label className="block text-sm font-bold">
-                  البريد الإلكتروني
-                  <span className="mt-2 flex h-12 items-center gap-3 rounded-lg border border-border bg-card px-3 shadow-sm transition focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15">
-                    <Mail className="size-5 text-muted-foreground" />
-                    <input
-                      type="email"
-                      value={resetEmail}
-                      onChange={(event) => setResetEmail(event.target.value)}
-                      required
-                      className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-                      autoComplete="email"
-                    />
-                  </span>
-                </label>
-
-                {resetError ? (
-                  <div
-                    role="alert"
-                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200"
-                  >
-                    {resetError}
-                  </div>
-                ) : null}
-
-                {resetMessage ? (
-                  <div
-                    role="status"
-                    className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200"
-                  >
-                    {resetMessage}
-                  </div>
-                ) : null}
-
-                <button
-                  type="submit"
-                  disabled={resetPending}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-base font-bold text-primary-foreground shadow-lg shadow-primary/20 transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {resetPending ? "جاري الإرسال..." : "إرسال تعليمات الاستعادة"}
-                  <ArrowLeft className="size-5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("login");
-                    setResetMessage("");
-                    setResetError("");
-                  }}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-bold text-foreground transition hover:bg-muted"
-                >
-                  الرجوع لتسجيل الدخول
-                </button>
-              </form>
-            )}
-
-            <div className="mt-7 rounded-lg border border-border bg-muted/45 p-4 text-sm leading-6 text-muted-foreground">
-              لوحة تجريبية فقط. استخدم البريد الموجود وكلمة المرور التجريبية
-              المضبوطة في البيئة. لا يوجد حساب backend حقيقي.
-            </div>
           </div>
         </section>
       </div>

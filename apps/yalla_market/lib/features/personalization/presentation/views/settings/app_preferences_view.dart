@@ -8,7 +8,6 @@ import '../../../../../core/localization/app_language_controller.dart';
 import '../../../../../core/presentation/widgets/appbar/page_top_bar.dart';
 import '../../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../../core/preferences/app_preferences_controller.dart';
-import '../../../../../core/theme/app_theme_controller.dart';
 
 part 'app_preferences_tiles.dart';
 part 'app_preferences_sheet_widgets.dart';
@@ -29,11 +28,12 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
         : const Color(0xFFF7F8FB);
     final currentLanguage = AppLanguageController.instance.value;
     final languageLabel = currentLanguage.isArabic ? 'العربية' : 'English';
-    final currentThemeMode = AppThemeController.instance.value;
 
     return ValueListenableBuilder<AppPreferences>(
       valueListenable: AppPreferencesController.instance,
       builder: (context, preferences, _) {
+        final themeLabel = _themeModeLabel(preferences.themeMode);
+
         return Scaffold(
           backgroundColor: backgroundColor,
           body: SafeArea(
@@ -56,7 +56,21 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
                             subtitle: 'Tune shopping, alerts and data usage',
                           ),
                           const SizedBox(height: 18),
-                          _PreferencesHero(isDark: isDark),
+                          _PreferencesSection(
+                            title: 'Appearance',
+                            isDark: isDark,
+                            children: [
+                              _PreferenceInfoTile(
+                                icon: _themeModeIcon(preferences.themeMode),
+                                title: 'Theme',
+                                subtitle: themeLabel,
+                                accentColor: _themeModeAccentColor(
+                                  preferences.themeMode,
+                                ),
+                                onTap: () => _showThemeSheet(context),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 18),
                           _PreferencesSection(
                             title: 'Shopping setup',
@@ -106,13 +120,6 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
                             title: 'Quick controls',
                             isDark: isDark,
                             children: [
-                              _PreferenceInfoTile(
-                                icon: _themeIcon(currentThemeMode),
-                                title: 'Theme',
-                                subtitle: _themeLabel(currentThemeMode),
-                                accentColor: const Color(0xFF8B5CF6),
-                                onTap: () => _showThemeSheet(context),
-                              ),
                               _PreferenceSwitchTile(
                                 icon: AppIcons.notification,
                                 title: 'Push notifications',
@@ -134,16 +141,6 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
                                 onChanged: AppPreferencesController
                                     .instance
                                     .setSafeMode,
-                              ),
-                              _PreferenceSwitchTile(
-                                icon: AppIcons.image,
-                                title: 'HD image quality',
-                                subtitle: 'Use sharper product images.',
-                                value: preferences.hdImages,
-                                accentColor: const Color(0xFF06B6D4),
-                                onChanged: AppPreferencesController
-                                    .instance
-                                    .setHdImages,
                               ),
                             ],
                           ),
@@ -188,20 +185,43 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
     );
   }
 
-  IconData _themeIcon(ThemeMode themeMode) {
-    return switch (themeMode) {
-      ThemeMode.dark => AppIcons.moon,
-      ThemeMode.light => AppIcons.sun_1,
-      ThemeMode.system => AppIcons.setting_2,
-    };
-  }
+  void _showThemeSheet(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentThemeMode = AppPreferencesController.instance.value.themeMode;
+    const themeModes = [ThemeMode.system, ThemeMode.light, ThemeMode.dark];
 
-  String _themeLabel(ThemeMode themeMode) {
-    return switch (themeMode) {
-      ThemeMode.dark => 'Dark theme is active',
-      ThemeMode.light => 'Light theme is active',
-      ThemeMode.system => 'Follows system theme',
-    };
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.darkCardColor : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return _PreferenceSelectionSheet(
+          title: 'Theme',
+          children: [
+            for (final themeMode in themeModes) ...[
+              _PreferenceOptionTile(
+                title: _themeModeLabel(themeMode),
+                subtitle: _themeModeSubtitle(themeMode),
+                icon: _themeModeIcon(themeMode),
+                accentColor: _themeModeAccentColor(themeMode),
+                isSelected: currentThemeMode == themeMode,
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  AppPreferencesController.instance.setThemeMode(themeMode);
+                  CustomSnackBar.showSuccess(
+                    context: context,
+                    title: 'Theme updated',
+                  );
+                },
+              ),
+              if (themeMode != themeModes.last) const SizedBox(height: 10),
+            ],
+          ],
+        );
+      },
+    );
   }
 
   void _showLanguageSheet(BuildContext context) {
@@ -255,76 +275,6 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
     );
   }
 
-  void _showThemeSheet(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentThemeMode = AppThemeController.instance.value;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDark ? AppColors.darkCardColor : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return _PreferenceSelectionSheet(
-          title: 'Theme',
-          children: [
-            _PreferenceOptionTile(
-              title: 'System theme',
-              subtitle: 'Follow device appearance automatically',
-              icon: AppIcons.setting_2,
-              accentColor: const Color(0xFF8B5CF6),
-              isSelected: currentThemeMode == ThemeMode.system,
-              onTap: () => _selectThemeMode(
-                context: context,
-                sheetContext: sheetContext,
-                mode: ThemeMode.system,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _PreferenceOptionTile(
-              title: 'Light theme',
-              subtitle: 'Keep the app in light mode',
-              icon: AppIcons.sun_1,
-              accentColor: const Color(0xFF8B5CF6),
-              isSelected: currentThemeMode == ThemeMode.light,
-              onTap: () => _selectThemeMode(
-                context: context,
-                sheetContext: sheetContext,
-                mode: ThemeMode.light,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _PreferenceOptionTile(
-              title: 'Dark theme',
-              subtitle: 'Keep the app in dark mode',
-              icon: AppIcons.moon,
-              accentColor: const Color(0xFF8B5CF6),
-              isSelected: currentThemeMode == ThemeMode.dark,
-              onTap: () => _selectThemeMode(
-                context: context,
-                sheetContext: sheetContext,
-                mode: ThemeMode.dark,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _selectThemeMode({
-    required BuildContext context,
-    required BuildContext sheetContext,
-    required ThemeMode mode,
-  }) async {
-    Navigator.pop(sheetContext);
-    await AppThemeController.instance.setThemeMode(mode);
-    if (!context.mounted) return;
-
-    CustomSnackBar.showSuccess(context: context, title: 'Theme saved');
-  }
-
   void _showFixedPreferenceSheet({
     required BuildContext context,
     required String title,
@@ -361,5 +311,37 @@ class _AppPreferencesViewState extends State<AppPreferencesView> {
         );
       },
     );
+  }
+
+  String _themeModeLabel(ThemeMode themeMode) {
+    return switch (themeMode) {
+      ThemeMode.system => 'System default',
+      ThemeMode.light => 'Light',
+      ThemeMode.dark => 'Dark',
+    };
+  }
+
+  String _themeModeSubtitle(ThemeMode themeMode) {
+    return switch (themeMode) {
+      ThemeMode.system => 'Use your device theme setting.',
+      ThemeMode.light => 'Always use the light theme.',
+      ThemeMode.dark => 'Always use the dark theme.',
+    };
+  }
+
+  IconData _themeModeIcon(ThemeMode themeMode) {
+    return switch (themeMode) {
+      ThemeMode.system => AppIcons.mobile,
+      ThemeMode.light => AppIcons.sun_1,
+      ThemeMode.dark => AppIcons.moon,
+    };
+  }
+
+  Color _themeModeAccentColor(ThemeMode themeMode) {
+    return switch (themeMode) {
+      ThemeMode.system => AppColors.info,
+      ThemeMode.light => AppColors.warning,
+      ThemeMode.dark => const Color(0xFF8B5CF6),
+    };
   }
 }

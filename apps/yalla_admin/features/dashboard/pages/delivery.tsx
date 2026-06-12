@@ -2,7 +2,6 @@
 
 import { Fragment, useState } from "react";
 import {
-  ArrowRight,
   ArrowUpDown,
   AlertCircle,
   BadgeCheck,
@@ -13,7 +12,6 @@ import {
   ImagePlus,
   Mail,
   MapPin,
-  MoreHorizontal,
   PackageCheck,
   Phone,
   RotateCcw,
@@ -28,6 +26,7 @@ import {
 
 import { DashboardImage } from "../dashboard-image";
 import {
+  ActionMenu,
   Badge,
   Button,
   Card,
@@ -41,6 +40,8 @@ import {
 } from "../primitives";
 import { deliveryZones } from "@/features/dashboard/reference-data";
 import { cn } from "@/lib/utils";
+
+const deliveryListPageSize = 10;
 import { useSnackbar } from "../snackbar";
 
 function MetricCards({
@@ -210,6 +211,16 @@ function CourierStatusBadge({ status }: { status: Courier["status"] }) {
   return <Badge tone={tone}>{status}</Badge>;
 }
 
+function readImageAsDataUrl(file: File, onLoad: (value: string) => void) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === "string") {
+      onLoad(reader.result);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 function CourierAvatar({
   courier,
   size = "md",
@@ -248,6 +259,57 @@ function CourierAvatar({
           {initials || <UserRound className="size-6" />}
         </div>
       )}
+    </div>
+  );
+}
+
+function EditableCourierAvatar({
+  courier,
+  onPhotoChange,
+}: {
+  courier: Pick<Courier, "id" | "name" | "photoUrl">;
+  onPhotoChange: (courierId: string, photoUrl: string | null) => void;
+}) {
+  function handleImageSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    readImageAsDataUrl(file, (value) => onPhotoChange(courier.id, value));
+  }
+
+  return (
+    <div className="group relative shrink-0">
+      <label className="block cursor-pointer" title="تغيير الصورة">
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="sr-only"
+          onChange={handleImageSelected}
+          aria-label="تغيير صورة المندوب"
+        />
+        <CourierAvatar courier={courier} size="lg" />
+        <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-foreground/55 text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <Camera className="size-5" />
+        </span>
+        <span className="absolute -bottom-1 -left-1 inline-flex size-7 items-center justify-center rounded-md border bg-background text-primary shadow-sm">
+          <ImagePlus className="size-4" />
+        </span>
+      </label>
+      {courier.photoUrl ? (
+        <button
+          type="button"
+          onClick={() => onPhotoChange(courier.id, null)}
+          className="absolute -right-2 -top-2 inline-flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground"
+          aria-label="حذف صورة المندوب"
+          title="حذف الصورة"
+        >
+          <X className="size-3.5" />
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -320,12 +382,31 @@ function CourierOrdersSection({
   );
 }
 
+function CourierInfoRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border bg-background/70 px-3 py-2.5">
+      <div className="text-xs font-semibold text-muted-foreground">{label}</div>
+      <div className="mt-1 min-h-5 text-sm font-semibold leading-6 text-foreground">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function CourierDetailsDrawer({
   courier,
   onClose,
+  onPhotoChange,
 }: {
   courier: Courier;
   onClose: () => void;
+  onPhotoChange: (courierId: string, photoUrl: string | null) => void;
 }) {
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
@@ -340,7 +421,7 @@ function CourierDetailsDrawer({
         </button>
 
         <div className="flex items-start gap-4 border-b bg-muted/20 px-5 py-5 pe-12 sm:px-8">
-          <CourierAvatar courier={courier} size="lg" />
+          <EditableCourierAvatar courier={courier} onPhotoChange={onPhotoChange} />
           <div>
             <h2 className="text-2xl font-semibold leading-8">{courier.name}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -400,21 +481,18 @@ function CourierDetailsDrawer({
 
           <div className="flex flex-col gap-4">
             <FormCard title="بيانات المندوب">
-              <div className="space-y-3 text-sm">
-                <div className="grid gap-1">
-                  <span className="text-muted-foreground">البريد</span>
-                  <span className="break-all text-start font-medium" dir="ltr">
+              <div className="space-y-2">
+                <CourierInfoRow label="البريد">
+                  <span className="block break-all text-right" dir="ltr">
                     {courier.email}
                   </span>
-                </div>
-                <div className="grid gap-1">
-                  <span className="text-muted-foreground">المركبة</span>
-                  <span className="font-medium">{courier.vehicle}</span>
-                </div>
-                <div className="grid gap-1">
-                  <span className="text-muted-foreground">رقم اللوحة</span>
-                  <span className="font-medium">{courier.plateNumber}</span>
-                </div>
+                </CourierInfoRow>
+                <CourierInfoRow label="المركبة">
+                  {courier.vehicle}
+                </CourierInfoRow>
+                <CourierInfoRow label="رقم اللوحة">
+                  {courier.plateNumber}
+                </CourierInfoRow>
               </div>
             </FormCard>
 
@@ -448,54 +526,22 @@ function ZoneActionsMenu({
   onDelete: () => void;
 }) {
   return (
-    <div
-      className="flex min-w-[156px] items-center justify-center gap-2"
-      onClick={(event) => event.stopPropagation()}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={cn(
-          "inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-md border bg-background text-sm font-bold shadow-sm transition-colors hover:bg-accent",
-          open && "border-primary/30 bg-primary/10 text-primary",
-        )}
-        aria-label={`إجراءات ${zone.name}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-      >
-        <MoreHorizontal className="size-4" />
-      </button>
-      {open ? (
-        <div
-          role="menu"
-          className="inline-flex h-8 items-center gap-1 rounded-md border bg-background p-0.5 shadow-sm"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={onEdit}
-            className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium text-foreground hover:bg-accent"
-            title="تعديل"
-          >
-            <Edit3 className="size-3.5" />
-            <span>تعديل</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={onDelete}
-            className="inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium text-destructive hover:bg-destructive/10"
-            title="حذف"
-          >
-            <Trash2 className="size-3.5" />
-            <span>حذف</span>
-          </button>
-        </div>
-      ) : null}
+    <div className="flex justify-center">
+      <ActionMenu
+        open={open}
+        onToggle={onToggle}
+        align="center"
+        label={`\u0625\u062c\u0631\u0627\u0621\u0627\u062a ${zone.name}`}
+        triggerClassName="h-8 w-10"
+        menuClassName="w-36"
+        items={[
+          { label: "\u062a\u0639\u062f\u064a\u0644", icon: Edit3, onClick: onEdit },
+          { label: "\u062d\u0630\u0641", icon: Trash2, onClick: onDelete, tone: "danger" },
+        ]}
+      />
     </div>
   );
 }
-
 function ZoneInlineEditPanel({
   draft,
   zoneName,
@@ -562,6 +608,7 @@ function ZoneInlineEditPanel({
 
 function DeliveryZonesTable({
   zones,
+  startIndex = 0,
   openActionMenu,
   editingZoneId,
   editDraft,
@@ -573,6 +620,7 @@ function DeliveryZonesTable({
   onSaveEdit,
 }: {
   zones: DeliveryZone[];
+  startIndex?: number;
   openActionMenu: string | null;
   editingZoneId: string | null;
   editDraft: ZoneDraft;
@@ -631,7 +679,7 @@ function DeliveryZonesTable({
                   )}
                 >
                   <td className="p-0 align-middle">
-                    <span className="block px-3">{index + 1}</span>
+                    <span className="block px-3">{startIndex + index + 1}</span>
                   </td>
                   <td className="p-2 align-middle">
                     <div>
@@ -680,11 +728,11 @@ function DeliveryZonesTable({
   );
 }
 
-function ZoneCreateView({
-  onBack,
+function ZoneCreateDialog({
+  onClose,
   onCreate,
 }: {
-  onBack: () => void;
+  onClose: () => void;
   onCreate: (zone: DeliveryZone) => void;
 }) {
   const [draft, setDraft] = useState<ZoneDraft>(createZoneDraft());
@@ -707,40 +755,31 @@ function ZoneCreateView({
   }
 
   return (
-    <div className="px-6 py-6">
-      <Card className="flex min-h-[72px] flex-col gap-4 rounded-lg px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
+      <section className="relative w-full max-w-3xl overflow-hidden rounded-xl border bg-background shadow-2xl">
         <button
           type="button"
-          onClick={onBack}
-          className="inline-flex size-10 items-center justify-center rounded-md border bg-background hover:bg-accent"
-          aria-label="الرجوع لمناطق التوصيل"
+          onClick={onClose}
+          className="absolute left-4 top-4 z-10 inline-flex size-8 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent"
+          aria-label="إغلاق إضافة المنطقة"
         >
-          <ArrowRight className="size-4" />
+          <X className="size-4" />
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="border-b bg-muted/20 px-6 py-5 pe-14">
           <h1 className="text-xl font-semibold leading-7">إضافة منطقة جديدة</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             بيانات المنطقة وسعر التوصيل الثابت
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" form="zone-create-form" size="sm">
-            <Save className="size-4" />
-            حفظ المنطقة
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={resetDraft}>
-            <RotateCcw className="size-4" />
-            إعادة ضبط
-          </Button>
-        </div>
-      </Card>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form id="zone-create-form" onSubmit={submitZone}>
-          <FormCard title="بيانات المنطقة">
-            <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 p-6 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="rounded-lg border bg-card">
+              <div className="border-b px-4 py-3 text-sm font-bold">بيانات المنطقة</div>
+              <div className="grid gap-4 p-4 md:grid-cols-2">
               <Field label="اسم المنطقة *">
                 <Input
+                  autoFocus
                   dir="rtl"
                   value={draft.name}
                   onChange={(event) =>
@@ -763,28 +802,43 @@ function ZoneCreateView({
                   />
                 </div>
               </Field>
+              </div>
             </div>
-          </FormCard>
-        </form>
 
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3 text-sm font-bold">معاينة سريعة</div>
-          <div className="space-y-4 p-4 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">المنطقة</span>
-              <span className="font-semibold">{normalizedName}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-muted-foreground">السعر الثابت</span>
-              <span className="font-semibold">{formatReferenceCurrency(previewFee)}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-muted-foreground">
-              <MapPin className="size-4 text-primary" />
-              <span>{getArabicToday()}</span>
+            <div className="rounded-lg border bg-card">
+              <div className="border-b px-4 py-3 text-sm font-bold">معاينة سريعة</div>
+              <div className="space-y-4 p-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">المنطقة</span>
+                  <span className="font-semibold">{normalizedName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">السعر الثابت</span>
+                  <span className="font-semibold">{formatReferenceCurrency(previewFee)}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-muted-foreground">
+                  <MapPin className="size-4 text-primary" />
+                  <span>{getArabicToday()}</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t bg-muted/15 px-6 py-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+            <Button type="button" variant="outline" onClick={resetDraft}>
+              <RotateCcw className="size-4" />
+              إعادة ضبط
+            </Button>
+            <Button type="submit">
+              <Save className="size-4" />
+              حفظ المنطقة
+            </Button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }
@@ -795,7 +849,15 @@ export function DeliveryZonesPage() {
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<ZoneDraft>(createZoneDraft());
   const { showSnackbar } = useSnackbar();
+  const [currentPage, setCurrentPage] = useState(1);
   const zoneCount = zones.length;
+  const totalPages = Math.max(1, Math.ceil(zoneCount / deliveryListPageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * deliveryListPageSize;
+  const pagedZones = zones.slice(
+    pageStartIndex,
+    pageStartIndex + deliveryListPageSize,
+  );
   const prices = zones.map((zone) => zone.fixedDeliveryFee);
   const lowestPrice = prices.length ? Math.min(...prices) : 0;
   const highestPrice = prices.length ? Math.max(...prices) : 0;
@@ -848,10 +910,6 @@ export function DeliveryZonesPage() {
     });
   }
 
-  if (creating) {
-    return <ZoneCreateView onBack={() => setCreating(false)} onCreate={addZone} />;
-  }
-
   return (
     <div className="px-6 py-8">
       <PageTitle
@@ -889,7 +947,8 @@ export function DeliveryZonesPage() {
         />
         <div className="mt-4 rounded-md border bg-card">
           <DeliveryZonesTable
-            zones={zones}
+            zones={pagedZones}
+            startIndex={pageStartIndex}
             openActionMenu={openActionMenu}
             editingZoneId={editingZoneId}
             editDraft={editDraft}
@@ -905,8 +964,27 @@ export function DeliveryZonesPage() {
             onSaveEdit={saveEditingZone}
           />
         </div>
-        <Pagination text={`عرض ${zoneCount} من ${zoneCount} نتيجة`} pages="1 / 1" nextDisabled />
+        <Pagination
+          text={`عرض ${pagedZones.length} من ${zoneCount} نتيجة`}
+          pages={`${safeCurrentPage} / ${totalPages}`}
+          previousDisabled={safeCurrentPage === 1}
+          nextDisabled={safeCurrentPage === totalPages}
+          onPrevious={() =>
+            setCurrentPage((page) => Math.max(1, Math.min(page, totalPages) - 1))
+          }
+          onNext={() =>
+            setCurrentPage((page) =>
+              Math.min(totalPages, Math.min(page, totalPages) + 1),
+            )
+          }
+        />
       </div>
+      {creating ? (
+        <ZoneCreateDialog
+          onClose={() => setCreating(false)}
+          onCreate={addZone}
+        />
+      ) : null}
     </div>
   );
 }
@@ -969,13 +1047,8 @@ function CourierPhotoPicker({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        onChange(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    readImageAsDataUrl(file, onChange);
+    event.currentTarget.value = "";
   }
 
   return (
@@ -1213,11 +1286,38 @@ function CourierCard({
 export function CouriersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
+  const [sendOrderCourier, setSendOrderCourier] = useState<Courier | null>(null);
   const [courierRows, setCourierRows] = useState<Courier[]>(couriers);
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(courierRows.length / deliveryListPageSize),
+  );
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * deliveryListPageSize;
+  const pagedCouriers = courierRows.slice(
+    pageStartIndex,
+    pageStartIndex + deliveryListPageSize,
+  );
+
+  const { showSnackbar } = useSnackbar();
 
   function addCourier(courier: Courier) {
     setCourierRows((current) => [courier, ...current]);
     setDrawerOpen(false);
+  }
+
+  function updateCourierPhoto(courierId: string, photoUrl: string | null) {
+    setCourierRows((currentRows) =>
+      currentRows.map((courier) =>
+        courier.id === courierId ? { ...courier, photoUrl } : courier,
+      ),
+    );
+    setSelectedCourier((currentCourier) =>
+      currentCourier?.id === courierId
+        ? { ...currentCourier, photoUrl }
+        : currentCourier,
+    );
   }
 
   return (
@@ -1250,31 +1350,44 @@ export function CouriersPage() {
                 label: "بحث",
                 type: "search",
                 placeholder: "ابحث عن مندوب...",
-                width: "md:w-80",
+                width: "md:flex-1",
               },
               {
                 label: "المنطقة",
                 type: "select",
                 value: "كل المناطق",
                 options: ["كل المناطق", ...deliveryZones.map((zone) => zone.name)],
-                width: "md:w-48",
+                width: "md:flex-1",
               },
             ]}
           />
           <div className="mt-4">
             <div className="grid gap-3">
-              {courierRows.map((courier, index) => (
+              {pagedCouriers.map((courier, index) => (
                 <CourierCard
                   key={courier.id}
                   courier={courier}
-                  index={index}
+                  index={pageStartIndex + index}
                   onDetails={() => setSelectedCourier(courier)}
-                  onSendOrder={() => setSelectedCourier(courier)}
+                  onSendOrder={() => setSendOrderCourier(courier)}
                 />
               ))}
             </div>
           </div>
-          <Pagination text={`عرض ${courierRows.length} من ${courierRows.length} نتيجة`} pages="1 / 1" nextDisabled />
+          <Pagination
+            text={`عرض ${pagedCouriers.length} من ${courierRows.length} نتيجة`}
+            pages={`${safeCurrentPage} / ${totalPages}`}
+            previousDisabled={safeCurrentPage === 1}
+            nextDisabled={safeCurrentPage === totalPages}
+            onPrevious={() =>
+              setCurrentPage((page) => Math.max(1, Math.min(page, totalPages) - 1))
+            }
+            onNext={() =>
+              setCurrentPage((page) =>
+                Math.min(totalPages, Math.min(page, totalPages) + 1),
+              )
+            }
+          />
         </div>
       </Card>
 
@@ -1285,8 +1398,84 @@ export function CouriersPage() {
         <CourierDetailsDrawer
           courier={selectedCourier}
           onClose={() => setSelectedCourier(null)}
+          onPhotoChange={updateCourierPhoto}
         />
       ) : null}
+      {sendOrderCourier ? (
+        <SendOrderDrawer
+          courier={sendOrderCourier}
+          onClose={() => setSendOrderCourier(null)}
+          onSend={(orderCode) => {
+            showSnackbar({
+              message: `تم إرسال الطلب ${orderCode} إلى ${sendOrderCourier.name}.`,
+            });
+            setSendOrderCourier(null);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SendOrderDrawer({
+  courier,
+  onClose,
+  onSend,
+}: {
+  courier: Courier;
+  onClose: () => void;
+  onSend: (orderCode: string) => void;
+}) {
+  const [orderCode, setOrderCode] = useState("");
+
+  function submitOrder(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedCode = orderCode.trim();
+
+    if (!normalizedCode) return;
+    onSend(normalizedCode);
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
+      <section className="relative w-full max-w-md rounded-xl border bg-background p-5 shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute left-4 top-4 inline-flex size-8 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent"
+          aria-label="إغلاق"
+        >
+          <X className="size-4" />
+        </button>
+
+        <div className="mb-5 pe-10">
+          <h2 className="text-lg font-semibold">إرسال طلب</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{courier.name}</p>
+        </div>
+
+        <form onSubmit={submitOrder} className="space-y-4">
+          <Field label="كود الطلب">
+            <Input
+              autoFocus
+              value={orderCode}
+              onChange={(event) => setOrderCode(event.target.value)}
+              placeholder="ORD-20260529-024"
+              dir="ltr"
+              className="text-right"
+            />
+          </Field>
+
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={!orderCode.trim()}>
+              <Send className="size-4" />
+              إرسال طلب
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </section>
     </div>
   );
 }

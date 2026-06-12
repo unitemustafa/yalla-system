@@ -5,12 +5,9 @@ import 'package:yalla_market/core/icons/app_icons.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/presentation/widgets/appbar/page_top_bar.dart';
 import '../../../../../core/presentation/widgets/buttons/app_action_button.dart';
-import '../../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 
 class MembershipBenefitsView extends StatelessWidget {
   const MembershipBenefitsView({super.key});
-
-  static const String activationPhone = '+20 100 000 0000';
 
   @override
   Widget build(BuildContext context) {
@@ -41,13 +38,7 @@ class MembershipBenefitsView extends StatelessWidget {
               AppActionButton(
                 label: 'Contact to Activate',
                 icon: AppIcons.call,
-                onPressed: () {
-                  CustomSnackBar.showInfo(
-                    context: context,
-                    title: 'Activation phone',
-                    message: activationPhone,
-                  );
-                },
+                onPressed: null,
               ),
             ],
           ),
@@ -221,10 +212,12 @@ class _ActivationCard extends StatelessWidget {
                   ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 2),
-                const SelectableText(
-                  MembershipBenefitsView.activationPhone,
+                SelectableText(
+                  context.tr('Service unavailable'),
                   style: TextStyle(
-                    color: AppColors.primary,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.62)
+                        : Colors.black.withValues(alpha: 0.50),
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                   ),

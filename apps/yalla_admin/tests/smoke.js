@@ -108,19 +108,9 @@ async function main() {
     throw new Error(`Expected unauthorized items request to return 401, got ${unauthorized.response.status}`);
   }
 
-  const unauthorizedThemes = await jsonRequest("/api/dashboard/themes");
-  if (unauthorizedThemes.response.status !== 401) {
-    throw new Error(`Expected unauthorized themes request to return 401, got ${unauthorizedThemes.response.status}`);
-  }
-
-  const activeTheme = await jsonRequest("/api/themes/active?target=market");
-  if (!activeTheme.response.ok || activeTheme.data?.target !== "market" || !activeTheme.data?.theme?.slug) {
-    throw new Error("Expected public active theme API to return a market theme");
-  }
-
   const badLogin = await jsonRequest("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email: "admin@yalla.market", password: "wrong" }),
+    body: JSON.stringify({ email: "dashboard@admin.com", password: "wrong" }),
   });
   if (badLogin.response.status !== 401) {
     throw new Error(`Expected bad login to return 401, got ${badLogin.response.status}`);
@@ -129,7 +119,7 @@ async function main() {
   const login = await jsonRequest("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
-      email: "admin@yalla.market",
+      email: "dashboard@admin.com",
       password: demoPassword,
     }),
   });
@@ -141,7 +131,6 @@ async function main() {
   const authHeaders = { cookie };
   const items = await jsonRequest("/api/dashboard/items", { headers: authHeaders });
   const orders = await jsonRequest("/api/dashboard/orders", { headers: authHeaders });
-  const themes = await jsonRequest("/api/dashboard/themes", { headers: authHeaders });
 
   if (!Array.isArray(items.data?.items) || items.data.items.length === 0) {
     throw new Error("Expected dashboard items API to return rows");
@@ -149,55 +138,8 @@ async function main() {
   if (!Array.isArray(orders.data?.orders) || orders.data.orders.length === 0) {
     throw new Error("Expected dashboard orders API to return rows");
   }
-  if (!Array.isArray(themes.data?.themes) || themes.data.themes.length === 0) {
-    throw new Error("Expected dashboard themes API to return rows");
-  }
-
-  const createdTheme = await jsonRequest("/api/dashboard/themes", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      name: "Smoke Test Theme",
-      slug: `smoke-test-${Date.now()}`,
-      description: "Temporary smoke test theme",
-      occasion: "custom",
-      colors: {
-        primary: "#155e75",
-        secondary: "#0f766e",
-        background: "#ffffff",
-        text: "#111827",
-        button: "#155e75",
-        headerNavigation: "#ffffff",
-      },
-      targets: ["dashboard"],
-    }),
-  });
-  const createdThemeId = createdTheme.data?.theme?.id;
-  if (!createdTheme.response.ok || !createdThemeId) {
-    throw new Error("Expected theme create API to return a theme");
-  }
-
-  const activatedTheme = await jsonRequest(
-    `/api/dashboard/themes/${encodeURIComponent(createdThemeId)}/activate`,
-    {
-      method: "POST",
-      headers: authHeaders,
-      body: JSON.stringify({ targets: ["dashboard"] }),
-    },
-  );
-  if (!activatedTheme.response.ok) {
-    throw new Error("Expected theme activation API to succeed");
-  }
-
-  const deletedTheme = await jsonRequest(
-    `/api/dashboard/themes/${encodeURIComponent(createdThemeId)}?hard=true`,
-    {
-      method: "DELETE",
-      headers: authHeaders,
-    },
-  );
-  if (!deletedTheme.response.ok) {
-    throw new Error("Expected theme cleanup delete to succeed");
+  if (!items.data.items.every((item) => typeof item.code === "string" && item.code)) {
+    throw new Error("Expected every dashboard item to include a product code");
   }
 
   const firstItem = items.data.items[0];
@@ -232,6 +174,9 @@ async function main() {
   if (!duplicatedItem.response.ok || !duplicateId) {
     throw new Error("Expected item duplicate API to return the copied item");
   }
+  if (!/^PRD-[A-Z2-9]+$/.test(duplicatedItem.data?.item?.code ?? "")) {
+    throw new Error("Expected duplicated item to receive a generated product code");
+  }
 
   const deletedDuplicate = await jsonRequest(
     `/api/dashboard/items/${encodeURIComponent(duplicateId)}`,
@@ -243,6 +188,33 @@ async function main() {
   if (!deletedDuplicate.response.ok) {
     throw new Error("Expected duplicate cleanup delete to succeed");
   }
+
+  const createdItem = await jsonRequest("/api/dashboard/items", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      name: "Smoke product",
+      description: "Created by smoke test",
+      category: "Smoke",
+      subcategory: "Smoke",
+      price: "1 EGP",
+      active: true,
+    }),
+  });
+  const createdItemCode = createdItem.data?.item?.code;
+  const createdItemId = createdItem.data?.item?.id;
+  if (
+    !createdItem.response.ok ||
+    !createdItemId ||
+    !/^PRD-[A-Z2-9]+$/.test(createdItemCode ?? "")
+  ) {
+    throw new Error("Expected item create API to return a generated product code");
+  }
+
+  await jsonRequest(`/api/dashboard/items/${encodeURIComponent(createdItemId)}`, {
+    method: "DELETE",
+    headers: authHeaders,
+  });
 
   const firstOrder = orders.data.orders[0];
   const patchedOrder = await jsonRequest(
@@ -261,6 +233,30 @@ async function main() {
     method: "PATCH",
     headers: authHeaders,
     body: JSON.stringify({ status: firstOrder.status }),
+  });
+
+  const createdOrder = await jsonRequest("/api/dashboard/orders", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      customer: "Smoke customer",
+      phone: "+201000000000",
+      type: "delivery",
+      payment: "cash",
+      total: 0,
+    }),
+  });
+  const createdOrderNumber = createdOrder.data?.order?.number;
+  if (
+    !createdOrder.response.ok ||
+    !/^ORD-\d{8}-[A-Z2-9]+$/.test(createdOrderNumber ?? "")
+  ) {
+    throw new Error("Expected order create API to return a generated order code");
+  }
+
+  await jsonRequest(`/api/dashboard/orders/${encodeURIComponent(createdOrderNumber)}`, {
+    method: "DELETE",
+    headers: authHeaders,
   });
 
   console.log(

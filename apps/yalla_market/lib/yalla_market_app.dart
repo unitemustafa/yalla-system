@@ -6,11 +6,11 @@ import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/localization/app_language_controller.dart';
 import 'core/localization/app_translations.dart';
+import 'core/preferences/app_preferences_controller.dart';
 import 'core/routing/app_navigator.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/app_routes.dart';
 import 'core/theme/app_theme.dart';
-import 'core/theme/app_theme_controller.dart';
 import 'features/auth/presentation/cubit/auth_cubit.dart';
 import 'features/auth/presentation/cubit/auth_state.dart';
 import 'features/cart/presentation/cubit/cart_cubit.dart';
@@ -61,9 +61,9 @@ class YallaMarketApp extends StatelessWidget {
         child: ValueListenableBuilder<AppLanguage>(
           valueListenable: AppLanguageController.instance,
           builder: (context, language, _) {
-            return ValueListenableBuilder<ThemeMode>(
-              valueListenable: AppThemeController.instance,
-              builder: (context, themeMode, _) {
+            return ValueListenableBuilder<AppPreferences>(
+              valueListenable: AppPreferencesController.instance,
+              builder: (context, preferences, _) {
                 return MaterialApp(
                   navigatorKey: AppNavigator.key,
                   debugShowCheckedModeBanner: false,
@@ -72,7 +72,7 @@ class YallaMarketApp extends StatelessWidget {
                       AppTranslations.of(context).appName,
                   theme: AppTheme.lightTheme,
                   darkTheme: AppTheme.darkTheme,
-                  themeMode: themeMode,
+                  themeMode: preferences.themeMode,
                   locale: language.locale,
                   supportedLocales: AppTranslations.supportedLocales,
                   builder: (context, child) {

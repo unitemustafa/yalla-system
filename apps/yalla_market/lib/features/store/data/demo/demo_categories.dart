@@ -428,20 +428,7 @@ class MarketCategories {
 
   static const business = [advertising, services, stationery];
 
-  static const localShopCategories = [
-    restaurants,
-    supermarket,
-    pharmacy,
-    bakeries,
-    cafe,
-    vegetables,
-    fruits,
-    poultry,
-    fish,
-    freshMeat,
-    dairy,
-    sweets,
-  ];
+  static const localShopCategories = [restaurants, supermarket, pharmacy];
 
   static bool hasLocalShops(String categoryName) {
     final normalized = categoryName.trim().toLowerCase();

@@ -8,6 +8,7 @@ Thumbs.db
 # Root-local tool state
 .codex/
 .playwright-mcp/
+.codex*.png
 
 # Next.js dashboard
 apps/yalla_admin/node_modules/

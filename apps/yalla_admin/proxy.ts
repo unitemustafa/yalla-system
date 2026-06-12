@@ -13,7 +13,6 @@ const protectedPrefixes = [
   "/notifications",
   "/offers",
   "/orders",
-  "/users",
 ];
 
 function isProtectedPath(pathname: string) {

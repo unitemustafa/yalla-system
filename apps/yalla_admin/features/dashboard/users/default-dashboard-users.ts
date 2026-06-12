@@ -1,6 +1,7 @@
 export type DashboardUser = {
   id: string;
   name: string;
+  username: string;
   phone: string;
   email: string;
   avatar: string;
@@ -20,6 +21,7 @@ export const dashboardUsers: DashboardUser[] = [
   {
     id: "default-user",
     name: "mohamed Gamal",
+    username: "mohamed.gamal",
     phone: "+201121675495",
     email: "mohamed.gamal@yalla-market.com",
     avatar: "/default-user-avatar.svg",

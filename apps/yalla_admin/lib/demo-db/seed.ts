@@ -92,13 +92,20 @@ function cloneItem(row: ItemRow): ItemRow {
   return { ...row };
 }
 
+function seedItemCode(index: number) {
+  return `PRD-SEED-${String(index + 1).padStart(3, "0")}`;
+}
+
 function cloneOrder(order: DashboardOrder): DashboardOrder {
   return { ...order };
 }
 
 export function createSeedStore(): DashboardSeed {
   return {
-    items: itemRows.map(cloneItem),
+    items: itemRows.map((item, index) => ({
+      ...cloneItem(item),
+      code: item.code ?? seedItemCode(index),
+    })),
     orders: seedOrders.map(cloneOrder),
   };
 }
@@ -119,6 +126,7 @@ function isItemRow(value: unknown): value is ItemRow {
   return (
     isString(value.index) &&
     isString(value.id) &&
+    (value.code === undefined || isString(value.code)) &&
     isString(value.image) &&
     isString(value.name) &&
     isString(value.description) &&

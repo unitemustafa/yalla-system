@@ -11,6 +11,7 @@ export async function ensureDashboardSchema() {
         prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS dashboard_items (
             id TEXT PRIMARY KEY NOT NULL,
+            code TEXT NOT NULL UNIQUE,
             position INTEGER NOT NULL,
             image TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -42,6 +43,19 @@ export async function ensureDashboardSchema() {
           )
         `),
       ])
+      .then(async () => {
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN code TEXT",
+        ).catch(() => undefined);
+        await prisma.$executeRawUnsafe(`
+          UPDATE dashboard_items
+          SET code = 'PRD-SEED-' || printf('%03d', rowid)
+          WHERE code IS NULL OR trim(code) = ''
+        `);
+        await prisma.$executeRawUnsafe(
+          "CREATE UNIQUE INDEX IF NOT EXISTS dashboard_items_code_key ON dashboard_items(code)",
+        );
+      })
       .then(() => undefined);
   }
 
