@@ -16,6 +16,18 @@ import '../../snackbars/custom_snackbar.dart';
 import '../../texts/app_currency_text.dart';
 import '../../texts/green_currency_price.dart';
 
+String? _validDiscountLabel(String? discount) {
+  final value = discount?.trim();
+  if (value == null || value.isEmpty) return null;
+
+  final numericValue = double.tryParse(
+    value.replaceAll(RegExp(r'[^0-9.,-]'), '').replaceAll(',', ''),
+  );
+  if (numericValue != null && numericValue <= 0) return null;
+
+  return value;
+}
+
 class ProductCardVertical extends StatefulWidget {
   const ProductCardVertical({
     super.key,
@@ -51,6 +63,8 @@ class _ProductCardVerticalState extends State<ProductCardVertical> {
   }
 
   void _openProductDetails(BuildContext context) {
+    final discount = _validDiscountLabel(widget.discount);
+
     Navigator.pushNamed(
       context,
       AppRoutes.productDetail,
@@ -62,19 +76,21 @@ class _ProductCardVerticalState extends State<ProductCardVertical> {
         productId: widget.productId,
         productSlug: widget.productSlug,
         oldPrice: widget.oldPrice,
-        discount: widget.discount,
+        discount: discount,
       ),
     );
   }
 
   void _toggleWishlist(BuildContext context, bool wasFavorite) {
+    final discount = _validDiscountLabel(widget.discount);
+
     final item = WishlistItem(
       image: widget.image,
       title: widget.title,
       brand: widget.brand,
       price: widget.price,
       oldPrice: widget.oldPrice,
-      discount: widget.discount,
+      discount: discount,
     );
 
     context.read<WishlistCubit>().toggleItem(item);
@@ -118,6 +134,7 @@ class _ProductCardVerticalState extends State<ProductCardVertical> {
         ? AppColors.darkTextSecondary
         : AppColors.lightTextSecondary;
     final textColor = isDark ? Colors.white : AppColors.lightTextPrimary;
+    final discount = _validDiscountLabel(widget.discount);
 
     return Material(
       color: Colors.transparent,
@@ -170,7 +187,7 @@ class _ProductCardVerticalState extends State<ProductCardVertical> {
                         ),
                       ),
                     ),
-                    if (widget.discount != null)
+                    if (discount != null)
                       PositionedDirectional(
                         top: 0,
                         start: 0,
@@ -184,7 +201,7 @@ class _ProductCardVerticalState extends State<ProductCardVertical> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            widget.discount!,
+                            discount,
                             style: const TextStyle(
                               color: Colors.black,
                               fontSize: 12,

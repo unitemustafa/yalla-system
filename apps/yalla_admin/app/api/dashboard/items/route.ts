@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       typeof body.subcategory === "string" ? body.subcategory : undefined,
     calories: typeof body.calories === "string" ? body.calories : undefined,
     price: typeof body.price === "string" ? body.price : undefined,
+    variantDetails:
+      typeof body.variantDetails === "string" ? body.variantDetails : undefined,
     featured:
       typeof body.featured === "boolean" || typeof body.featured === "string"
         ? body.featured

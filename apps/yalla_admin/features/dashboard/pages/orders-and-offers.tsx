@@ -675,18 +675,17 @@ function OrdersFilters({
       </label>
       <label className="grid gap-2 text-sm">
         الحالة
-        <select
+        <AppSelect
           value={filters.status}
-          onChange={(event) => onChange({ ...filters, status: event.target.value })}
-          className="h-9 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none"
-        >
-          <option value="all">الكل</option>
-          {statuses.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
+          onValueChange={(status) => onChange({ ...filters, status })}
+          options={[
+            { value: "all", label: "الكل" },
+            ...statuses.map((status) => ({ value: status, label: status })),
+          ]}
+          className="h-9 bg-input"
+          contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
+          ariaLabel="الحالة"
+        />
       </label>
     </div>
   );
@@ -1885,18 +1884,20 @@ export function CreateOrderPage() {
             {activeOrderPanel === "delivery" ? (
               <>
                 <Field label="طريقة الدفع">
-                  <select
-                    name="payment"
+                  <AppSelect
                     value={payment}
-                    onChange={(event) =>
-                      setPayment(event.target.value as "cash" | "card" | "wallet")
+                    onValueChange={(value) =>
+                      setPayment(value as "cash" | "card" | "wallet")
                     }
-                    className={inputClass}
-                  >
-                    <option value="cash">نقدي</option>
-                    <option value="card">بطاقة بنكية</option>
-                    <option value="wallet">محفظة إلكترونية</option>
-                  </select>
+                    options={[
+                      { value: "cash", label: "نقدي" },
+                      { value: "card", label: "بطاقة بنكية" },
+                      { value: "wallet", label: "محفظة إلكترونية" },
+                    ]}
+                    className="h-10 bg-input"
+                    contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
+                    ariaLabel="طريقة الدفع"
+                  />
                 </Field>
 
                 <Field label="الخصم">
@@ -2057,11 +2058,26 @@ function CustomerSearchModal({
   useEffect(() => {
     if (!open) return;
 
+    const scrollY = window.scrollY;
     const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
 
     return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
       document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      window.scrollTo(0, scrollY);
     };
   }, [open]);
 
@@ -2070,7 +2086,7 @@ function CustomerSearchModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/45 px-4 py-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overscroll-none bg-foreground/45 px-4 py-6 backdrop-blur-sm">
       <div
         role="dialog"
         aria-modal="true"
@@ -3235,8 +3251,31 @@ export function OffersPage() {
   }
 
   function deleteOffer(offerId: string) {
+    const deletedOfferIndex = offers.findIndex((offer) => offer.id === offerId);
+    const deletedOffer = offers[deletedOfferIndex];
+
+    if (!deletedOffer) {
+      return;
+    }
+
     setOffers((currentOffers) => currentOffers.filter((offer) => offer.id !== offerId));
-    showSnackbar({ message: "تم حذف العرض." });
+    showSnackbar({
+      message: "تم حذف العرض.",
+      tone: "danger",
+      actionLabel: "تراجع",
+      durationMs: 5000,
+      onAction: () => {
+        setOffers((currentOffers) => {
+          if (currentOffers.some((offer) => offer.id === deletedOffer.id)) {
+            return currentOffers;
+          }
+
+          const nextOffers = [...currentOffers];
+          nextOffers.splice(deletedOfferIndex, 0, deletedOffer);
+          return nextOffers;
+        });
+      },
+    });
   }
 
   return (

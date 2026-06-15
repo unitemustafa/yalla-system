@@ -8,11 +8,13 @@ import {
   Store,
 } from "lucide-react";
 
+import { defaultDashboardAccountEmail } from "@/lib/account-email";
+
 export const currentUser = {
   initials: "MA",
   fullName: "Mohamed Abdeljalel",
   role: "Manager",
-  email: "m.abdeljalel@yalla-market.com",
+  email: defaultDashboardAccountEmail,
   phone: "+20 112 240 1581",
   username: "m.abdeljalel",
   location: "Cairo, Egypt",

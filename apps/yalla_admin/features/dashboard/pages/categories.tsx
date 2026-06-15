@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ChevronDown,
   Edit,
   GripVertical,
   Pencil,
@@ -18,6 +17,7 @@ import { DashboardImage } from "../dashboard-image";
 import {
   ActionMenu,
   AppSelect,
+  Badge,
   Button,
   Card,
   DataTable,
@@ -284,6 +284,7 @@ function CategorySectionDrawer({
       section.toLocaleLowerCase("ar-EG") ===
         trimmedName.toLocaleLowerCase("ar-EG"),
   );
+  const visibleSections = existingSections.filter((section) => section !== "all");
   const canSubmit = trimmedName.length > 0 && !sectionExists;
 
   return (
@@ -325,6 +326,21 @@ function CategorySectionDrawer({
               التصنيف موجود بالفعل.
             </p>
           ) : null}
+          <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium">التصنيفات الموجودة</span>
+              <span className="text-xs text-muted-foreground">
+                {visibleSections.length} تصنيفات
+              </span>
+            </div>
+            <div className="flex max-h-28 flex-wrap gap-2 overflow-y-auto pr-0.5">
+              {visibleSections.map((section) => (
+                <Badge key={section} tone="secondary">
+                  {section}
+                </Badge>
+              ))}
+            </div>
+          </div>
           <Button
             className="mt-2 h-11 w-full"
             disabled={!canSubmit}
@@ -499,9 +515,11 @@ export function CategoriesPage() {
     <div className="px-6 py-6">
       <div className="flex min-h-[57px] items-start">
         <div>
-          <h1 className="text-2xl font-semibold leading-8">الفئات</h1>
+          <h1 className="text-2xl font-semibold leading-8">
+            الفئات والتصنيفات
+          </h1>
           <p className="mt-1 text-sm leading-[21px] text-muted-foreground">
-            إدارة فئات المنتجات حسب أقسام تطبيق العملاء مثل الطازج والأكل والتسوق.
+            إدارة فئات المنتجات وتصنيفاتها حسب أقسام تطبيق العملاء مثل الطازج والأكل والتسوق.
           </p>
         </div>
       </div>
@@ -509,7 +527,7 @@ export function CategoriesPage() {
       <Card className="mt-8">
         <div className="flex min-h-[76px] flex-col items-start justify-between gap-4 border-b px-6 py-4 sm:flex-row sm:items-center">
           <div>
-            <div className="text-base font-semibold">كل الفئات</div>
+            <div className="text-base font-semibold">كل الفئات والتصنيفات</div>
             <div className="mt-1 text-xs text-muted-foreground">
               أنشئ فئة جديدة لتنظيم المنتجات.
             </div>
@@ -548,41 +566,41 @@ export function CategoriesPage() {
             </label>
             <label className="flex flex-col gap-2 md:w-[150px]">
               <span className="text-sm leading-5">الحالة</span>
-              <div className="relative">
-                <select
-                  value={statusFilter}
-                  onChange={(event) => {
-                    setStatusFilter(event.target.value as CategoryStatusFilter);
-                    setOpenActionMenu(null);
-                    resetToFirstPage();
-                  }}
-                  className="flex h-9 w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pe-9 text-sm text-muted-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="all">كل الحالات</option>
-                  <option value="active">نشط</option>
-                  <option value="inactive">غير نشط</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground opacity-50" />
-              </div>
+              <AppSelect
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value as CategoryStatusFilter);
+                  setOpenActionMenu(null);
+                  resetToFirstPage();
+                }}
+                options={[
+                  { value: "all", label: "كل الحالات" },
+                  { value: "active", label: "نشط" },
+                  { value: "inactive", label: "غير نشط" },
+                ]}
+                className="h-9"
+                contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
+                ariaLabel="الحالة"
+              />
             </label>
             <label className="flex flex-col gap-2 md:w-[170px]">
               <span className="text-sm leading-5">النوع</span>
-              <div className="relative">
-                <select
-                  value={typeFilter}
-                  onChange={(event) => {
-                    setTypeFilter(event.target.value as CategoryTypeFilter);
-                    setOpenActionMenu(null);
-                    resetToFirstPage();
-                  }}
-                  className="flex h-9 w-full appearance-none rounded-md border border-border bg-background px-3 py-2 pe-9 text-sm text-muted-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="all">كل الفئات</option>
-                  <option value="popular">فئات شائعة</option>
-                  <option value="featured">فئات مميزة</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground opacity-50" />
-              </div>
+              <AppSelect
+                value={typeFilter}
+                onValueChange={(value) => {
+                  setTypeFilter(value as CategoryTypeFilter);
+                  setOpenActionMenu(null);
+                  resetToFirstPage();
+                }}
+                options={[
+                  { value: "all", label: "كل الفئات" },
+                  { value: "popular", label: "فئات شائعة" },
+                  { value: "featured", label: "فئات مميزة" },
+                ]}
+                className="h-9"
+                contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
+                ariaLabel="النوع"
+              />
             </label>
           </div>
           <div className="mt-4 overflow-x-auto rounded-md border">

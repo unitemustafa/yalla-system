@@ -153,6 +153,18 @@ export function NotificationsPage() {
     });
   }
 
+
+  function deleteNotification(notificationId: string) {
+    setNotifications((currentNotifications) =>
+      currentNotifications.filter(
+        (notification) => notification.id !== notificationId,
+      ),
+    );
+    showSnackbar({
+      message: "تم حذف الإشعار.",
+      tone: "danger",
+    });
+  }
   return (
     <div className="px-6 py-6">
       <PageTitle
@@ -301,6 +313,14 @@ export function NotificationsPage() {
                           {notification.read ? (
                             <CheckCheck className="size-3.5 text-emerald-500" />
                           ) : null}
+                          <button
+                            aria-label="حذف الإشعار"
+                            className="inline-flex size-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => deleteNotification(notification.id)}
+                            type="button"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
                         </div>
                       </div>
                       <div className="mt-3 flex items-center justify-between gap-3">

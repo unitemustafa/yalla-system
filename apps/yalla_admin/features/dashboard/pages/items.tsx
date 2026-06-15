@@ -49,6 +49,36 @@ const itemsPageSize = 10;
 const checkboxClass =
   "peer inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-border text-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground";
 
+function useBodyScrollLock(locked: boolean) {
+  useEffect(() => {
+    if (!locked) {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [locked]);
+}
+
 const itemSortCollator = new Intl.Collator("ar", {
   numeric: true,
   sensitivity: "base",
@@ -129,15 +159,13 @@ function ItemsFilters({
   categories,
   filters,
   onChange,
-  onReset,
 }: {
   categories: string[];
   filters: ItemFilters;
   onChange: (filters: ItemFilters) => void;
-  onReset: () => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-[minmax(300px,1fr)_220px_180px_120px] md:items-end">
+    <div className="grid gap-3 md:grid-cols-[minmax(300px,1fr)_220px_180px] md:items-end">
       <label className="grid gap-2 text-sm">
         بحث
         <input
@@ -148,7 +176,7 @@ function ItemsFilters({
         />
       </label>
       <label className="grid gap-2 text-sm">
-        التصنيف
+        الفئة
         <AppSelect
           value={filters.category}
           onValueChange={(category) => onChange({ ...filters, category })}
@@ -159,7 +187,7 @@ function ItemsFilters({
               label: category,
             })),
           ]}
-          ariaLabel="التصنيف"
+          ariaLabel="الفئة"
           className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
         />
       </label>
@@ -179,9 +207,6 @@ function ItemsFilters({
           className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
         />
       </label>
-      <Button type="button" variant="outline" className="h-10 w-full" onClick={onReset}>
-        إعادة ضبط
-      </Button>
     </div>
   );
 }
@@ -243,8 +268,10 @@ function DeleteDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  useBodyScrollLock(true);
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-foreground/40 px-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-hidden overscroll-none bg-foreground/40 px-4">
       <div
         role="alertdialog"
         aria-modal="true"
@@ -340,7 +367,7 @@ function ItemsMobileCards({
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="rounded-md bg-muted/40 p-2">
-                  <div className="text-muted-foreground">التصنيف</div>
+                  <div className="text-muted-foreground">الفئة</div>
                   <div className="mt-1 truncate font-medium">{row.category}</div>
                 </div>
                 <div className="rounded-md bg-muted/40 p-2">
@@ -623,11 +650,6 @@ export function ItemsPage() {
             setFilters(nextFilters);
             setCurrentPage(1);
           }}
-          onReset={() => {
-            setFilters(defaultFilters);
-            setSelectedRows(new Set());
-            setCurrentPage(1);
-          }}
         />
         {loading ? (
           <div className="mt-4 flex h-24 items-center justify-center rounded-md border text-sm text-muted-foreground lg:hidden">
@@ -684,7 +706,7 @@ export function ItemsPage() {
               "الاسم",
               "Code",
               "الوصف",
-              "التصنيف",
+              "الفئة",
               "السعر",
               "نشط",
               "",

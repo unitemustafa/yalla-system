@@ -30,7 +30,11 @@ export const navGroups: NavGroup[] = [
           { label: "كل المنتجات", href: "/items", page: "items" },
           { label: "إضافة منتج", href: "/items/create", page: "create-item" },
           { label: "المحلات", href: "/items/shops", page: "shops" },
-          { label: "الفئات", href: "/items/categories", page: "categories" },
+          {
+            label: "الفئات والتصنيفات",
+            href: "/items/categories",
+            page: "categories",
+          },
           { label: "الإضافات", href: "/items/addons", page: "addons" },
         ],
       },
@@ -95,7 +99,7 @@ export const breadcrumbByPage: Record<PageKey, BreadcrumbItem[]> = {
   categories: [
     dashboardCrumb,
     { label: "المنتجات", href: "/items" },
-    { label: "الفئات" },
+    { label: "الفئات والتصنيفات" },
   ],
   addons: [
     dashboardCrumb,
@@ -172,6 +176,7 @@ export type ItemRow = {
   subcategory: string;
   calories: string;
   price: string;
+  variantDetails?: string;
   featured: string;
   active: boolean;
 };

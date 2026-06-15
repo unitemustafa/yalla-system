@@ -23,16 +23,16 @@ class ProductDetailsView extends StatelessWidget {
       title: product.name,
       brand: 'Yalla Market',
       price: AppCurrency.format(product.effectiveBasePrice),
-      oldPrice: product.discountPrice == null
-          ? null
-          : AppCurrency.format(product.basePrice),
+      oldPrice: product.hasDiscount
+          ? AppCurrency.format(product.basePrice)
+          : null,
       discount: _discountLabel(product),
     );
   }
 
   String? _discountLabel(ProductModel product) {
-    final discountPrice = product.discountPrice;
-    if (discountPrice == null || product.basePrice <= 0) return null;
+    if (!product.hasDiscount) return null;
+    final discountPrice = product.discountPrice!;
 
     final discount =
         ((product.basePrice - discountPrice) / product.basePrice) * 100;

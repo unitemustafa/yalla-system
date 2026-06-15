@@ -9,6 +9,7 @@ import {
   useDashboardI18n,
 } from "./i18n";
 import { useDashboardCustomization } from "./customization";
+import { DashboardOfflineBanner } from "./offline-banner";
 import { SnackbarProvider } from "./snackbar";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <DashboardAutoTranslate>
       <div className="min-h-screen w-full bg-background text-foreground">
+        <DashboardOfflineBanner />
         {mobileNavOpen ? (
           <button
             className="fixed inset-0 z-20 bg-foreground/30 backdrop-blur-[1px] lg:hidden"

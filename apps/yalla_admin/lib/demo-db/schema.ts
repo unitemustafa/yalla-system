@@ -20,6 +20,7 @@ export async function ensureDashboardSchema() {
             subcategory TEXT NOT NULL,
             calories TEXT NOT NULL,
             price TEXT NOT NULL,
+            variantDetails TEXT NOT NULL DEFAULT '{}',
             featured TEXT NOT NULL,
             active BOOLEAN NOT NULL,
             createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,6 +56,9 @@ export async function ensureDashboardSchema() {
         await prisma.$executeRawUnsafe(
           "CREATE UNIQUE INDEX IF NOT EXISTS dashboard_items_code_key ON dashboard_items(code)",
         );
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN variantDetails TEXT NOT NULL DEFAULT '{}'",
+        ).catch(() => undefined);
       })
       .then(() => undefined);
   }

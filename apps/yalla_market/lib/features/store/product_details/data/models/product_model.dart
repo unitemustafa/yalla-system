@@ -26,7 +26,13 @@ class ProductModel {
   final bool notesEnabled;
 
   /// السعر الذي يبدأ منه الحساب قبل إضافة أسعار الاختيارات.
-  double get effectiveBasePrice => discountPrice ?? basePrice;
+  bool get hasDiscount =>
+      discountPrice != null &&
+      discountPrice! > 0 &&
+      basePrice > 0 &&
+      discountPrice! < basePrice;
+
+  double get effectiveBasePrice => hasDiscount ? discountPrice! : basePrice;
 
   bool get hasOptions => optionGroups.isNotEmpty;
   bool get isBundle => bundleItems.isNotEmpty;

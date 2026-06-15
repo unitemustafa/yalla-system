@@ -39,6 +39,18 @@ List<String> _uniqueImageSources(Iterable<String> sources) {
   return images;
 }
 
+String? _validDiscountLabel(String? discount) {
+  final value = discount?.trim();
+  if (value == null || value.isEmpty) return null;
+
+  final numericValue = double.tryParse(
+    value.replaceAll(RegExp(r'[^0-9.,-]'), '').replaceAll(',', ''),
+  );
+  if (numericValue != null && numericValue <= 0) return null;
+
+  return value;
+}
+
 class ProductDetailView extends StatefulWidget {
   const ProductDetailView({
     super.key,
@@ -81,6 +93,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
   int quantity = 0;
   String selectedColor = 'Green';
   String selectedSize = 'Medium';
+  String selectedType = 'Electronic devices';
   late String currentImage;
 
   @override
@@ -122,7 +135,15 @@ class _ProductDetailViewState extends State<ProductDetailView> {
       'Green' => 0,
       _ => 0,
     };
-    return (baseQuantity + colorAdjustment).clamp(1, 99).toInt();
+    final typeAdjustment = switch (selectedType) {
+      'Mobile' => -2,
+      'Accessories' => 4,
+      'Spare parts' => 1,
+      _ => 0,
+    };
+    return (baseQuantity + colorAdjustment + typeAdjustment)
+        .clamp(1, 99)
+        .toInt();
   }
 
   String _variationPrice(String? price, int tier) {
@@ -263,7 +284,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         brand: widget.brand,
         price: widget.price,
         oldPrice: widget.oldPrice,
-        discount: widget.discount,
+        discount: _validDiscountLabel(widget.discount),
       ),
     );
 
@@ -313,7 +334,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
 
     context.read<CartCubit>().addItem(
       CartItemData(
-        id: '${widget.title}_${selectedColor}_$selectedSize',
+        id: '${widget.title}_${selectedColor}_${selectedSize}_$selectedType',
         productId: widget.productId,
         image: currentImage,
         brand: widget.brand,
@@ -323,6 +344,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         attributes: [
           CartItemAttribute(label: 'Color', value: selectedColor),
           CartItemAttribute(label: 'Size', value: selectedSize),
+          CartItemAttribute(label: 'Type', value: selectedType),
         ],
       ),
       quantity,
@@ -383,7 +405,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _PriceHeader(
-                    discount: widget.discount,
+                    discount: _validDiscountLabel(widget.discount),
                     price: _formatPrice(widget.price),
                     oldPrice: _formatPrice(widget.oldPrice),
                     isDark: isDark,
@@ -451,6 +473,37 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildSizeOption('X-Large', isAvailable: false),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _SectionTitle(title: 'Type', isDark: isDark),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTypeOption(
+                          'Electronic devices',
+                          isAvailable: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildTypeOption('Mobile', isAvailable: true),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildTypeOption(
+                          'Accessories',
+                          isAvailable: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildTypeOption(
+                          'Spare parts',
+                          isAvailable: true,
+                        ),
                       ),
                     ],
                   ),
@@ -543,13 +596,35 @@ class _ProductDetailViewState extends State<ProductDetailView> {
   }
 
   Widget _buildSizeOption(String size, {required bool isAvailable}) {
-    final isSelected = selectedSize == size;
+    return _buildChoiceOption(
+      label: size,
+      isSelected: selectedSize == size,
+      isAvailable: isAvailable,
+      onTap: () => setState(() => selectedSize = size),
+    );
+  }
+
+  Widget _buildTypeOption(String type, {required bool isAvailable}) {
+    return _buildChoiceOption(
+      label: type,
+      isSelected: selectedType == type,
+      isAvailable: isAvailable,
+      onTap: () => setState(() => selectedType = type),
+    );
+  }
+
+  Widget _buildChoiceOption({
+    required String label,
+    required bool isSelected,
+    required bool isAvailable,
+    required VoidCallback onTap,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: isAvailable ? () => setState(() => selectedSize = size) : null,
+        onTap: isAvailable ? onTap : null,
         borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -578,7 +653,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
             children: [
               Flexible(
                 child: Text(
-                  size,
+                  context.tr(label),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(

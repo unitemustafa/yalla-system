@@ -19,6 +19,7 @@ model DashboardItem {
   calories    String
   // TODO: Convert demo price strings to typed numeric currency fields in a planned migration.
   price       String
+  variantDetails String @default("{}")
   featured    String
   active      Boolean
   createdAt   DateTime @default(now())

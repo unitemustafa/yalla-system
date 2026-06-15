@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ComponentPropsWithoutRef, MouseEvent } from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Select } from "radix-ui";
 import {
   Check,
@@ -196,6 +196,7 @@ export function AppSelect({
   className,
   contentClassName,
   disabled,
+  dir,
 }: {
   value?: string;
   defaultValue?: string;
@@ -207,6 +208,7 @@ export function AppSelect({
   className?: string;
   contentClassName?: string;
   disabled?: boolean;
+  dir?: "ltr" | "rtl";
 }) {
   return (
     <Select.Root
@@ -217,6 +219,7 @@ export function AppSelect({
     >
       <Select.Trigger
         aria-label={ariaLabel}
+        dir={dir}
         className={cn(
           "group inline-flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm outline-none transition hover:border-primary/40 hover:bg-accent/70 hover:text-accent-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 data-[state=open]:border-primary data-[state=open]:bg-accent data-[state=open]:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
           className,
@@ -237,6 +240,7 @@ export function AppSelect({
       <Select.Portal>
         <Select.Content
           align="start"
+          dir={dir}
           position="popper"
           sideOffset={8}
           className={cn(
@@ -322,12 +326,92 @@ export function ActionMenu({
   triggerClassName?: string;
   menuClassName?: string;
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<"bottom" | "top">("bottom");
+
+  const preferredPlacement = useCallback(
+    (
+      trigger: HTMLElement,
+      menuHeight = 52 + items.length * 40 + (title ? 44 : 0),
+    ) => {
+      const scope =
+        trigger.closest("table") ??
+        trigger.closest("[data-action-menu-scope]") ??
+        trigger.closest("main") ??
+        document.body;
+      const scopedTriggers = Array.from(
+        scope.querySelectorAll<HTMLButtonElement>(
+          "button[data-action-menu-trigger]",
+        ),
+      )
+        .filter((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
+        .sort((firstButton, secondButton) => {
+          const firstRect = firstButton.getBoundingClientRect();
+          const secondRect = secondButton.getBoundingClientRect();
+
+          return firstRect.top - secondRect.top || firstRect.left - secondRect.left;
+        });
+      const triggerIndex = scopedTriggers.indexOf(
+        trigger as HTMLButtonElement,
+      );
+
+      if (
+        scopedTriggers.length > 3 &&
+        triggerIndex >= scopedTriggers.length - 3
+      ) {
+        return "top";
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight;
+      const spaceBelow = viewportHeight - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+
+      return spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow
+        ? "top"
+        : "bottom";
+    },
+    [items.length, title],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+
+    function updatePlacement() {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      setPlacement(
+        preferredPlacement(trigger, menuRef.current?.offsetHeight),
+      );
+    }
+
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [open, preferredPlacement]);
+
   return (
     <div className="relative flex justify-end" onClick={(event) => event.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
+        data-action-menu-trigger
         onClick={(event) => {
           event.stopPropagation();
+          if (!open) {
+            setPlacement(preferredPlacement(event.currentTarget));
+          }
           onToggle();
         }}
         className={cn(
@@ -343,9 +427,11 @@ export function ActionMenu({
       </button>
       {open ? (
         <div
+          ref={menuRef}
           role="menu"
           className={cn(
-            "absolute top-11 z-30 w-48 overflow-hidden rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-2xl shadow-black/20 backdrop-blur-md animate-in fade-in-0 zoom-in-95 dark:shadow-black/40",
+            "absolute z-30 w-48 overflow-hidden rounded-xl border border-border/70 bg-popover/95 p-1.5 text-popover-foreground shadow-2xl shadow-black/20 backdrop-blur-md animate-in fade-in-0 zoom-in-95 dark:shadow-black/40",
+            placement === "top" ? "bottom-11" : "top-11",
             align === "end" && "end-0",
             align === "start" && "start-0",
             align === "center" && "left-1/2 -translate-x-1/2",
@@ -734,7 +820,7 @@ export function Pagination({
   onNext?: () => void;
 }) {
   return (
-    <div className="flex min-h-[53px] flex-col gap-3 px-0 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:py-0">
+    <div className="flex min-h-[53px] flex-col gap-3 px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:py-0">
       <div className="flex flex-wrap items-center gap-3">
         <span>{text}</span>
       </div>

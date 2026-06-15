@@ -7,6 +7,7 @@ import 'core/di/service_locator.dart';
 import 'core/localization/app_language_controller.dart';
 import 'core/localization/app_translations.dart';
 import 'core/preferences/app_preferences_controller.dart';
+import 'core/presentation/widgets/offline_connection_banner.dart';
 import 'core/routing/app_navigator.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/app_routes.dart';
@@ -80,7 +81,12 @@ class YallaMarketApp extends StatelessWidget {
                       textDirection: language.isArabic
                           ? TextDirection.rtl
                           : TextDirection.ltr,
-                      child: child ?? const SizedBox.shrink(),
+                      child: OfflineConnectionBanner(
+                        message: language.isArabic
+                            ? 'لا يوجد اتصال بالإنترنت. تحقق من الشبكة لإكمال التحديثات.'
+                            : 'No internet connection. Check your network to continue updates.',
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     );
                   },
                   localizationsDelegates: const [

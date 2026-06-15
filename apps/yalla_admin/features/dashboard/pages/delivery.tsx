@@ -1,11 +1,13 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { Fragment, useState } from "react";
 import {
   ArrowUpDown,
   AlertCircle,
   BadgeCheck,
   Camera,
+  ChevronDown,
   CheckCircle2,
   DollarSign,
   Edit3,
@@ -32,7 +34,6 @@ import {
   Card,
   Field,
   FilterBar,
-  FormCard,
   Input,
   PageTitle,
   Pagination,
@@ -340,18 +341,36 @@ function CourierOrdersSection({
   title,
   orders,
   emptyText,
+  defaultOpen = false,
 }: {
   title: string;
   orders: CourierOrder[];
   emptyText: string;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
-      <div className="flex min-h-12 items-center justify-between gap-3 border-b bg-muted/20 px-4 py-3">
-        <div className="text-sm font-bold">{title}</div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+        className="flex min-h-12 w-full items-center justify-between gap-3 bg-muted/20 px-4 py-3 text-start transition hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+      >
+        <span className="flex items-center gap-2">
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+          <span className="text-sm font-bold">{title}</span>
+        </span>
         <Badge tone="secondary">{orders.length}</Badge>
-      </div>
-      <div className="flex flex-col gap-3 p-4">
+      </button>
+      {open ? (
+      <div className="flex flex-col gap-3 border-t p-4">
         {orders.length === 0 ? (
           <div className="rounded-md bg-muted/30 px-3 py-4 text-center text-sm text-muted-foreground">
             {emptyText}
@@ -378,6 +397,7 @@ function CourierOrdersSection({
           ))
         )}
       </div>
+      ) : null}
     </section>
   );
 }
@@ -399,6 +419,44 @@ function CourierInfoRow({
   );
 }
 
+function CollapsibleCourierPanel({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <section className="overflow-hidden rounded-lg border bg-card">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+        className="flex min-h-[49px] w-full items-center justify-between gap-3 border-b bg-card px-4 py-3 text-start transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+      >
+        <span className="flex items-center gap-2">
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+          <span className="text-sm font-bold">{title}</span>
+        </span>
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-4 rounded-b-lg bg-card p-4">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function CourierDetailsDrawer({
   courier,
   onClose,
@@ -408,9 +466,32 @@ function CourierDetailsDrawer({
   onClose: () => void;
   onPhotoChange: (courierId: string, photoUrl: string | null) => void;
 }) {
+  const [passwordDraft, setPasswordDraft] = useState({
+    password: "",
+    confirmPassword: "",
+  });
+  const [passwordMessage, setPasswordMessage] = useState("");
+
+  function updateCourierPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (passwordDraft.password.length < 6) {
+      setPasswordMessage("كلمة المرور يجب ألا تقل عن 6 أحرف.");
+      return;
+    }
+
+    if (passwordDraft.password !== passwordDraft.confirmPassword) {
+      setPasswordMessage("تأكيد كلمة المرور غير مطابق.");
+      return;
+    }
+
+    setPasswordDraft({ password: "", confirmPassword: "" });
+    setPasswordMessage("تم تغيير كلمة مرور المندوب.");
+  }
+
   return (
-    <div className="fixed inset-0 z-40 overflow-y-auto bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
-      <section className="relative mx-auto flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+    <div className="fixed inset-0 z-40 flex items-center overflow-y-auto bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
+      <section className="relative mx-auto flex max-h-[calc(100vh-3rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
         <button
           type="button"
           onClick={onClose}
@@ -480,7 +561,7 @@ function CourierDetailsDrawer({
           </div>
 
           <div className="flex flex-col gap-4">
-            <FormCard title="بيانات المندوب">
+            <CollapsibleCourierPanel title="بيانات المندوب">
               <div className="space-y-2">
                 <CourierInfoRow label="البريد">
                   <span className="block break-all text-right" dir="ltr">
@@ -494,9 +575,51 @@ function CourierDetailsDrawer({
                   {courier.plateNumber}
                 </CourierInfoRow>
               </div>
-            </FormCard>
+            </CollapsibleCourierPanel>
 
-            <FormCard title="إرسال طلب">
+            <CollapsibleCourierPanel title="تغيير كلمة المرور">
+              <form className="grid gap-3" onSubmit={updateCourierPassword}>
+                <Field label="كلمة المرور الجديدة">
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwordDraft.password}
+                    onChange={(event) =>
+                      setPasswordDraft((current) => ({
+                        ...current,
+                        password: event.target.value,
+                      }))
+                    }
+                    placeholder="••••••"
+                  />
+                </Field>
+                <Field label="تأكيد كلمة المرور">
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwordDraft.confirmPassword}
+                    onChange={(event) =>
+                      setPasswordDraft((current) => ({
+                        ...current,
+                        confirmPassword: event.target.value,
+                      }))
+                    }
+                    placeholder="••••••"
+                  />
+                </Field>
+                {passwordMessage ? (
+                  <div className="rounded-md bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">
+                    {passwordMessage}
+                  </div>
+                ) : null}
+                <Button type="submit" className="w-full">
+                  <Save className="size-4" />
+                  حفظ كلمة المرور
+                </Button>
+              </form>
+            </CollapsibleCourierPanel>
+
+            <CollapsibleCourierPanel title="إرسال طلب">
               <Field label="اختيار الطلب">
                 <SelectBox>ORD-20260529-024 • {courier.zone}</SelectBox>
               </Field>
@@ -504,7 +627,7 @@ function CourierDetailsDrawer({
                 <Send className="size-4" />
                 إرسال الطلب للمندوب
               </Button>
-            </FormCard>
+            </CollapsibleCourierPanel>
           </div>
         </div>
       </section>
@@ -1284,11 +1407,28 @@ function CourierCard({
 }
 
 export function CouriersPage() {
+  const searchParams = useSearchParams();
+  const requestedCourier = searchParams.get("courier");
+  const initialCourierIndex = requestedCourier
+    ? couriers.findIndex((courier) =>
+        [courier.id, courier.phone, courier.name].some(
+          (value) =>
+            value.trim().toLocaleLowerCase("ar-EG") ===
+            requestedCourier.trim().toLocaleLowerCase("ar-EG"),
+        ),
+      )
+    : -1;
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedCourier, setSelectedCourier] = useState<Courier | null>(null);
+  const [selectedCourier, setSelectedCourier] = useState<Courier | null>(
+    () => (initialCourierIndex >= 0 ? couriers[initialCourierIndex] : null),
+  );
   const [sendOrderCourier, setSendOrderCourier] = useState<Courier | null>(null);
   const [courierRows, setCourierRows] = useState<Courier[]>(couriers);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() =>
+    initialCourierIndex >= 0
+      ? Math.floor(initialCourierIndex / deliveryListPageSize) + 1
+      : 1,
+  );
   const totalPages = Math.max(
     1,
     Math.ceil(courierRows.length / deliveryListPageSize),

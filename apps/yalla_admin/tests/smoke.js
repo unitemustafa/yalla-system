@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const fs = require("node:fs/promises");
+const nodePath = require("node:path");
 const { spawn } = require("node:child_process");
 
 const baseURL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 const demoPassword = requireEnv("DASHBOARD_DEMO_PASSWORD");
 const sessionSecret = requireEnv("SESSION_SECRET");
+const defaultAccountEmail = "m.abdeljalel@yalla-market.com";
 let serverProcess;
 
 function requireEnv(name) {
@@ -85,6 +88,39 @@ async function jsonRequest(path, options = {}) {
   return { response, data };
 }
 
+async function uploadSmokeImage(cookie) {
+  const formData = new FormData();
+  const pngBytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+    "base64",
+  );
+
+  formData.append(
+    "file",
+    new Blob([pngBytes], { type: "image/png" }),
+    "smoke-upload.png",
+  );
+
+  const response = await fetch(`${baseURL}/api/dashboard/uploads`, {
+    method: "POST",
+    headers: { cookie },
+    body: formData,
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  return { response, data };
+}
+
+async function removeUploadedSmokeImage(url) {
+  if (typeof url !== "string" || !url.startsWith("/uploads/dashboard/")) {
+    return;
+  }
+
+  const filePath = nodePath.join(process.cwd(), "public", ...url.split("/").slice(1));
+  await fs.rm(filePath, { force: true });
+}
+
 async function stopServer() {
   if (!serverProcess?.pid) {
     return;
@@ -141,6 +177,75 @@ async function main() {
   if (!items.data.items.every((item) => typeof item.code === "string" && item.code)) {
     throw new Error("Expected every dashboard item to include a product code");
   }
+
+  const nextAccountEmail = `smoke-${Date.now()}@yalla-market.com`;
+  const emailChangeRequest = await jsonRequest("/api/auth/email-change/request", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ newEmail: nextAccountEmail }),
+  });
+  const emailChangeCode = emailChangeRequest.data?.devCode;
+  if (!emailChangeRequest.response.ok || typeof emailChangeCode !== "string") {
+    throw new Error("Expected email change request to return a dev verification code");
+  }
+
+  const emailChangeConfirm = await jsonRequest("/api/auth/email-change/confirm", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ code: emailChangeCode }),
+  });
+  if (emailChangeConfirm.data?.email !== nextAccountEmail) {
+    throw new Error("Expected email change confirmation to persist the new email");
+  }
+
+  const newEmailLogin = await jsonRequest("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: nextAccountEmail,
+      password: demoPassword,
+    }),
+  });
+  if (!newEmailLogin.response.ok) {
+    throw new Error("Expected login with the changed account email to succeed");
+  }
+
+  const emailRestoreRequest = await jsonRequest("/api/auth/email-change/request", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ newEmail: defaultAccountEmail }),
+  });
+  const emailRestoreCode = emailRestoreRequest.data?.devCode;
+  if (!emailRestoreRequest.response.ok || typeof emailRestoreCode !== "string") {
+    throw new Error("Expected email restore request to return a dev verification code");
+  }
+
+  const emailRestoreConfirm = await jsonRequest("/api/auth/email-change/confirm", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ code: emailRestoreCode }),
+  });
+  if (emailRestoreConfirm.data?.email !== defaultAccountEmail) {
+    throw new Error("Expected email restore confirmation to persist the default email");
+  }
+
+  const uploadedImage = await uploadSmokeImage(cookie);
+  const uploadedImageUrl = uploadedImage.data?.url;
+  if (
+    !uploadedImage.response.ok ||
+    typeof uploadedImageUrl !== "string" ||
+    !uploadedImageUrl.startsWith("/uploads/dashboard/")
+  ) {
+    throw new Error("Expected dashboard image upload to return a public URL");
+  }
+
+  const uploadedAsset = await fetch(`${baseURL}${uploadedImageUrl}`);
+  if (
+    !uploadedAsset.ok ||
+    !uploadedAsset.headers.get("content-type")?.startsWith("image/png")
+  ) {
+    throw new Error("Expected uploaded dashboard image to be publicly readable");
+  }
+  await removeUploadedSmokeImage(uploadedImageUrl);
 
   const firstItem = items.data.items[0];
   const originalActive = Boolean(firstItem.active);

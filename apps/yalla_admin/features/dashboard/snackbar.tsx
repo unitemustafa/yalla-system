@@ -18,11 +18,17 @@ type Snackbar = {
   id: number;
   message: string;
   tone: SnackbarTone;
+  actionLabel?: string;
+  durationMs: number;
+  onAction?: () => void;
 };
 
 type SnackbarInput = {
   message: string;
   tone?: SnackbarTone;
+  actionLabel?: string;
+  durationMs?: number;
+  onAction?: () => void;
 };
 
 type SnackbarContextValue = {
@@ -40,14 +46,23 @@ export function SnackbarProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const showSnackbar = useCallback(({ message, tone = "success" }: SnackbarInput) => {
-    const id = Date.now() + Math.random();
+  const showSnackbar = useCallback(
+    ({
+      message,
+      tone = "success",
+      actionLabel,
+      durationMs = actionLabel ? 5000 : 3600,
+      onAction,
+    }: SnackbarInput) => {
+      const id = Date.now() + Math.random();
 
-    setSnackbars((currentSnackbars) => [
-      ...currentSnackbars.slice(-2),
-      { id, message, tone },
-    ]);
-  }, []);
+      setSnackbars((currentSnackbars) => [
+        ...currentSnackbars.slice(-2),
+        { id, message, tone, actionLabel, durationMs, onAction },
+      ]);
+    },
+    [],
+  );
 
   const value = useMemo(() => ({ showSnackbar }), [showSnackbar]);
 
@@ -79,9 +94,9 @@ function SnackbarItem({
   onClose: () => void;
 }) {
   useEffect(() => {
-    const timer = window.setTimeout(onClose, 3600);
+    const timer = window.setTimeout(onClose, snackbar.durationMs);
     return () => window.clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, snackbar.durationMs]);
 
   const Icon =
     snackbar.tone === "danger"
@@ -105,6 +120,18 @@ function SnackbarItem({
     >
       <Icon className="mt-0.5 size-4 shrink-0" />
       <div className="min-w-0 flex-1 leading-5">{snackbar.message}</div>
+      {snackbar.actionLabel && snackbar.onAction ? (
+        <button
+          className="shrink-0 rounded-md px-2 py-0.5 text-xs font-bold underline-offset-4 transition hover:underline"
+          onClick={() => {
+            snackbar.onAction?.();
+            onClose();
+          }}
+          type="button"
+        >
+          {snackbar.actionLabel}
+        </button>
+      ) : null}
       <button
         aria-label="إغلاق التنبيه"
         className="rounded-md p-0.5 opacity-70 transition-opacity hover:opacity-100"

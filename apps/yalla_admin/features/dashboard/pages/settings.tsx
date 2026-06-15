@@ -24,6 +24,7 @@ import { logoSrc } from "@/features/dashboard/data";
 import { useDashboardI18n } from "@/features/dashboard/i18n";
 import { Button, Card, Input, PageTitle } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
+import { uploadDashboardImage } from "@/features/dashboard/upload-dashboard-image";
 import { cn } from "@/lib/utils";
 
 function SettingBlock({
@@ -55,6 +56,7 @@ export function SettingsPage() {
     useDashboardCustomization();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const brandName = customization.brandName || t("brand.name");
   const branchName = customization.branchName || t("branch.default");
@@ -76,20 +78,25 @@ export function SettingsPage() {
     }
   }
 
-  function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        updateCustomization({ logoDataUrl: reader.result });
-      }
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingLogo(true);
+
+    try {
+      const uploadedLogoUrl = await uploadDashboardImage(file);
+      updateCustomization({ logoDataUrl: uploadedLogoUrl });
+    } catch {
+      setStatus("تعذر رفع اللوجو الآن.");
+      showSnackbar({ message: "تعذر رفع اللوجو.", tone: "danger" });
+    } finally {
+      setIsUploadingLogo(false);
+      event.target.value = "";
+    }
   }
 
   function handleReset() {
@@ -350,12 +357,13 @@ export function SettingsPage() {
                   type="file"
                 />
                 <Button
+                  disabled={isUploadingLogo}
                   onClick={() => fileInputRef.current?.click()}
                   type="button"
                   variant="outline"
                 >
                   <ImagePlus className="size-4" />
-                  تغيير اللوجو
+                  {isUploadingLogo ? "جاري الرفع..." : "تغيير اللوجو"}
                 </Button>
                 {customization.logoDataUrl ? (
                   <Button

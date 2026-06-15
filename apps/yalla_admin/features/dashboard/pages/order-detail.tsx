@@ -163,6 +163,10 @@ function courierInitials(name: string) {
     .join("");
 }
 
+function courierDetailsHref(courier: OrderCourier) {
+  return `/delivery/couriers?courier=${encodeURIComponent(courier.phone)}`;
+}
+
 type MoneyStatTone = "default" | "green" | "amber";
 
 const moneyStatToneStyles: Record<
@@ -681,8 +685,12 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
           </InfoPanel>
 
           {assignedCourier ? (
-            <InfoPanel title="طيار الطلب" icon={Truck}>
-              <div className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/10 px-4 py-3">
+            <InfoPanel title="طيار الطلب" icon={Truck} defaultOpen>
+              <Link
+                href={courierDetailsHref(assignedCourier)}
+                className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-primary/10 px-4 py-3 transition hover:border-primary/40 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                aria-label={`Open ${assignedCourier.name}`}
+              >
                 <div className="min-w-0">
                   <div className="text-xs text-muted-foreground">المندوب الحالي</div>
                   <div className="mt-1 truncate font-semibold text-primary">
@@ -692,7 +700,7 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
                   {courierInitials(assignedCourier.name)}
                 </span>
-              </div>
+              </Link>
               <DetailRow
                 label="رقم الموبايل"
                 value={

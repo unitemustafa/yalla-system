@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import {
+  getDashboardAccountEmail,
+  isDashboardAccountEmail,
+} from "@/lib/account-email";
+
 export const authCookieName = "yalla-session";
 export const authCookieMaxAge = 60 * 60 * 8;
 export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
@@ -93,19 +98,30 @@ export function validateDemoCredentials(email: string, password: string) {
   const normalizedEmail = email.trim().toLowerCase();
 
   // Demo-only auth: this dashboard has no real backend user database yet.
-  if (normalizedEmail !== demoAdmin.email || password !== getDemoPassword()) {
+  if (
+    normalizedEmail !== demoAdmin.email &&
+    !isDashboardAccountEmail(normalizedEmail)
+  ) {
+    return null;
+  }
+
+  if (password !== getDemoPassword()) {
     return null;
   }
 
   return {
-    email: demoAdmin.email,
+    email:
+      normalizedEmail === demoAdmin.email
+        ? demoAdmin.email
+        : getDashboardAccountEmail(),
     name: demoAdmin.name,
     role: demoAdmin.role,
   };
 }
 
 export function isDemoAdminEmail(email: string) {
-  return email.trim().toLowerCase() === demoAdmin.email;
+  const normalizedEmail = email.trim().toLowerCase();
+  return normalizedEmail === demoAdmin.email || isDashboardAccountEmail(normalizedEmail);
 }
 
 export function createSessionToken(user: {

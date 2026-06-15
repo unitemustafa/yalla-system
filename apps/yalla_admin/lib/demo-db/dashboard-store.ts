@@ -37,6 +37,7 @@ export type CreateItemInput = {
   subcategory?: string;
   calories?: string;
   price?: string;
+  variantDetails?: string;
   featured?: boolean | string;
   active?: boolean;
 };
@@ -168,6 +169,7 @@ function toItemRow(item: DashboardItem): ItemRow {
     subcategory: item.subcategory,
     calories: item.calories,
     price: item.price,
+    variantDetails: item.variantDetails ?? "{}",
     featured: item.featured,
     active: item.active,
   };
@@ -217,6 +219,7 @@ async function ensureSeeded() {
             subcategory: item.subcategory,
             calories: item.calories,
             price: item.price,
+            variantDetails: "{}",
             featured: item.featured,
             active: item.active,
           })),
@@ -277,6 +280,7 @@ export async function createItem(input: CreateItemInput) {
       subcategory: trimText(input.subcategory, "\u0639\u0627\u0645"),
       calories: trimText(input.calories),
       price: normalizePrice(input.price),
+      variantDetails: trimText(input.variantDetails, "{}"),
       featured: normalizeFeatured(input.featured),
       active: input.active ?? true,
     },
@@ -328,6 +332,10 @@ export async function updateItem(
         typeof patch.price === "string" && patch.price.trim()
           ? normalizePrice(patch.price)
           : item.price,
+      variantDetails:
+        typeof patch.variantDetails === "string"
+          ? trimText(patch.variantDetails, "{}")
+          : item.variantDetails,
       featured:
         typeof patch.featured === "boolean" ||
         typeof patch.featured === "string"
@@ -366,6 +374,7 @@ export async function duplicateItem(itemId: string) {
       subcategory: item.subcategory,
       calories: item.calories,
       price: item.price,
+      variantDetails: item.variantDetails ?? "{}",
       featured: item.featured,
       active: item.active,
     },
