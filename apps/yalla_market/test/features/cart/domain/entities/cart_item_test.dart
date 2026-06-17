@@ -102,6 +102,10 @@ void main() {
         'attributes': [
           {'label': 'Size', 'value': 'Large'},
         ],
+        'itemType': 'product',
+        'visibilityMode': 'general',
+        'regionSlugs': [],
+        'regionNames': [],
       });
     });
   });

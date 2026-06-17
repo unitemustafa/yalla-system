@@ -30,7 +30,11 @@ void main() {
         success: (products) {
           expect(products, isNotEmpty);
           expect(
-            products.every((product) => product.citySlug == 'sharm-el-sheikh'),
+            products.every(
+              (product) =>
+                  product.isGeneralVisibility ||
+                  product.effectiveRegionSlugs.contains('sharm-el-sheikh'),
+            ),
             isTrue,
           );
         },

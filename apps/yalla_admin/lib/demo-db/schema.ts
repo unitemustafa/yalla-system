@@ -2,6 +2,29 @@ import { prisma } from "@/lib/prisma";
 
 let schemaPromise: Promise<void> | null = null;
 
+type TableColumn = {
+  name: string;
+};
+
+async function readTableColumns(tableName: "dashboard_items") {
+  const columns = await prisma.$queryRawUnsafe<TableColumn[]>(
+    `PRAGMA table_info(${tableName})`,
+  );
+
+  return new Set(columns.map((column) => column.name));
+}
+
+async function addDashboardItemColumnIfMissing(
+  columns: Set<string>,
+  columnName: string,
+  sql: string,
+) {
+  if (columns.has(columnName)) return;
+
+  await prisma.$executeRawUnsafe(sql);
+  columns.add(columnName);
+}
+
 // TODO: Convert demo price/date strings to typed numeric/date fields in a
 // planned migration. The local schema keeps strings for compatibility today.
 export async function ensureDashboardSchema() {
@@ -49,9 +72,13 @@ export async function ensureDashboardSchema() {
         `),
       ])
       .then(async () => {
-        await prisma.$executeRawUnsafe(
+        const dashboardItemColumns = await readTableColumns("dashboard_items");
+
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "code",
           "ALTER TABLE dashboard_items ADD COLUMN code TEXT",
-        ).catch(() => undefined);
+        );
         await prisma.$executeRawUnsafe(`
           UPDATE dashboard_items
           SET code = 'PRD-SEED-' || printf('%03d', rowid)
@@ -60,21 +87,31 @@ export async function ensureDashboardSchema() {
         await prisma.$executeRawUnsafe(
           "CREATE UNIQUE INDEX IF NOT EXISTS dashboard_items_code_key ON dashboard_items(code)",
         );
-        await prisma.$executeRawUnsafe(
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "variantDetails",
           "ALTER TABLE dashboard_items ADD COLUMN variantDetails TEXT NOT NULL DEFAULT '{}'",
-        ).catch(() => undefined);
-        await prisma.$executeRawUnsafe(
+        );
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "shopName",
           "ALTER TABLE dashboard_items ADD COLUMN shopName TEXT NOT NULL DEFAULT ''",
-        ).catch(() => undefined);
-        await prisma.$executeRawUnsafe(
+        );
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "visibilityMode",
           "ALTER TABLE dashboard_items ADD COLUMN visibilityMode TEXT NOT NULL DEFAULT 'general'",
-        ).catch(() => undefined);
-        await prisma.$executeRawUnsafe(
+        );
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "regionSlugs",
           "ALTER TABLE dashboard_items ADD COLUMN regionSlugs TEXT NOT NULL DEFAULT '[]'",
-        ).catch(() => undefined);
-        await prisma.$executeRawUnsafe(
+        );
+        await addDashboardItemColumnIfMissing(
+          dashboardItemColumns,
+          "regionNames",
           "ALTER TABLE dashboard_items ADD COLUMN regionNames TEXT NOT NULL DEFAULT '[]'",
-        ).catch(() => undefined);
+        );
       })
       .then(() => undefined);
   }

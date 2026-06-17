@@ -5,10 +5,15 @@ Thumbs.db
 .idea/
 *.iml
 
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
 # Root-local tool state
 .codex/
 .playwright-mcp/
 .codex*.png
+/products-display-*.png
 
 # Next.js dashboard
 apps/yalla_admin/node_modules/
