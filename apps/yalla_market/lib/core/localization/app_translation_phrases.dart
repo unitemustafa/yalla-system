@@ -7,6 +7,60 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'All': 'الكل',
     'Alexandria': 'الإسكندرية',
     'Cairo': 'القاهرة',
+    'App settings': 'إعدادات التطبيق',
+    'Better delivery experience': 'تجربة توصيل أفضل',
+    'Browsing region': 'منطقة التصفح',
+    'Change region': 'تغيير المنطقة',
+    'Change region manually': 'غيّر المنطقة يدويًا',
+    'Manual': 'يدوي',
+    'Automatic': 'تلقائي',
+    'Automatic location': 'تحديد تلقائي',
+    'Choose manually or let GPS detect your area.':
+        'اختار منطقتك يدويًا أو خلّي GPS يحاول يحددها تلقائيًا.',
+    'GPS can try to detect your area automatically.':
+        'GPS هيحاول يحدد منطقتك تلقائيًا، ولو ما ظبطش تقدر تختار يدويًا.',
+    'Location is taking too long': 'تحديد الموقع أخد وقت طويل',
+    'Choose your area manually and you can try GPS again later.':
+        'اختار منطقتك يدويًا، وتقدر تجرب GPS تاني بعدين.',
+    'Choose the browsing region used for products':
+        'اختار المنطقة اللي هنعرض منتجاتها',
+    'Detecting location...': 'بنحدد موقعك...',
+    'Enable GPS and continue': 'فعّل الموقع وكمل',
+    'Enable your location': 'فعّل موقعك',
+    'General': 'عام',
+    'General browsing': 'تصفح عام',
+    'General products and offers will be shown.':
+        'هيتم عرض المنتجات والعروض العامة.',
+    'General region saved': 'تم حفظ المنطقة العامة',
+    'GPS helps Yalla Market show nearby products, local offers, better delivery suggestions, and more accurate delivery pricing later.':
+        'الموقع بيساعد يلا ماركت يعرض منتجات قريبة، عروض محلية، اقتراحات توصيل أفضل، وتسعير توصيل أدق بعدين.',
+    'In-progress and completed orders': 'طلبات جارية ومكتملة',
+    'Location permission was not granted. Allow location to continue.':
+        'صلاحية الموقع غير مفعلة. اسمح بالموقع عشان تكمل.',
+    'Location services are disabled. Turn on GPS to continue.':
+        'خدمات الموقع مقفولة. فعّل GPS عشان تكمل.',
+    'Location settings': 'إعدادات الموقع',
+    'More accurate delivery price later': 'سعر توصيل أدق لاحقًا',
+    'Nearby offers': 'عروض قريبة',
+    'Offline': 'غير متصل',
+    'Online': 'متصل',
+    'Products and offers will refresh for your region.':
+        'المنتجات والعروض هتتحدث حسب منطقتك.',
+    'Products that fit your region': 'منتجات مناسبة لمنطقتك',
+    'Products will refresh for your selected region.':
+        'المنتجات هتتحدث حسب المنطقة المختارة.',
+    'Set shopping delivery address': 'حدد عنوان توصيل الطلبات',
+    'Switch': 'تبديل',
+    'Use GPS location': 'استخدم موقع GPS',
+    'Is this your governorate?': 'هل دي محافظتك؟',
+    'We detected your governorate': 'حددنا محافظتك',
+    'We could not detect a supported governorate. Choose one manually.':
+        'مقدرناش نحدد محافظة مدعومة. اختار محافظتك يدويًا.',
+    'Yes, continue': 'نعم، كمل',
+    'You will see general products and offers.':
+        'هتشوف المنتجات والعروض العامة.',
+    'You are now in a supported region. Switch to see its offers. Your cart will be checked at checkout.':
+        'أنت دلوقتي في منطقة مدعومة. بدّل المنطقة عشان تشوف عروضها، والسلة هتتراجع عند الدفع.',
     'Choose city': 'اختار المدينة',
     'Choose manually': 'اختيار يدوي',
     'Choose the city used for available products':
@@ -40,6 +94,8 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Add to Bag': 'ضيف للسلة',
     'Add products you like and review them here before checkout.':
         'ضيف المنتجات اللي عجبتك وراجعها هنا قبل الدفع.',
+    'Add, remove products and move to checkout':
+        'ضيف واحذف المنتجات وكمل للدفع',
     'Added to wishlist': 'اتضاف للمفضلة',
     'Address deleted': 'تم حذف العنوان',
     'Addresses': 'العناوين',
@@ -66,6 +122,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Brands': 'البراندات',
     'Brands & picks': 'براندات واختيارات',
     'Before deleting': 'قبل الحذف',
+    'Black': 'أسود',
     'Cancel': 'إلغاء',
     'Cart': 'السلة',
     'Cash on Delivery': 'الدفع عند الاستلام',
@@ -105,6 +162,8 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Could not sign you out.': 'مش قادرين نسجل خروجك.',
     'Could not update profile': 'مش قادرين نحدّث البروفايل',
     'Could not use your current location.': 'مش قادرين نستخدم موقعك الحالي.',
+    'Could not find your current location. Choose one manually.':
+        'مش قادرين نحدد موقعك الحالي. اختار المنطقة يدويًا.',
     'Country': 'الدولة',
     'Court-ready accessories': 'إكسسوارات جاهزة للملعب',
     'Create Account': 'اعمل حساب جديد',
@@ -179,6 +238,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Jackets, shirts and outfits': 'جاكيتات وتيشيرتات وأطقم',
     'Jordan court blue': 'Jordan أزرق للملعب',
     'Language': 'اللغة',
+    'Large': 'كبير',
     'Language updated': 'تم تحديث اللغة',
     'Lifestyle': 'لايف ستايل',
     'Light': 'فاتح',
@@ -307,6 +367,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Sign In': 'تسجيل الدخول',
     'Skip': 'تخطي',
     'Size': 'المقاس',
+    'Small': 'صغير',
     'Sort by': 'رتّب حسب',
     'Sort products': 'ترتيب المنتجات',
     'Higher Price': 'الأعلى سعرًا',
@@ -371,6 +432,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'We will verify it while creating your account.':
         'هنراجعه وإحنا بنعمل الحساب.',
     'Wishlist': 'المفضلة',
+    'X-Large': 'كبير جدًا',
     'Write a message...': 'اكتب رسالة...',
     'يلا ماركت Support': 'دعم يلا ماركت',
     'Your Nike training order is being prepared.':
@@ -433,6 +495,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'English': 'الإنجليزية',
     'English interface': 'واجهة باللغة الإنجليزية',
     'Enter a valid email address': 'اكتب إيميل صحيح',
+    'Enter a valid phone number': 'اكتب رقم موبايل صحيح',
     'Enter your password first.': 'اكتب كلمة السر الأول.',
     'Email check skipped': 'تخطينا فحص الإيميل',
     'Email is already registered.': 'الإيميل ده مستخدم بالفعل.',
@@ -457,6 +520,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Keep search results family friendly.': 'خلي نتائج البحث مناسبة للعائلة.',
     'Last Name': 'اسم العيلة',
     'Male': 'ذكر',
+    'Medium': 'متوسط',
     'Medium password': 'كلمة سر متوسطة',
     'Name is too short': 'الاسم قصير جدًا',
     'No local user session.': 'مفيش جلسة مستخدم محفوظة.',
@@ -571,6 +635,7 @@ const Map<String, Map<String, String>> _translationPhrases = {
         'جرّب أسماء منتجات أو فئات أو كلمات للعروض.',
     'Green sports shoe': 'حذاء رياضي أخضر',
     'Red black sports sneaker': 'حذاء رياضي أحمر وأسود',
+    'Red': 'أحمر',
     'Orange sports sneaker': 'حذاء رياضي برتقالي',
     'Trail running shoe': 'حذاء جري للطرق',
     'Blue court sneaker': 'حذاء ملعب أزرق',

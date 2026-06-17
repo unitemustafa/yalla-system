@@ -5,7 +5,9 @@ import 'package:yalla_market/features/location/presentation/cubit/location_state
 import 'package:yalla_market/features/location/presentation/widgets/city_selection_panel.dart';
 
 void main() {
-  testWidgets('other city input accepts custom city names', (tester) async {
+  testWidgets('manual mode shows cities and other general region', (
+    tester,
+  ) async {
     CityData? selectedCity;
 
     await tester.pumpWidget(
@@ -23,15 +25,46 @@ void main() {
       ),
     );
 
+    expect(find.text('Manual'), findsOneWidget);
+    expect(find.text('Automatic'), findsOneWidget);
+    expect(find.text('Use GPS location'), findsOneWidget);
+
+    await tester.tap(find.text('Manual'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cairo'), findsOneWidget);
+    expect(find.text('Sharm El Sheikh'), findsOneWidget);
+    expect(find.text('General'), findsOneWidget);
     await tester.tap(find.text('Other'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'Hehia');
-    await tester.ensureVisible(find.text('Save city'));
-    await tester.tap(find.text('Save city'));
+    expect(selectedCity?.name, 'General');
+    expect(selectedCity?.slug, CityData.generalSlug);
+  });
+
+  testWidgets('automatic mode exposes GPS action', (tester) async {
+    var usedCurrentLocation = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: CitySelectionPanel(
+              state: const LocationReady(null),
+              compact: true,
+              onCitySelected: (_) {},
+              onUseCurrentLocation: () => usedCurrentLocation = true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Use GPS location'), findsOneWidget);
+
+    await tester.tap(find.text('Use GPS location'));
     await tester.pumpAndSettle();
 
-    expect(selectedCity?.name, 'Hehia');
-    expect(selectedCity?.slug, 'hehia');
+    expect(usedCurrentLocation, isTrue);
   });
 }

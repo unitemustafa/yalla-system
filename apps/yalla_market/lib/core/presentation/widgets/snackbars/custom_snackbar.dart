@@ -47,6 +47,23 @@ class CustomSnackBar {
     );
   }
 
+  static void showPersistentSuccess({
+    required BuildContext context,
+    required String title,
+    String? message,
+    String actionLabel = 'Done',
+  }) {
+    _show(
+      context: context,
+      title: title,
+      message: message,
+      icon: AppIcons.tick_circle,
+      accentColor: AppColors.success,
+      duration: const Duration(days: 365),
+      actionLabel: actionLabel,
+    );
+  }
+
   static void showWarning({
     required BuildContext context,
     required String title,
@@ -58,6 +75,23 @@ class CustomSnackBar {
       message: message,
       icon: AppIcons.warning_2,
       accentColor: AppColors.warning,
+    );
+  }
+
+  static void showPersistentWarning({
+    required BuildContext context,
+    required String title,
+    String? message,
+    String actionLabel = 'Done',
+  }) {
+    _show(
+      context: context,
+      title: title,
+      message: message,
+      icon: AppIcons.warning_2,
+      accentColor: AppColors.warning,
+      duration: const Duration(days: 365),
+      actionLabel: actionLabel,
     );
   }
 
@@ -95,21 +129,27 @@ class CustomSnackBar {
     required IconData icon,
     required Color accentColor,
     String? message,
+    Duration? duration,
+    String? actionLabel,
   }) {
     final theme = Theme.of(context);
     final localizedTitle = context.tr(title);
     final localizedMessage = message == null ? null : context.tr(message);
+    final localizedAction = actionLabel == null
+        ? null
+        : context.tr(actionLabel);
     final hasMessage = message != null && message.trim().isNotEmpty;
+    final messenger = ScaffoldMessenger.of(context);
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         elevation: 0,
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.transparent,
         margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
         padding: EdgeInsets.zero,
-        duration: Duration(seconds: hasMessage ? 4 : 2),
+        duration: duration ?? Duration(seconds: hasMessage ? 4 : 2),
         content: Container(
           constraints: const BoxConstraints(minHeight: 50),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -168,6 +208,30 @@ class CustomSnackBar {
                   ],
                 ),
               ),
+              if (localizedAction != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: messenger.hideCurrentSnackBar,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(44, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    localizedAction,
+                    style:
+                        theme.textTheme.labelLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ) ??
+                        const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

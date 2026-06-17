@@ -7,6 +7,8 @@ import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../domain/entities/city_data.dart';
 import '../cubit/location_state.dart';
 
+enum LocationChoiceMode { automatic, manual }
+
 class CitySelectionPanel extends StatefulWidget {
   const CitySelectionPanel({
     super.key,
@@ -14,146 +16,273 @@ class CitySelectionPanel extends StatefulWidget {
     required this.onCitySelected,
     required this.onUseCurrentLocation,
     this.compact = false,
+    this.initialMode = LocationChoiceMode.automatic,
+    this.mode,
+    this.onModeChanged,
   });
 
   final LocationState state;
   final ValueChanged<CityData> onCitySelected;
   final VoidCallback onUseCurrentLocation;
   final bool compact;
+  final LocationChoiceMode initialMode;
+  final LocationChoiceMode? mode;
+  final ValueChanged<LocationChoiceMode>? onModeChanged;
 
   @override
   State<CitySelectionPanel> createState() => _CitySelectionPanelState();
 }
 
 class _CitySelectionPanelState extends State<CitySelectionPanel> {
-  late final TextEditingController _customCityController;
-  bool _isOtherExpanded = false;
-  String? _customCityError;
+  late LocationChoiceMode _mode;
 
   @override
   void initState() {
     super.initState();
-    final selectedCity = widget.state.selectedCity;
-    final selectedCustomCity =
-        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
-
-    _isOtherExpanded = selectedCustomCity;
-    _customCityController = TextEditingController(
-      text: selectedCustomCity ? selectedCity.name : '',
-    );
+    _mode = widget.mode ?? widget.initialMode;
   }
 
   @override
   void didUpdateWidget(covariant CitySelectionPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final selectedCity = widget.state.selectedCity;
-    final selectedCustomCity =
-        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
-
-    if (selectedCustomCity && oldWidget.state.selectedCity != selectedCity) {
-      _isOtherExpanded = true;
-      _customCityController.text = selectedCity.name;
+    final newMode = widget.mode;
+    if (newMode != null && newMode != _mode) {
+      _mode = newMode;
     }
-  }
-
-  @override
-  void dispose() {
-    _customCityController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDetecting = widget.state is LocationDetecting;
     final isSaving = widget.state is LocationSaving;
-    final isBusy = isDetecting || isSaving || widget.state is LocationLoading;
+    final isLoading = widget.state is LocationLoading;
+    final isBusy = isDetecting || isSaving || isLoading;
+    final manualDisabled = isSaving || isLoading;
     final error = widget.state is LocationFailure
         ? (widget.state as LocationFailure).message
         : null;
     final selectedCity = widget.state.selectedCity;
-    final selectedCustomCity =
-        selectedCity != null && !CityData.isSupportedSlug(selectedCity.slug);
+    final manualCities = CityData.supported
+        .where((city) => !city.isGeneral)
+        .toList(growable: false);
 
     return Column(
       mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _LocationIntro(compact: widget.compact),
-        if (error != null) ...[
+        const SizedBox(height: 18),
+        _ChoiceModeSwitch(selectedMode: _mode, onChanged: _setMode),
+        if (error != null && _mode == LocationChoiceMode.automatic) ...[
           const SizedBox(height: 12),
           _LocationError(message: error),
         ],
-        const SizedBox(height: 20),
-        Text(
-          context.tr('Choose manually'),
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 10),
-        ...CityData.supported.map(
-          (city) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _CityTile(
-              city: city,
-              selected: selectedCity?.slug == city.slug,
-              disabled: isBusy,
-              onTap: () => _selectSupportedCity(city),
-            ),
-          ),
-        ),
-        _CityTile(
-          city: const CityData(name: 'Other', slug: 'other'),
-          selected: selectedCustomCity || _isOtherExpanded,
-          disabled: isBusy,
-          onTap: _showOtherCity,
-        ),
+        const SizedBox(height: 18),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
-          child: _isOtherExpanded
-              ? Padding(
-                  key: const ValueKey('custom-city-section'),
-                  padding: const EdgeInsets.only(top: 10),
-                  child: _CustomCitySection(
-                    controller: _customCityController,
-                    errorText: _customCityError,
-                    enabled: !isBusy,
-                    isDetecting: isDetecting,
-                    isSaving: isSaving,
-                    onSave: _saveCustomCity,
-                    onUseCurrentLocation: widget.onUseCurrentLocation,
-                  ),
+          child: _mode == LocationChoiceMode.automatic
+              ? _AutomaticLocationPanel(
+                  key: const ValueKey('automatic-location-choice'),
+                  isDetecting: isDetecting,
+                  isBusy: isBusy,
+                  onUseCurrentLocation: widget.onUseCurrentLocation,
                 )
-              : const SizedBox.shrink(key: ValueKey('custom-city-empty')),
+              : Column(
+                  key: const ValueKey('manual-location-choice'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.tr('Change region manually'),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ...manualCities.map(
+                      (city) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _CityTile(
+                          city: city,
+                          selected: selectedCity?.slug == city.slug,
+                          disabled: manualDisabled,
+                          onTap: () => _selectSupportedCity(city),
+                        ),
+                      ),
+                    ),
+                    _OtherRegionTile(
+                      selected: selectedCity?.isGeneral ?? false,
+                      disabled: manualDisabled,
+                      onTap: () => _selectSupportedCity(CityData.general),
+                    ),
+                  ],
+                ),
         ),
       ],
     );
   }
 
-  void _selectSupportedCity(CityData city) {
-    setState(() {
-      _isOtherExpanded = false;
-      _customCityError = null;
-    });
-    widget.onCitySelected(city);
-  }
-
-  void _showOtherCity() {
-    setState(() {
-      _isOtherExpanded = true;
-      _customCityError = null;
-    });
-  }
-
-  void _saveCustomCity() {
-    final city = CityData.fromCustomName(_customCityController.text);
-    if (city == null) {
-      setState(() => _customCityError = 'City name is required');
-      return;
+  void _setMode(LocationChoiceMode mode) {
+    if (widget.mode == null) {
+      setState(() {
+        _mode = mode;
+      });
     }
+    widget.onModeChanged?.call(mode);
+  }
 
-    setState(() => _customCityError = null);
+  void _selectSupportedCity(CityData city) {
     widget.onCitySelected(city);
+  }
+}
+
+class _ChoiceModeSwitch extends StatelessWidget {
+  const _ChoiceModeSwitch({
+    required this.selectedMode,
+    required this.onChanged,
+  });
+
+  final LocationChoiceMode selectedMode;
+  final ValueChanged<LocationChoiceMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCardColor : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ChoiceModeButton(
+              label: 'Automatic',
+              icon: AppIcons.routing,
+              selected: selectedMode == LocationChoiceMode.automatic,
+              onTap: () => onChanged(LocationChoiceMode.automatic),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _ChoiceModeButton(
+              label: 'Manual',
+              icon: AppIcons.edit,
+              selected: selectedMode == LocationChoiceMode.manual,
+              onTap: () => onChanged(LocationChoiceMode.manual),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChoiceModeButton extends StatelessWidget {
+  const _ChoiceModeButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = selected
+        ? Colors.white
+        : isDark
+        ? AppColors.darkTextPrimary
+        : AppColors.lightTextPrimary;
+
+    return Material(
+      color: selected ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: SizedBox(
+          height: 44,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: foreground),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  context.tr(label),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AutomaticLocationPanel extends StatelessWidget {
+  const _AutomaticLocationPanel({
+    super.key,
+    required this.isDetecting,
+    required this.isBusy,
+    required this.onUseCurrentLocation,
+  });
+
+  final bool isDetecting;
+  final bool isBusy;
+  final VoidCallback onUseCurrentLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mutedColor = isDark
+        ? AppColors.darkTextSecondary
+        : AppColors.lightTextSecondary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.tr('Automatic location'),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          context.tr('GPS can try to detect your area automatically.'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: mutedColor,
+            height: 1.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        AppActionButton(
+          label: isDetecting ? 'Detecting location...' : 'Use GPS location',
+          icon: AppIcons.location,
+          isLoading: isDetecting,
+          onPressed: isBusy ? null : onUseCurrentLocation,
+        ),
+      ],
+    );
   }
 }
 
@@ -251,85 +380,6 @@ class _LocationError extends StatelessWidget {
   }
 }
 
-class _CustomCitySection extends StatelessWidget {
-  const _CustomCitySection({
-    required this.controller,
-    required this.errorText,
-    required this.enabled,
-    required this.isDetecting,
-    required this.isSaving,
-    required this.onSave,
-    required this.onUseCurrentLocation,
-  });
-
-  final TextEditingController controller;
-  final String? errorText;
-  final bool enabled;
-  final bool isDetecting;
-  final bool isSaving;
-  final VoidCallback onSave;
-  final VoidCallback onUseCurrentLocation;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor = isDark ? AppColors.darkCardColor : Colors.white;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.10)
-        : Colors.black.withValues(alpha: 0.08);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: controller,
-          enabled: enabled,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) {
-            if (enabled) onSave();
-          },
-          decoration: InputDecoration(
-            labelText: context.tr('Enter your city'),
-            errorText: errorText == null ? null : context.tr(errorText!),
-            filled: true,
-            fillColor: fillColor,
-            prefixIcon: const Icon(AppIcons.location_add, size: 20),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        AppActionButton(
-          label: 'Save city',
-          icon: AppIcons.tick_circle,
-          isLoading: isSaving,
-          onPressed: enabled ? onSave : null,
-        ),
-        const SizedBox(height: 10),
-        AppActionButton(
-          label: isDetecting
-              ? 'Detecting your location...'
-              : 'Use my current location',
-          icon: AppIcons.routing,
-          isLoading: isDetecting,
-          onPressed: enabled ? onUseCurrentLocation : null,
-          variant: AppActionButtonVariant.outlined,
-        ),
-      ],
-    );
-  }
-}
-
 class _CityTile extends StatelessWidget {
   const _CityTile({
     required this.city,
@@ -394,9 +444,112 @@ class _CityTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (city.isGeneral) ...[
+                const SizedBox(width: 8),
+                _RegionBadge(label: context.tr('General')),
+              ],
               const Icon(AppIcons.arrow_right_3, size: 18),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OtherRegionTile extends StatelessWidget {
+  const _OtherRegionTile({
+    required this.selected,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final bool disabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = selected
+        ? AppColors.primary.withValues(alpha: isDark ? 0.20 : 0.10)
+        : isDark
+        ? AppColors.darkCardColor
+        : Colors.white;
+    final borderColor = selected
+        ? AppColors.primary.withValues(alpha: 0.42)
+        : isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+    final textColor = selected
+        ? AppColors.primary
+        : isDark
+        ? Colors.white
+        : AppColors.lightTextPrimary;
+
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: disabled ? null : onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected ? AppIcons.tick_circle5 : AppIcons.global,
+                color: selected ? AppColors.primary : textColor,
+                size: 21,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.tr('Other'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _RegionBadge(label: context.tr('General')),
+              const Icon(AppIcons.arrow_right_3, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RegionBadge extends StatelessWidget {
+  const _RegionBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: isDark ? 0.18 : 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.warning,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
