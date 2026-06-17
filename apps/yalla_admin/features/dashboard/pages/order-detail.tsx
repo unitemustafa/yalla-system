@@ -145,25 +145,28 @@ function customerAvatarForOrder(order: DashboardOrder) {
   return customerForOrder(order)?.avatar || fallbackCustomerAvatar;
 }
 
-function CustomerSummary({ order }: { order: DashboardOrder }) {
+function customerDetailsHref(order: DashboardOrder) {
+  return `/customers/${customerForOrder(order)?.id ?? "default-user"}`;
+}
+
+function CustomerAvatarLink({ order }: { order: DashboardOrder }) {
   return (
-    <div className="flex items-center gap-3 rounded-md bg-muted/25 px-3 py-3">
+    <Link
+      href={customerDetailsHref(order)}
+      aria-label="فتح تفاصيل المستخدم"
+      title="فتح تفاصيل المستخدم"
+      className="inline-flex size-12 shrink-0 items-center justify-center rounded-md transition hover:ring-2 hover:ring-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={customerAvatarForOrder(order)}
         alt={order.customer}
-        className="size-12 shrink-0 rounded-md border bg-muted object-cover"
+        className="size-12 rounded-md border bg-muted object-cover"
         onError={(event) => {
           event.currentTarget.src = fallbackCustomerAvatar;
         }}
       />
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold">{order.customer}</div>
-        <div dir="ltr" className="mt-1 truncate text-xs text-muted-foreground">
-          {order.phone}
-        </div>
-      </div>
-    </div>
+    </Link>
   );
 }
 
@@ -317,38 +320,47 @@ function InfoPanel({
   icon: Icon,
   children,
   defaultOpen = false,
+  headerAction,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  headerAction?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <Card className="overflow-hidden rounded-lg">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((currentOpen) => !currentOpen)}
+      <div
         className={cn(
-          "flex min-h-14 w-full items-center justify-between gap-3 bg-muted/25 px-5 text-start transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+          "flex min-h-14 w-full items-center justify-between gap-3 bg-muted/25 px-5",
           open && "border-b",
         )}
       >
-        <span className="flex items-center gap-2">
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform duration-200",
-              open && "rotate-180",
-            )}
-          />
-          <span className="text-sm font-semibold">{title}</span>
-        </span>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="size-4" />
-        </span>
-      </button>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((currentOpen) => !currentOpen)}
+          className="flex min-h-14 flex-1 items-center justify-between gap-3 text-start transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+        >
+          <span className="flex items-center gap-2">
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform duration-200",
+                open && "rotate-180",
+              )}
+            />
+            <span className="text-sm font-semibold">{title}</span>
+          </span>
+          {!headerAction ? (
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Icon className="size-4" />
+            </span>
+          ) : null}
+        </button>
+        {headerAction}
+      </div>
       <div
         className={cn(
           "grid transition-[grid-template-rows] duration-200 ease-out",
@@ -808,8 +820,11 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
             </InfoPanel>
           ) : null}
 
-          <InfoPanel title="بيانات العميل" icon={UserRound}>
-            <CustomerSummary order={order} />
+          <InfoPanel
+            title="بيانات العميل"
+            icon={UserRound}
+            headerAction={<CustomerAvatarLink order={order} />}
+          >
             <DetailRow label="الاسم" value={order.customer} />
             <DetailRow
               label="رقم الموبايل"
