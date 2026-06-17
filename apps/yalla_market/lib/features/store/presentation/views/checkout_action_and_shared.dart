@@ -3,12 +3,14 @@ part of 'checkout_view.dart';
 class _CheckoutActionBar extends StatelessWidget {
   const _CheckoutActionBar({
     required this.total,
+    this.deliveryNote,
     required this.isDark,
     required this.isLoading,
     required this.onCheckout,
   });
 
   final double total;
+  final String? deliveryNote;
   final bool isDark;
   final bool isLoading;
   final VoidCallback onCheckout;
@@ -66,6 +68,17 @@ class _CheckoutActionBar extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
+                  if (deliveryNote != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      deliveryNote!,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -110,12 +123,14 @@ class _SummaryRow extends StatelessWidget {
     required this.value,
     required this.textColor,
     required this.mutedColor,
+    this.valueColor,
   });
 
   final String label;
   final String value;
   final Color textColor;
   final Color mutedColor;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -133,43 +148,9 @@ class _SummaryRow extends StatelessWidget {
         AppCurrencyText(
           text: value,
           style: TextStyle(
-            color: textColor,
+            color: valueColor ?? textColor,
             fontSize: 14,
             fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoLine extends StatelessWidget {
-  const _InfoLine({
-    required this.icon,
-    required this.text,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String text;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: color,
-              height: 1.35,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ),
       ],

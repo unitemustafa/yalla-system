@@ -21,6 +21,8 @@ class SignupAvailabilityChecker {
     required this.phoneForLookup,
     required this.validatePhoneFormat,
     required this.validateUsername,
+    required this.canCheckEmail,
+    required this.canCheckPhone,
   });
 
   final TextEditingController emailController;
@@ -39,6 +41,12 @@ class SignupAvailabilityChecker {
 
   /// Returns a validation error message or null if valid.
   final String? Function(String?) validateUsername;
+
+  /// Allows email lookup only after previous fields are valid.
+  final bool Function() canCheckEmail;
+
+  /// Allows phone lookup only after email has already been verified available.
+  final bool Function() canCheckPhone;
 
   /// Must be updated each build via [updateContext].
   BuildContext? _context;
@@ -95,7 +103,7 @@ class SignupAvailabilityChecker {
     emailAvailabilityMessage = null;
     onStateChanged();
 
-    if (email.isEmpty || validationMessage != null) return;
+    if (email.isEmpty || validationMessage != null || !canCheckEmail()) return;
 
     _emailLookupDebounce = Timer(const Duration(milliseconds: 450), () {
       final ctx = _context;
@@ -108,7 +116,10 @@ class SignupAvailabilityChecker {
   Future<bool> ensureEmailAvailable(BuildContext context) async {
     final email = emailController.text.trim().toLowerCase();
 
-    if (email.isEmpty || Validators.email(email) != null) return false;
+    if (email.isEmpty || Validators.email(email) != null || !canCheckEmail()) {
+      formKey.currentState?.validate();
+      return false;
+    }
 
     if (_lastCheckedEmail == email && isEmailAvailable == true) {
       return true;
@@ -132,7 +143,7 @@ class SignupAvailabilityChecker {
   }) async {
     final email = emailController.text.trim().toLowerCase();
 
-    if (email.isEmpty || Validators.email(email) != null) {
+    if (email.isEmpty || Validators.email(email) != null || !canCheckEmail()) {
       isCheckingEmail = false;
       isEmailAvailable = null;
       _lastCheckedEmail = null;
@@ -195,7 +206,7 @@ class SignupAvailabilityChecker {
     phoneAvailabilityMessage = null;
     onStateChanged();
 
-    if (validationMessage != null) return;
+    if (validationMessage != null || !canCheckPhone()) return;
 
     _phoneLookupDebounce = Timer(const Duration(milliseconds: 450), () {
       final ctx = _context;
@@ -208,7 +219,10 @@ class SignupAvailabilityChecker {
   Future<bool> ensurePhoneAvailable(BuildContext context) async {
     final validationMessage = validatePhoneFormat(phoneController.text);
 
-    if (validationMessage != null) return false;
+    if (validationMessage != null || !canCheckPhone()) {
+      formKey.currentState?.validate();
+      return false;
+    }
 
     final phone = phoneForLookup();
     if (_lastCheckedPhone == phone && isPhoneAvailable == true) {
@@ -233,7 +247,7 @@ class SignupAvailabilityChecker {
   }) async {
     final validationMessage = validatePhoneFormat(phoneController.text);
 
-    if (validationMessage != null) {
+    if (validationMessage != null || !canCheckPhone()) {
       isCheckingPhone = false;
       isPhoneAvailable = null;
       _lastCheckedPhone = null;

@@ -99,19 +99,19 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                   const SizedBox(height: 18),
                   _ProfileInfoSection(
-                    title: 'Profile Information',
+                    title: context.tr('Profile Information'),
                     isDark: isDark,
                     children: [
                       ProfileMenuTile(
                         leadingIcon: AppIcons.user_edit,
-                        title: 'Name',
+                        title: context.tr('Name'),
                         value: profile.displayName,
                         onTap: () =>
                             _openEditor(context, EditableProfileField.name),
                       ),
                       ProfileMenuTile(
                         leadingIcon: AppIcons.user_tag,
-                        title: 'Username',
+                        title: context.tr('Username'),
                         value: profile.username,
                         onTap: () => _handleUsernameTap(context, profile),
                       ),
@@ -119,37 +119,36 @@ class _ProfileViewState extends State<ProfileView> {
                   ),
                   const SizedBox(height: 18),
                   _ProfileInfoSection(
-                    title: 'Personal Information',
+                    title: context.tr('Personal Information'),
                     isDark: isDark,
                     children: [
                       ProfileMenuTile(
                         leadingIcon: AppIcons.sms,
-                        title: 'E-mail',
+                        title: context.tr('E-mail'),
                         value: profile.email,
-                        onTap: () =>
-                            _openEditor(context, EditableProfileField.email),
+                        showTrailingIcon: false,
                       ),
                       ProfileMenuTile(
                         leadingIcon: AppIcons.call,
-                        title: 'Phone',
+                        title: context.tr('Phone'),
                         value: profile.phone.isEmpty
-                            ? 'Not set'
+                            ? context.tr('Not set')
                             : profile.phone,
                         onTap: () =>
                             _openEditor(context, EditableProfileField.phone),
                       ),
                       ProfileMenuTile(
                         leadingIcon: AppIcons.user,
-                        title: 'Gender',
+                        title: context.tr('Gender'),
                         value: profile.gender.isEmpty
-                            ? 'Not set'
-                            : profile.gender,
+                            ? context.tr('Not set')
+                            : context.tr(profile.gender),
                         onTap: () =>
                             _openEditor(context, EditableProfileField.gender),
                       ),
                       ProfileMenuTile(
                         leadingIcon: AppIcons.calendar,
-                        title: 'Birth Date',
+                        title: context.tr('Birth Date'),
                         value: _formatDate(profile.birthDate),
                         onTap: () => _openEditor(
                           context,
@@ -180,6 +179,22 @@ class _ProfileViewState extends State<ProfileView> {
   }
 
   void _openEditor(BuildContext context, EditableProfileField field) {
+    if (field == EditableProfileField.email) {
+      final useArabicCopy =
+          context.isArabicLanguage ||
+          Directionality.of(context) == TextDirection.rtl;
+      CustomSnackBar.showWarning(
+        context: context,
+        title: useArabicCopy
+            ? 'تغيير الإيميل مقفول'
+            : 'Email cannot be changed',
+        message: useArabicCopy
+            ? 'لو محتاج مساعدة في إيميل الحساب تواصل مع الدعم.'
+            : 'Contact support if you need help with your account email.',
+      );
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => EditProfileFieldView(field: field)),
@@ -368,7 +383,7 @@ class _ProfileHeaderCard extends StatelessWidget {
               Expanded(
                 child: _ProfileBadge(
                   icon: AppIcons.shield_tick,
-                  label: 'Verified',
+                  label: context.tr('Verified'),
                   color: AppColors.success,
                   isDark: isDark,
                 ),
@@ -377,7 +392,7 @@ class _ProfileHeaderCard extends StatelessWidget {
               Expanded(
                 child: _ProfileBadge(
                   icon: AppIcons.star,
-                  label: 'Gold member',
+                  label: context.tr('Gold member'),
                   color: AppColors.warning,
                   isDark: isDark,
                   isActive: false,

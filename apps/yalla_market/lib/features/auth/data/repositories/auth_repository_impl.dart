@@ -13,6 +13,8 @@ class AuthRepositoryImpl implements AuthRepository {
   static const String _accountsKey = 'auth.local_accounts';
   static const String _demoEmail = 'm@example.com';
   static const String _demoPassword = 'Password123!';
+  static const String _marketEmail = 'market@admin.com';
+  static const String _marketPassword = '01266666610';
   static const Set<String> _reservedUsernames = {
     'admin',
     'support',
@@ -494,7 +496,7 @@ class AuthRepositoryImpl implements AuthRepository {
     final preferences = await SharedPreferences.getInstance();
     final rawAccounts = preferences.getString(_accountsKey);
     if (rawAccounts == null || rawAccounts.trim().isEmpty) {
-      return [_seedAccount()];
+      return _seedAccounts();
     }
 
     final decoded = jsonDecode(rawAccounts) as List<dynamic>;
@@ -503,7 +505,7 @@ class AuthRepositoryImpl implements AuthRepository {
         .map(_LocalAuthAccount.fromJson)
         .toList(growable: true);
 
-    return accounts;
+    return _withSeedAccounts(accounts);
   }
 
   Future<void> _saveAccounts(List<_LocalAuthAccount> accounts) async {
@@ -528,7 +530,7 @@ class AuthRepositoryImpl implements AuthRepository {
     await preferences.remove(_sessionKey);
   }
 
-  _LocalAuthAccount _seedAccount() {
+  List<_LocalAuthAccount> _seedAccounts() {
     const user = AuthUser(
       id: 'local-demo-shopper',
       email: _demoEmail,
@@ -537,10 +539,36 @@ class AuthRepositoryImpl implements AuthRepository {
       username: 'demo_buyer',
       role: 'CUSTOMER',
     );
-    return _LocalAuthAccount(
-      user: user,
-      passwordDigest: _passwordDigest(_demoEmail, _demoPassword),
+    const marketUser = AuthUser(
+      id: 'local-market-admin',
+      email: _marketEmail,
+      firstName: 'Market',
+      lastName: 'Admin',
+      username: 'market_admin',
+      phone: _marketPassword,
+      role: 'CUSTOMER',
     );
+
+    return [
+      _LocalAuthAccount(
+        user: user,
+        passwordDigest: _passwordDigest(_demoEmail, _demoPassword),
+      ),
+      _LocalAuthAccount(
+        user: marketUser,
+        passwordDigest: _passwordDigest(_marketEmail, _marketPassword),
+      ),
+    ];
+  }
+
+  List<_LocalAuthAccount> _withSeedAccounts(List<_LocalAuthAccount> accounts) {
+    final merged = [...accounts];
+    for (final seedAccount in _seedAccounts()) {
+      if (merged._byEmail(seedAccount.user.email) == null) {
+        merged.add(seedAccount);
+      }
+    }
+    return merged;
   }
 
   String _passwordDigest(String email, String password) {

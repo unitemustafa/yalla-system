@@ -378,72 +378,11 @@ class _SearchStarter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mutedColor = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
     const suggestions = ['مطاعم', 'خضار', 'صيدلية', 'ملابس', 'أجهزة إلكترونية'];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF25273A) : const Color(0xFFEAF2FF),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : AppColors.primary.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(
-                    alpha: isDark ? 0.20 : 0.12,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  AppIcons.search_favorite,
-                  color: AppColors.primary,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      context.tr('Search smarter'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.tr(
-                        'Try product names, categories, or sale keywords.',
-                      ),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: mutedColor,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
         Text(
           context.tr('Trending searches'),
           style: Theme.of(

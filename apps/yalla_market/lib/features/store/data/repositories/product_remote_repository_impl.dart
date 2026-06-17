@@ -101,7 +101,7 @@ class ProductRemoteRepositoryImpl implements ProductRepository {
   Map<String, dynamic> _cityQuery(String? citySlug) {
     final normalized = citySlug?.trim();
     if (normalized == null || normalized.isEmpty) return const {};
-    return {'city': normalized};
+    return {'region': normalized, 'city': normalized};
   }
 
   Future<ApiResult<T>> _guard<T>(Future<T> Function() action) async {

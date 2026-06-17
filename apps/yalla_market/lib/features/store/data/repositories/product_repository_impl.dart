@@ -129,10 +129,18 @@ class ProductRepositoryImpl implements ProductRepository {
     String? citySlug,
   ) {
     final normalized = citySlug?.trim().toLowerCase();
-    if (normalized == null || normalized.isEmpty) return products;
+    if (normalized == null || normalized.isEmpty || normalized == 'general') {
+      return products
+          .where((product) => product.isGeneralVisibility)
+          .toList(growable: false);
+    }
 
     return products
-        .where((product) => product.citySlug == normalized)
+        .where(
+          (product) =>
+              product.isGeneralVisibility ||
+              product.effectiveRegionSlugs.contains(normalized),
+        )
         .toList(growable: false);
   }
 

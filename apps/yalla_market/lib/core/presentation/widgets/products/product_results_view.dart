@@ -50,14 +50,7 @@ class _ProductResultsViewState extends State<ProductResultsView> {
   String _sortOption = 'Name';
   int _page = 0;
 
-  static const _sortOptions = [
-    'Name',
-    'Higher Price',
-    'Lower Price',
-    'Sale',
-    'Newest',
-    'Popularity',
-  ];
+  static const _sortOptions = ['Name', 'Higher Price', 'Lower Price', 'Newest'];
 
   @override
   void initState() {
@@ -215,17 +208,9 @@ class _ProductResultsViewState extends State<ProductResultsView> {
       case 'Lower Price':
         sorted.sort((a, b) => a.priceValue.compareTo(b.priceValue));
         break;
-      case 'Sale':
-        sorted.sort((a, b) {
-          final aHasDiscount = a.discount.trim().isNotEmpty;
-          final bHasDiscount = b.discount.trim().isNotEmpty;
-          if (aHasDiscount == bHasDiscount) return a.title.compareTo(b.title);
-          return bHasDiscount ? 1 : -1;
-        });
+      case 'Newest':
         break;
       case 'Name':
-      case 'Newest':
-      case 'Popularity':
       default:
         sorted.sort((a, b) => a.title.compareTo(b.title));
     }

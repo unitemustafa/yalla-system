@@ -41,6 +41,24 @@ void main() {
       );
     });
 
+    test(
+      'allows the seeded market account with the requested credentials',
+      () async {
+        final result = await repository.login(
+          email: 'market@admin.com',
+          password: '01266666610',
+        );
+
+        result.when(
+          success: (session) {
+            expect(session.user.email, 'market@admin.com');
+            expect(session.user.phone, '01266666610');
+          },
+          failure: (failure) => fail(failure.message),
+        );
+      },
+    );
+
     test('persists signed up users and validates their password', () async {
       await repository.signup(
         firstName: 'Mustafa',

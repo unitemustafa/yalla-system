@@ -28,10 +28,13 @@ class LocationCubit extends Cubit<LocationState> {
     );
   }
 
-  Future<CityData?> selectCity(CityData city) async {
+  Future<CityData?> selectCity(
+    CityData city, {
+    RegionSource source = RegionSource.manual,
+  }) async {
     emit(LocationSaving(state.selectedCity));
 
-    final result = await _useCases.saveSelectedCity(city);
+    final result = await _useCases.saveSelectedCity(city, source: source);
     return result.when(
       success: (savedCity) {
         emit(LocationReady(savedCity));
@@ -42,6 +45,33 @@ class LocationCubit extends Cubit<LocationState> {
         return null;
       },
     );
+  }
+
+  Future<CityData?> selectGeneralRegion() {
+    return selectCity(CityData.general, source: RegionSource.general);
+  }
+
+  Future<CityData?> detectCurrentLocation() async {
+    emit(LocationDetecting(state.selectedCity));
+
+    final result = await _useCases.detectCurrentLocation();
+    return result.when(
+      success: (city) {
+        emit(LocationReady(city));
+        return city;
+      },
+      failure: (failure) {
+        emit(LocationFailure(failure.message, state.selectedCity));
+        return null;
+      },
+    );
+  }
+
+  Future<CityData?> previewCurrentLocation() async {
+    final result = await _useCases.detectCurrentLocation(
+      requestPermission: false,
+    );
+    return result.when(success: (city) => city, failure: (_) => null);
   }
 
   Future<CityData?> useCurrentLocation() async {
@@ -58,5 +88,13 @@ class LocationCubit extends Cubit<LocationState> {
         return null;
       },
     );
+  }
+
+  Future<void> openAppSettings() async {
+    await _useCases.openAppSettings();
+  }
+
+  Future<void> openLocationSettings() async {
+    await _useCases.openLocationSettings();
   }
 }

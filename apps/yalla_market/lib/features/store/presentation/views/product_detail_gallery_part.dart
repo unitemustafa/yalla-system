@@ -29,7 +29,7 @@ class _ProductGallery extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCardColor : const Color(0xFFF1F3F8),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
@@ -57,17 +57,20 @@ class _ProductGallery extends StatelessWidget {
             const SizedBox(height: 8),
             GestureDetector(
               onTap: onImageTap,
-              child: SizedBox(
-                height: 226,
-                width: double.infinity,
-                child: AppImage(
-                  source: currentImage,
-                  fit: BoxFit.contain,
-                  fallback: const Icon(AppIcons.image),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  height: 188,
+                  width: double.infinity,
+                  child: AppImage(
+                    source: currentImage,
+                    fit: BoxFit.cover,
+                    fallback: const Icon(AppIcons.image),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             SizedBox(
               height: 64,
               child: ListView.separated(

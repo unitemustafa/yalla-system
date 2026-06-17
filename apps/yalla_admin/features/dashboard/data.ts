@@ -177,6 +177,9 @@ export type ItemRow = {
   calories: string;
   price: string;
   variantDetails?: string;
+  visibilityMode?: "general" | "regions";
+  regionSlugs?: string[];
+  regionNames?: string[];
   featured: string;
   active: boolean;
 };

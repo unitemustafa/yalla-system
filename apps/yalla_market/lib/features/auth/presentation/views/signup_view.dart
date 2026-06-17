@@ -99,7 +99,7 @@ class _SignupViewState extends State<SignupView> {
   late final TextEditingController _passwordController;
   late PhoneCountry _selectedCountry;
   bool _obscurePassword = true;
-  bool _agreeToPrivacy = false;
+  bool _agreeToPrivacy = true;
   bool _showPrivacyError = false;
   late final SignupAvailabilityChecker _checker;
 
@@ -122,9 +122,14 @@ class _SignupViewState extends State<SignupView> {
       phoneForLookup: _phoneForLookup,
       validatePhoneFormat: _validatePhoneFormat,
       validateUsername: _validateUsername,
+      canCheckEmail: _canCheckEmailAvailability,
+      canCheckPhone: _canCheckPhoneAvailability,
     );
     _usernameController.addListener(_checker.scheduleUsernameCheck);
+    _usernameController.addListener(_checker.scheduleEmailCheck);
+    _usernameController.addListener(_checker.schedulePhoneCheck);
     _emailController.addListener(_checker.scheduleEmailCheck);
+    _emailController.addListener(_checker.schedulePhoneCheck);
     _phoneController.addListener(_checker.schedulePhoneCheck);
   }
 
@@ -132,7 +137,10 @@ class _SignupViewState extends State<SignupView> {
   void dispose() {
     _checker.dispose();
     _usernameController.removeListener(_checker.scheduleUsernameCheck);
+    _usernameController.removeListener(_checker.scheduleEmailCheck);
+    _usernameController.removeListener(_checker.schedulePhoneCheck);
     _emailController.removeListener(_checker.scheduleEmailCheck);
+    _emailController.removeListener(_checker.schedulePhoneCheck);
     _phoneController.removeListener(_checker.schedulePhoneCheck);
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -395,6 +403,27 @@ class _SignupViewState extends State<SignupView> {
       '',
     );
     return digits.isEmpty ? '' : '${_selectedCountry.dialCode}$digits';
+  }
+
+  bool _canCheckEmailAvailability() {
+    if (_firstNameController.text.trim().isEmpty ||
+        _lastNameController.text.trim().isEmpty) {
+      return false;
+    }
+
+    final username = _usernameController.text.trim();
+    if (_validateUsername(username) != null) return false;
+    if (username.isEmpty) return true;
+
+    return _checker.lastCheckedUsername == username &&
+        _checker.isUsernameAvailable == true;
+  }
+
+  bool _canCheckPhoneAvailability() {
+    final email = _emailController.text.trim().toLowerCase();
+    return _canCheckEmailAvailability() &&
+        _checker.lastCheckedEmail == email &&
+        _checker.isEmailAvailable == true;
   }
 
   String? _validateUsername(String? value) {

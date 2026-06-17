@@ -134,6 +134,11 @@ function isItemRow(value: unknown): value is ItemRow {
     isString(value.subcategory) &&
     isString(value.calories) &&
     isString(value.price) &&
+    (value.visibilityMode === undefined || isString(value.visibilityMode)) &&
+    (value.regionSlugs === undefined ||
+      (Array.isArray(value.regionSlugs) && value.regionSlugs.every(isString))) &&
+    (value.regionNames === undefined ||
+      (Array.isArray(value.regionNames) && value.regionNames.every(isString))) &&
     isString(value.featured) &&
     typeof value.active === "boolean"
   );

@@ -48,6 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSnackbar } from "../snackbar";
 import { dashboardUsers, type DashboardUser } from "../users/default-dashboard-users";
+import { deliveryZones } from "../reference-data";
 
 const currency = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
@@ -3398,6 +3399,14 @@ const packageSeedItems =
     ? preferredPackageSeedItems
     : defaultSelectableItems.slice(0, 3);
 
+type OfferVisibilityMode = "general" | "regions";
+
+function itemCoversOfferRegions(item: ItemRow, offerRegionSlugs: string[]) {
+  if (item.visibilityMode !== "regions") return true;
+  const itemRegions = item.regionSlugs ?? [];
+  return offerRegionSlugs.every((slug) => itemRegions.includes(slug));
+}
+
 type BundleLine = {
   id: string;
   itemId: string;
@@ -4491,6 +4500,9 @@ export function CreateOfferPage() {
   const [startTime, setStartTime] = useState(initialScheduleValues.time);
   const [endTime, setEndTime] = useState(initialScheduleValues.time);
   const [activeWeekDays, setActiveWeekDays] = useState<string[]>([]);
+  const [offerVisibilityMode, setOfferVisibilityMode] =
+    useState<OfferVisibilityMode>("general");
+  const [offerRegionSlugs, setOfferRegionSlugs] = useState<string[]>([]);
 
   function setScheduleDateOpen(field: "start" | "end", open: boolean) {
     setOpenScheduleDate(open ? field : null);
@@ -4602,6 +4614,68 @@ export function CreateOfferPage() {
     });
   }
 
+  function toggleOfferRegion(regionSlug: string) {
+    setOfferRegionSlugs((currentSlugs) =>
+      currentSlugs.includes(regionSlug)
+        ? currentSlugs.filter((slug) => slug !== regionSlug)
+        : [...currentSlugs, regionSlug],
+    );
+  }
+
+  function selectedOfferItems() {
+    if (selectedType === "باكج") {
+      return bundleItems.map((line) => selectedBundleItem(line.itemId));
+    }
+    if (selectedType === "فلاش") {
+      return flashProductIds
+        .map((itemId) => selectableItems.find((item) => item.id === itemId))
+        .filter((item): item is ItemRow => Boolean(item));
+    }
+    if (selectedType === "توصيل") {
+      const item = selectableItems.find((currentItem) => currentItem.id === deliveryProductId);
+      return item ? [item] : [];
+    }
+    if (selectedType === "إعلان" && adLinkType === "product") {
+      const item = selectableItems.find((currentItem) => currentItem.id === adProductId);
+      return item ? [item] : [];
+    }
+    const item = selectableItems.find((currentItem) => currentItem.id === discountProductId);
+    return item ? [item] : [];
+  }
+
+  function saveOffer() {
+    if (offerVisibilityMode === "regions" && offerRegionSlugs.length === 0) {
+      showSnackbar({
+        message: "اختر منطقة واحدة على الأقل أو اجعل العرض عامًا.",
+        tone: "danger",
+      });
+      return;
+    }
+
+    if (offerVisibilityMode === "regions") {
+      const invalidItems = selectedOfferItems().filter(
+        (item) => !itemCoversOfferRegions(item, offerRegionSlugs),
+      );
+
+      if (invalidItems.length > 0) {
+        showSnackbar({
+          message: `لا يمكن حفظ العرض. المنتجات التالية غير متاحة لكل مناطق العرض: ${invalidItems
+            .map((item) => item.name)
+            .join("، ")}.`,
+          tone: "danger",
+        });
+        return;
+      }
+    }
+
+    showSnackbar({
+      message:
+        formMode === "edit"
+          ? "تم حفظ تعديل العرض بنجاح."
+          : "تم إنشاء العرض بنجاح.",
+    });
+  }
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       const searchParams = new URLSearchParams(window.location.search);
@@ -4625,6 +4699,8 @@ export function CreateOfferPage() {
         setEndDate(formatDateInputValue(nextEndDate));
         setEndTime(formatTimeInputValue(nextEndDate));
         setActiveWeekDays([]);
+        setOfferVisibilityMode("general");
+        setOfferRegionSlugs([]);
       } else {
         const nextScheduleValues = currentScheduleValues();
         setOfferTitle("");
@@ -4637,6 +4713,8 @@ export function CreateOfferPage() {
         setStartTime(nextScheduleValues.time);
         setEndTime(nextScheduleValues.time);
         setActiveWeekDays([]);
+        setOfferVisibilityMode("general");
+        setOfferRegionSlugs([]);
         setOpenScheduleDate(null);
         setOpenScheduleTime(null);
       }
@@ -4668,11 +4746,7 @@ export function CreateOfferPage() {
             </Link>
             <Button
               className="h-10"
-              onClick={() =>
-                showSnackbar({
-                  message: formMode === "edit" ? "تم حفظ تعديل العرض بنجاح." : "تم إنشاء العرض بنجاح.",
-                })
-              }
+              onClick={saveOffer}
             >
               <CheckCircle2 className="size-4" />
               {formMode === "edit" ? "حفظ التعديل" : "إنشاء"}
@@ -5013,6 +5087,65 @@ export function CreateOfferPage() {
                 />
               </div>
             )}
+          </FormCard>
+
+          <FormCard title="مناطق الظهور">
+            <div className="grid gap-4">
+              <div className="grid gap-2 rounded-lg border bg-muted/20 p-1 sm:grid-cols-2">
+                {[
+                  { value: "general" as const, label: "عام" },
+                  { value: "regions" as const, label: "مناطق محددة" },
+                ].map((option) => {
+                  const selected = offerVisibilityMode === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setOfferVisibilityMode(option.value)}
+                      className={cn(
+                        "inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-black transition",
+                        selected
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {offerVisibilityMode === "regions" ? (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {deliveryZones.map((zone) => {
+                    const selected = offerRegionSlugs.includes(zone.id);
+
+                    return (
+                      <button
+                        key={zone.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleOfferRegion(zone.id)}
+                        className={cn(
+                          "flex min-h-11 items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-start text-sm font-bold transition hover:border-primary/50 hover:bg-accent/50",
+                          selected &&
+                            "border-primary bg-primary/10 text-primary ring-1 ring-primary/20",
+                        )}
+                      >
+                        <span className="truncate">{zone.name}</span>
+                        {selected ? <CheckCircle2 className="size-4 shrink-0" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-md border border-dashed bg-muted/20 px-3 py-3 text-sm font-medium text-muted-foreground">
+                  العرض العام يظهر لكل المستخدمين. العرض المحدد لا يظهر لمستخدم &quot;عام&quot; ولا خارج مناطقه.
+                </p>
+              )}
+            </div>
           </FormCard>
 
           <FormCard title="الجدولة">

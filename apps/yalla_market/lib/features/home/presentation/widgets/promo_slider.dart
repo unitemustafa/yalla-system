@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
 
 import '../../../../core/constants/app_assets.dart';
@@ -10,9 +11,11 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/images/app_image.dart';
 import '../../../../core/presentation/widgets/texts/app_currency_text.dart';
 import '../../../../core/presentation/widgets/texts/green_currency_price.dart';
+import '../../../../core/routing/app_route_arguments.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../cart/domain/entities/cart_item.dart';
 import '../../../cart/presentation/cubit/cart_cubit.dart';
+import '../../../location/presentation/cubit/location_cubit.dart';
 
 class PromoSlider extends StatefulWidget {
   const PromoSlider({super.key});
@@ -27,6 +30,7 @@ class _PromoSliderState extends State<PromoSlider> {
       icon: AppIcons.box,
       color: AppColors.primary,
       image: AppAssets.temporaryMarketPlaceholder,
+      endsAtIso: '2026-06-30T23:59:00+03:00',
       badgeEn: 'Package',
       badgeAr: 'باكج',
       titleEn: 'Weekly Package',
@@ -42,9 +46,13 @@ class _PromoSliderState extends State<PromoSlider> {
       detailAr: 'سعر الباكج بيتطبق لما كل المنتجات تتطلب في نفس السلة.',
       subtotal: 'EGP 355',
       discount: 'EGP 86',
-      deliveryFee: 'Free',
+      discountRateEn: '24% off',
+      discountRateAr: 'خصم 24%',
+      afterDiscount: 'EGP 269',
+      deliveryFee: 'لم يحدد',
       total: 'EGP 269',
       actionEn: 'Add package to cart',
+      visibilityMode: 'general',
       actionAr: 'ضيف الباكج للسلة',
       products: [
         _OfferProduct(
@@ -54,7 +62,6 @@ class _PromoSliderState extends State<PromoSlider> {
           brandEn: 'Vegetables',
           brandAr: 'خضار',
           price: 'EGP 120',
-          oldPrice: 'EGP 145',
           badgeEn: 'Bundle',
           badgeAr: 'باكج',
         ),
@@ -65,7 +72,6 @@ class _PromoSliderState extends State<PromoSlider> {
           brandEn: 'Bakery',
           brandAr: 'مخبوزات',
           price: 'EGP 89',
-          oldPrice: 'EGP 110',
           badgeEn: 'Bundle',
           badgeAr: 'باكج',
         ),
@@ -76,7 +82,6 @@ class _PromoSliderState extends State<PromoSlider> {
           brandEn: 'Supermarket',
           brandAr: 'سوبر ماركت',
           price: 'EGP 60',
-          oldPrice: 'EGP 100',
           badgeEn: 'Bundle',
           badgeAr: 'باكج',
         ),
@@ -86,7 +91,7 @@ class _PromoSliderState extends State<PromoSlider> {
       icon: AppIcons.flash_1,
       color: AppColors.warning,
       image: AppAssets.temporaryMarketPlaceholder,
-      endsAtIso: '2026-06-01T23:59:00+03:00',
+      endsAtIso: '2026-06-20T23:59:00+03:00',
       badgeEn: 'Flash',
       badgeAr: 'فلاش',
       titleEn: 'Flash Sale',
@@ -102,9 +107,15 @@ class _PromoSliderState extends State<PromoSlider> {
       detailAr: 'سعر الفلاش ثابت خلال مدة العرض فقط ومع توفر الكمية.',
       subtotal: 'EGP 220',
       discount: 'EGP 60',
-      deliveryFee: 'EGP 20',
-      total: 'EGP 180',
+      discountRateEn: '33% off',
+      discountRateAr: 'خصم 33%',
+      afterDiscount: 'EGP 160',
+      deliveryFee: 'لم يحدد',
+      total: 'EGP 160',
       actionEn: 'Add flash offer',
+      visibilityMode: 'regions',
+      regionSlugs: ['sharm-el-sheikh'],
+      regionNames: ['Sharm El Sheikh'],
       actionAr: 'ضيف عرض الفلاش',
       products: [
         _OfferProduct(
@@ -126,6 +137,7 @@ class _PromoSliderState extends State<PromoSlider> {
       icon: AppIcons.truck_fast,
       color: AppColors.info,
       image: AppAssets.temporaryMarketPlaceholder,
+      endsAtIso: '2026-06-28T23:59:00+03:00',
       badgeEn: 'Delivery',
       badgeAr: 'توصيل',
       titleEn: 'Free Delivery',
@@ -141,9 +153,13 @@ class _PromoSliderState extends State<PromoSlider> {
       detailAr: 'رسوم التوصيل بتتشال تلقائيا لما المنتج ده يكون في السلة.',
       subtotal: 'EGP 150',
       discount: 'EGP 0',
-      deliveryFee: 'Free',
+      discountRateEn: 'Free delivery',
+      discountRateAr: 'توصيل مجاني',
+      afterDiscount: 'EGP 150',
+      deliveryFee: 'لم يحدد',
       total: 'EGP 150',
       actionEn: 'Add free delivery item',
+      visibilityMode: 'general',
       actionAr: 'ضيف منتج التوصيل المجاني',
       products: [
         _OfferProduct(
@@ -162,9 +178,100 @@ class _PromoSliderState extends State<PromoSlider> {
       ],
     ),
     _PromoOfferData(
+      icon: AppIcons.notification,
+      color: AppColors.success,
+      image: AppAssets.temporaryMarketPlaceholder,
+      endsAtIso: '2026-07-03T23:59:00+03:00',
+      badgeEn: 'Ad',
+      badgeAr: 'إعلان',
+      titleEn: 'Sponsored Market Pick',
+      titleAr: 'عرض إعلاني مختار',
+      subtitleEn: 'A promoted deal shown with the same offer layout.',
+      subtitleAr: 'عرض ممول ظاهر مع نفس شكل العروض.',
+      valueEn: 'Sponsored',
+      valueAr: 'إعلان',
+      statusEn: 'Sponsored placement',
+      statusAr: 'عرض إعلاني',
+      detailEn:
+          'This promoted offer keeps the same checkout flow and timer behavior.',
+      detailAr: 'العرض الإعلاني بيظهر بنفس تجربة الشراء والتايمر.',
+      subtotal: 'EGP 300',
+      discount: 'EGP 30',
+      discountRateEn: '10% off',
+      discountRateAr: 'خصم 10%',
+      afterDiscount: 'EGP 270',
+      deliveryFee: 'لم يحدد',
+      total: 'EGP 270',
+      actionEn: 'Add sponsored offer',
+      visibilityMode: 'general',
+      actionAr: 'ضيف العرض الإعلاني',
+      products: [
+        _OfferProduct(
+          image: AppAssets.temporaryMarketPlaceholder,
+          titleEn: 'Sponsored grocery selection',
+          titleAr: 'اختيارات بقالة ممولة',
+          brandEn: 'Yalla Ads',
+          brandAr: 'إعلانات يلا',
+          price: 'EGP 270',
+          oldPrice: 'EGP 300',
+          badgeEn: 'Ad deal',
+          badgeAr: 'عرض إعلان',
+          metaEn: 'Featured today',
+          metaAr: 'مميز اليوم',
+        ),
+      ],
+    ),
+    _PromoOfferData(
+      icon: AppIcons.global,
+      color: AppColors.info,
+      image: AppAssets.temporaryMarketPlaceholder,
+      endsAtIso: '2026-07-04T23:59:00+03:00',
+      badgeEn: 'Ad link',
+      badgeAr: 'إعلان برابط',
+      titleEn: 'Partner Link Deal',
+      titleAr: 'إعلان برابط شريك',
+      subtitleEn: 'Tap the offer link to view the partner campaign.',
+      subtitleAr: 'اضغط على رابط العرض وشوف حملة الشريك.',
+      valueEn: 'Link offer',
+      valueAr: 'رابط عرض',
+      statusEn: 'Sponsored link',
+      statusAr: 'إعلان برابط',
+      detailEn: 'This ad includes a visible campaign link inside the offer.',
+      detailAr: 'الإعلان ده فيه رابط حملة واضح داخل العرض.',
+      subtotal: 'EGP 420',
+      discount: 'EGP 70',
+      discountRateEn: '17% off',
+      discountRateAr: 'خصم 17%',
+      afterDiscount: 'EGP 350',
+      deliveryFee: 'لم يحدد',
+      total: 'EGP 350',
+      actionEn: 'Add linked ad offer',
+      visibilityMode: 'general',
+      actionAr: 'ضيف عرض الإعلان بالرابط',
+      linkUrl: 'https://yalla.market/offers/partner-link',
+      linkLabelEn: 'yalla.market/offers/partner-link',
+      linkLabelAr: 'yalla.market/offers/partner-link',
+      products: [
+        _OfferProduct(
+          image: AppAssets.temporaryMarketPlaceholder,
+          titleEn: 'Partner campaign grocery bundle',
+          titleAr: 'باكج بقالة حملة الشريك',
+          brandEn: 'Partner Ad',
+          brandAr: 'إعلان شريك',
+          price: 'EGP 350',
+          oldPrice: 'EGP 420',
+          badgeEn: 'Linked ad',
+          badgeAr: 'إعلان برابط',
+          metaEn: 'Campaign link',
+          metaAr: 'رابط حملة',
+        ),
+      ],
+    ),
+    _PromoOfferData(
       icon: AppIcons.receipt_text,
       color: AppColors.error,
       image: AppAssets.samsungS9Mobile,
+      endsAtIso: '2026-07-05T23:59:00+03:00',
       badgeEn: 'Discount',
       badgeAr: 'خصم',
       titleEn: 'Extra Discount',
@@ -173,16 +280,22 @@ class _PromoSliderState extends State<PromoSlider> {
       subtitleAr: 'خصم مباشر على منتج محدد.',
       valueEn: '15% off',
       valueAr: 'خصم 15%',
-      statusEn: 'Coupon applied',
-      statusAr: 'الكوبون متطبق',
+      statusEn: 'Discount active',
+      statusAr: 'خصم نشط',
       detailEn:
           'The discount is included in the price below and confirmed in the order summary.',
       detailAr: 'الخصم متحسب في السعر تحت وبيتأكد في ملخص الطلب.',
       subtotal: 'EGP 480',
       discount: 'EGP 100',
-      deliveryFee: 'EGP 20',
-      total: 'EGP 400',
+      discountRateEn: '21% off',
+      discountRateAr: 'خصم 21%',
+      afterDiscount: 'EGP 380',
+      deliveryFee: 'لم يحدد',
+      total: 'EGP 380',
       actionEn: 'Add discounted item',
+      visibilityMode: 'regions',
+      regionSlugs: ['sharm-el-sheikh'],
+      regionNames: ['Sharm El Sheikh'],
       actionAr: 'ضيف المنتج المخفض',
       products: [
         _OfferProduct(
@@ -203,40 +316,26 @@ class _PromoSliderState extends State<PromoSlider> {
   ];
 
   late final PageController _pageController;
-  Timer? _autoSlideTimer;
   int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    _startAutoSlide();
   }
 
   @override
   void dispose() {
-    _autoSlideTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }
 
-  void _startAutoSlide() {
-    _autoSlideTimer?.cancel();
-    if (_offers.length < 2) return;
-
-    _autoSlideTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (!mounted || !_pageController.hasClients) return;
-
-      final nextIndex = (_currentIndex + 1) % _offers.length;
-      _pageController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 620),
-        curve: Curves.easeOutCubic,
-      );
-    });
-  }
-
   void _showOfferSheet(BuildContext context, _PromoOfferData offer) {
+    if (offer.hasExternalLink) {
+      unawaited(_launchOfferLink(context, offer));
+      return;
+    }
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -247,19 +346,27 @@ class _PromoSliderState extends State<PromoSlider> {
 
   @override
   Widget build(BuildContext context) {
+    final regionSlug = context.select<LocationCubit, String>(
+      (cubit) => cubit.state.selectedCity?.slug ?? 'general',
+    );
+    final offers = _visibleOffers(regionSlug);
+    if (_currentIndex >= offers.length && offers.isNotEmpty) {
+      _currentIndex = 0;
+    }
+
     return Column(
       children: [
         RepaintBoundary(
           child: SizedBox(
-            height: 158,
+            height: 154,
             child: PageView.builder(
               controller: _pageController,
-              itemCount: _offers.length,
+              itemCount: offers.length,
               onPageChanged: (index) {
                 setState(() => _currentIndex = index);
               },
               itemBuilder: (context, index) {
-                final offer = _offers[index];
+                final offer = offers[index];
                 return Padding(
                   padding: const EdgeInsets.only(right: 2),
                   child: _PromoOfferCard(
@@ -271,18 +378,18 @@ class _PromoSliderState extends State<PromoSlider> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_offers.length, (index) {
+          children: List.generate(offers.length, (index) {
             final isSelected = _currentIndex == index;
             final isDark = Theme.of(context).brightness == Brightness.dark;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
-              width: isSelected ? 22 : 7,
-              height: 7,
-              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isSelected ? 18 : 6,
+              height: 6,
+              margin: const EdgeInsets.symmetric(horizontal: 2.5),
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppColors.primary
@@ -296,6 +403,17 @@ class _PromoSliderState extends State<PromoSlider> {
         ),
       ],
     );
+  }
+
+  List<_PromoOfferData> _visibleOffers(String regionSlug) {
+    final normalized = regionSlug.trim().toLowerCase();
+    return _offers
+        .where((offer) {
+          if (offer.isGeneralVisibility) return true;
+          if (normalized.isEmpty || normalized == 'general') return false;
+          return offer.regionSlugs.contains(normalized);
+        })
+        .toList(growable: false);
   }
 }
 
@@ -362,59 +480,72 @@ class _PromoOfferCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
                 child: Column(
                   children: [
-                    Align(
-                      alignment: AlignmentDirectional.topEnd,
-                      child: _OfferOverlayBadge(offer: offer),
-                    ),
-                    const Spacer(),
                     Row(
                       textDirection: TextDirection.ltr,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        if (endsAt != null)
-                          _OfferCountdownTile(
-                            endsAt: endsAt,
-                            color: offer.color,
-                          )
-                        else
-                          _OfferValueTile(offer: offer),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                offer.title(context),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(
-                                      color: titleColor,
-                                      fontSize: 22,
-                                      height: 1.08,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                offer.subtitle(context),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: bodyColor,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                              ),
-                            ],
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 116),
+                              child: _OfferOverlayBadge(offer: offer),
+                            ),
                           ),
                         ),
+                        if (endsAt != null) ...[
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _OfferCountdownChip(
+                                endsAt: endsAt,
+                                color: offer.color,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
+                    ),
+                    const Spacer(),
+                    Align(
+                      alignment: AlignmentDirectional.bottomStart,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 270),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              offer.title(context),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: titleColor,
+                                    fontSize: 21,
+                                    height: 1.08,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            _OfferDescriptionTicker(
+                              text: offer.outsideDescription(context),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: bodyColor,
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -434,8 +565,12 @@ class _OfferOverlayBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final discountRate = offer.hasExternalLink
+        ? null
+        : offer.discountRate(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
         color: offer.color.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(8),
@@ -450,15 +585,20 @@ class _OfferOverlayBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(offer.icon, color: Colors.white, size: 15),
-          const SizedBox(width: 5),
-          Text(
-            offer.badge(context),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
+          Icon(offer.icon, color: Colors.white, size: 13),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              discountRate == null
+                  ? offer.badge(context)
+                  : '${offer.badge(context)} - $discountRate',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -467,54 +607,105 @@ class _OfferOverlayBadge extends StatelessWidget {
   }
 }
 
-class _OfferValueTile extends StatelessWidget {
-  const _OfferValueTile({required this.offer});
+class _OfferDescriptionTicker extends StatefulWidget {
+  const _OfferDescriptionTicker({required this.text, required this.style});
 
-  final _PromoOfferData offer;
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_OfferDescriptionTicker> createState() =>
+      _OfferDescriptionTickerState();
+}
+
+class _OfferDescriptionTickerState extends State<_OfferDescriptionTicker> {
+  final ScrollController _controller = ScrollController();
+  int _runId = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restartTicker());
+  }
+
+  @override
+  void didUpdateWidget(covariant _OfferDescriptionTicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _restartTicker());
+    }
+  }
+
+  @override
+  void dispose() {
+    _runId++;
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _restartTicker() {
+    if (!mounted) return;
+    _runId++;
+    if (_controller.hasClients) {
+      _controller.jumpTo(0);
+    }
+    unawaited(_runTicker(_runId));
+  }
+
+  Future<void> _runTicker(int runId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    while (mounted && _controller.hasClients && runId == _runId) {
+      final maxExtent = _controller.position.maxScrollExtent;
+      if (maxExtent <= 1) return;
+
+      final forwardMs = (maxExtent * 38).clamp(1400, 5200).round();
+      await _controller.animateTo(
+        maxExtent,
+        duration: Duration(milliseconds: forwardMs),
+        curve: Curves.linear,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+      if (!mounted || !_controller.hasClients || runId != _runId) return;
+
+      await _controller.animateTo(
+        0,
+        duration: const Duration(milliseconds: 850),
+        curve: Curves.easeOut,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 92,
-      constraints: const BoxConstraints(minHeight: 88),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(offer.icon, color: offer.color, size: 28),
-          const SizedBox(height: 8),
-          Text(
-            offer.value(context),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.lightTextPrimary,
-              height: 1.1,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
+    return ClipRect(
+      child: SingleChildScrollView(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        child: Text(
+          widget.text,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
+          style: widget.style,
+        ),
       ),
     );
   }
 }
 
-class _OfferCountdownTile extends StatefulWidget {
-  const _OfferCountdownTile({required this.endsAt, required this.color});
+class _OfferCountdownChip extends StatefulWidget {
+  const _OfferCountdownChip({required this.endsAt, required this.color});
 
   final DateTime endsAt;
   final Color color;
 
   @override
-  State<_OfferCountdownTile> createState() => _OfferCountdownTileState();
+  State<_OfferCountdownChip> createState() => _OfferCountdownChipState();
 }
 
-class _OfferCountdownTileState extends State<_OfferCountdownTile> {
+class _OfferCountdownChipState extends State<_OfferCountdownChip> {
   Timer? _timer;
   DateTime _now = DateTime.now();
 
@@ -538,38 +729,221 @@ class _OfferCountdownTileState extends State<_OfferCountdownTile> {
     final duration = remaining.isNegative ? Duration.zero : remaining;
 
     return Container(
-      width: 92,
-      constraints: const BoxConstraints(minHeight: 88),
-      padding: const EdgeInsets.all(10),
+      constraints: const BoxConstraints(maxWidth: 150),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.90),
+        color: Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: widget.color.withValues(alpha: 0.24)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: _CountdownUnits(
+          duration: duration,
+          color: widget.color,
+          numberColor: AppColors.lightTextPrimary,
+          isCompact: true,
+          isSingleLine: true,
+        ),
+      ),
+    );
+  }
+}
+
+class _CountdownUnits extends StatelessWidget {
+  const _CountdownUnits({
+    required this.duration,
+    required this.color,
+    required this.numberColor,
+    this.isCompact = false,
+    this.isSingleLine = false,
+  });
+
+  final Duration duration;
+  final Color color;
+  final Color numberColor;
+  final bool isCompact;
+  final bool isSingleLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final totalSeconds = duration.inSeconds;
+    const secondsPerDay = 24 * 60 * 60;
+    final days = totalSeconds ~/ secondsPerDay;
+    final hours = (totalSeconds % secondsPerDay) ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    final units = [
+      _CountdownUnitData(
+        value: days.toString(),
+        label: _useArabicCopy(context) ? 'يوم' : 'day',
+      ),
+      _CountdownUnitData(
+        value: hours.toString().padLeft(2, '0'),
+        label: _useArabicCopy(context) ? 'ساعة' : 'hr',
+      ),
+      _CountdownUnitData(
+        value: minutes.toString().padLeft(2, '0'),
+        label: _useArabicCopy(context) ? 'دقيقة' : 'min',
+      ),
+      _CountdownUnitData(
+        value: seconds.toString().padLeft(2, '0'),
+        label: _useArabicCopy(context) ? 'ثانية' : 'sec',
+      ),
+    ];
+
+    if (isSingleLine) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < units.length; index++) ...[
+              _CountdownUnitCell(
+                data: units[index],
+                color: color,
+                numberColor: numberColor,
+                isCompact: true,
+              ),
+              if (index != units.length - 1) const SizedBox(width: 3),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (isCompact) {
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _CountdownUnitCell(
+                  data: units[0],
+                  color: color,
+                  numberColor: numberColor,
+                  isCompact: true,
+                ),
+                const SizedBox(width: 4),
+                _CountdownUnitCell(
+                  data: units[1],
+                  color: color,
+                  numberColor: numberColor,
+                  isCompact: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _CountdownUnitCell(
+                  data: units[2],
+                  color: color,
+                  numberColor: numberColor,
+                  isCompact: true,
+                ),
+                const SizedBox(width: 4),
+                _CountdownUnitCell(
+                  data: units[3],
+                  color: color,
+                  numberColor: numberColor,
+                  isCompact: true,
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var index = 0; index < units.length; index++) ...[
+            _CountdownUnitCell(
+              data: units[index],
+              color: color,
+              numberColor: numberColor,
+              isCompact: false,
+            ),
+            if (index != units.length - 1) const SizedBox(width: 5),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CountdownUnitData {
+  const _CountdownUnitData({required this.value, required this.label});
+
+  final String value;
+  final String label;
+}
+
+class _CountdownUnitCell extends StatelessWidget {
+  const _CountdownUnitCell({
+    required this.data,
+    required this.color,
+    required this.numberColor,
+    required this.isCompact,
+  });
+
+  final _CountdownUnitData data;
+  final Color color;
+  final Color numberColor;
+  final bool isCompact;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = isCompact ? 29.0 : 44.0;
+
+    return Container(
+      width: width,
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 3 : 5,
+        vertical: isCompact ? 3 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(AppIcons.flash_1, color: widget.color, size: 28),
-          const SizedBox(height: 7),
-          Text(
-            remaining.isNegative
-                ? (context.isArabicLanguage ? 'انتهى' : 'Ended')
-                : (context.isArabicLanguage ? 'باقي' : 'Left'),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.lightTextPrimary,
-              height: 1,
-              fontWeight: FontWeight.w900,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              data.value,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: numberColor,
+                fontSize: isCompact ? 10 : 14,
+                height: 1,
+                fontWeight: FontWeight.w900,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ),
-          const SizedBox(height: 3),
-          Text(
-            _formatCountdown(duration, context),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: AppColors.lightTextPrimary,
-              height: 1,
-              fontWeight: FontWeight.w900,
+          SizedBox(height: isCompact ? 2 : 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              data.label,
+              maxLines: 1,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontSize: isCompact ? 7 : 10,
+                height: 1,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -610,7 +984,7 @@ class _PromoOfferSheet extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        height: MediaQuery.sizeOf(context).height * 0.66,
+        height: MediaQuery.sizeOf(context).height * 0.94,
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
         decoration: BoxDecoration(
           color: sheetColor,
@@ -642,6 +1016,15 @@ class _PromoOfferSheet extends StatelessWidget {
               isDark: isDark,
             ),
             const SizedBox(height: 14),
+            if (offer.endsAt != null) ...[
+              _OfferCountdownPanel(
+                offer: offer,
+                textColor: textColor,
+                mutedColor: mutedColor,
+                isDark: isDark,
+              ),
+              const SizedBox(height: 14),
+            ],
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
@@ -704,6 +1087,8 @@ class _OfferSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final discountRate = offer.discountRate(context);
+
     return Row(
       children: [
         Container(
@@ -720,14 +1105,33 @@ class _OfferSheetHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                offer.badge(context),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: mutedColor,
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      offer.badge(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: mutedColor,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (discountRate != null) ...[
+                    const SizedBox(width: 8),
+                    _MiniBadge(
+                      text: discountRate,
+                      color: offer.color,
+                      isDark: isDark,
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 3),
+              if (discountRate == null)
+                const SizedBox(height: 3)
+              else
+                const SizedBox(height: 6),
               Text(
                 offer.title(context),
                 maxLines: 2,
@@ -742,6 +1146,104 @@ class _OfferSheetHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _OfferCountdownPanel extends StatefulWidget {
+  const _OfferCountdownPanel({
+    required this.offer,
+    required this.textColor,
+    required this.mutedColor,
+    required this.isDark,
+  });
+
+  final _PromoOfferData offer;
+  final Color textColor;
+  final Color mutedColor;
+  final bool isDark;
+
+  @override
+  State<_OfferCountdownPanel> createState() => _OfferCountdownPanelState();
+}
+
+class _OfferCountdownPanelState extends State<_OfferCountdownPanel> {
+  Timer? _timer;
+  DateTime _now = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final endsAt = widget.offer.endsAt;
+    if (endsAt == null) return const SizedBox.shrink();
+
+    final remaining = endsAt.difference(_now);
+    final duration = remaining.isNegative ? Duration.zero : remaining;
+    final title = remaining.isNegative
+        ? (context.isArabicLanguage ? 'انتهى العرض' : 'Offer ended')
+        : (context.isArabicLanguage ? 'ينتهي العرض خلال' : 'Offer ends in');
+
+    return _OfferPanel(
+      isDark: widget.isDark,
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: widget.offer.color.withValues(
+                alpha: widget.isDark ? 0.18 : 0.10,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(widget.offer.icon, color: widget.offer.color, size: 21),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: widget.mutedColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerEnd,
+              child: _CountdownUnits(
+                duration: duration,
+                color: widget.offer.color,
+                numberColor: widget.textColor,
+                isCompact: true,
+                isSingleLine: true,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -833,8 +1335,8 @@ class _OfferProductsPanel extends StatelessWidget {
           const SizedBox(height: 12),
           for (var index = 0; index < offer.products.length; index++) ...[
             _OfferProductRow(
+              offer: offer,
               product: offer.products[index],
-              accentColor: offer.color,
               textColor: textColor,
               mutedColor: mutedColor,
               isDark: isDark,
@@ -849,18 +1351,39 @@ class _OfferProductsPanel extends StatelessWidget {
 
 class _OfferProductRow extends StatelessWidget {
   const _OfferProductRow({
+    required this.offer,
     required this.product,
-    required this.accentColor,
     required this.textColor,
     required this.mutedColor,
     required this.isDark,
   });
 
+  final _PromoOfferData offer;
   final _OfferProduct product;
-  final Color accentColor;
   final Color textColor;
   final Color mutedColor;
   final bool isDark;
+
+  void _openProductDetails(BuildContext context) {
+    final productBadge = product.badge(context);
+    final discount = _looksLikeDiscountLabel(productBadge)
+        ? productBadge
+        : offer.discountRate(context);
+    final navigator = Navigator.of(context);
+
+    navigator.pop();
+    navigator.pushNamed(
+      AppRoutes.productDetail,
+      arguments: ProductDetailRouteArgs(
+        image: product.image,
+        title: product.title(context),
+        brand: product.brand(context),
+        price: product.price,
+        oldPrice: product.oldPrice,
+        discount: discount,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -868,110 +1391,115 @@ class _OfferProductRow extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.05)
         : const Color(0xFFF1F3F8);
 
-    return Row(
-      children: [
-        Container(
-          width: 58,
-          height: 58,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: imageFill,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: AppImage(
-            source: product.image,
-            fit: BoxFit.contain,
-            cacheWidth: 116,
-            cacheHeight: 116,
-            filterQuality: FilterQuality.low,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return Semantics(
+      button: true,
+      label: product.title(context),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openProductDetails(context),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: imageFill,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: AppImage(
+                source: product.image,
+                fit: BoxFit.contain,
+                cacheWidth: 88,
+                cacheHeight: 88,
+                filterQuality: FilterQuality.low,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      product.title(context),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.title(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: textColor,
+                                height: 1.18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    product.brand(context),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: mutedColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 76,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: GreenCurrencyPrice(
+                      price: product.price,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: textColor,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _MiniBadge(
-                    text: product.badge(context),
-                    color: accentColor,
-                    isDark: isDark,
-                  ),
+                  if (product.oldPrice != null &&
+                      product.oldPrice != product.price) ...[
+                    const SizedBox(height: 2),
+                    AppCurrencyText(
+                      text: product.oldPrice!,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: mutedColor,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                      textAlign: TextAlign.end,
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                product.brand(context),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: mutedColor,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (product.meta(context).isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  product.meta(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: accentColor,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 76,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: AlignmentDirectional.centerEnd,
-                child: GreenCurrencyPrice(
-                  price: product.price,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: textColor,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (product.oldPrice != null &&
-                  product.oldPrice != product.price) ...[
-                const SizedBox(height: 2),
-                AppCurrencyText(
-                  text: product.oldPrice!,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: mutedColor,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                  textAlign: TextAlign.end,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
+}
+
+bool _looksLikeDiscountLabel(String value) {
+  final normalized = value.trim().toLowerCase();
+  return normalized.contains('%') ||
+      normalized.contains('off') ||
+      normalized.contains('خصم');
+}
+
+bool _useArabicCopy(BuildContext context) {
+  return context.isArabicLanguage ||
+      Directionality.of(context) == TextDirection.rtl;
 }
 
 class _OfferSummaryPanel extends StatelessWidget {
@@ -1000,15 +1528,27 @@ class _OfferSummaryPanel extends StatelessWidget {
             isDark: isDark,
           ),
           const SizedBox(height: 14),
+          if (offer.discountRate(context) != null) ...[
+            _SummaryLine(
+              label: context.isArabicLanguage ? 'نسبة الخصم' : 'Discount rate',
+              value: offer.discountRate(context)!,
+              valueColor: offer.color,
+              textColor: textColor,
+              mutedColor: mutedColor,
+            ),
+            const SizedBox(height: 10),
+          ],
           _SummaryLine(
-            label: context.isArabicLanguage ? 'قبل العرض' : 'Before offer',
+            label: context.isArabicLanguage
+                ? 'السعر قبل الخصم'
+                : 'Before discount',
             value: offer.subtotal,
             textColor: textColor,
             mutedColor: mutedColor,
           ),
           const SizedBox(height: 10),
           _SummaryLine(
-            label: context.isArabicLanguage ? 'خصم العرض' : 'Offer discount',
+            label: context.isArabicLanguage ? 'قيمة الخصم' : 'Discount value',
             value: '- ${offer.discount}',
             valueColor: AppColors.success,
             textColor: textColor,
@@ -1016,11 +1556,19 @@ class _OfferSummaryPanel extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           _SummaryLine(
+            label: context.isArabicLanguage
+                ? 'السعر بعد الخصم'
+                : 'After discount',
+            value: offer.afterDiscount,
+            valueColor: offer.color,
+            textColor: textColor,
+            mutedColor: mutedColor,
+          ),
+          const SizedBox(height: 10),
+          _SummaryLine(
             label: context.isArabicLanguage ? 'التوصيل' : 'Delivery',
             value: offer.deliveryFee,
-            valueColor: offer.deliveryFee == 'Free'
-                ? AppColors.success
-                : textColor,
+            valueColor: AppColors.success,
             textColor: textColor,
             mutedColor: mutedColor,
           ),
@@ -1364,11 +1912,20 @@ class _PromoOfferData {
     required this.detailAr,
     required this.subtotal,
     required this.discount,
+    required this.discountRateEn,
+    required this.discountRateAr,
+    required this.afterDiscount,
     required this.deliveryFee,
     required this.total,
     required this.actionEn,
     required this.actionAr,
     required this.products,
+    this.visibilityMode = 'general',
+    this.regionSlugs = const [],
+    this.regionNames = const [],
+    this.linkUrl,
+    this.linkLabelEn,
+    this.linkLabelAr,
   });
 
   final IconData icon;
@@ -1389,11 +1946,23 @@ class _PromoOfferData {
   final String detailAr;
   final String subtotal;
   final String discount;
+  final String discountRateEn;
+  final String discountRateAr;
+  final String afterDiscount;
   final String deliveryFee;
   final String total;
   final String actionEn;
   final String actionAr;
   final List<_OfferProduct> products;
+  final String visibilityMode;
+  final List<String> regionSlugs;
+  final List<String> regionNames;
+  final String? linkUrl;
+  final String? linkLabelEn;
+  final String? linkLabelAr;
+
+  bool get isGeneralVisibility =>
+      visibilityMode.trim().toLowerCase() == 'general' || regionSlugs.isEmpty;
 
   DateTime? get endsAt {
     final value = endsAtIso;
@@ -1402,25 +1971,50 @@ class _PromoOfferData {
   }
 
   String badge(BuildContext context) =>
-      context.isArabicLanguage ? badgeAr : badgeEn;
+      _useArabicCopy(context) ? badgeAr : badgeEn;
 
   String title(BuildContext context) =>
-      context.isArabicLanguage ? titleAr : titleEn;
+      _useArabicCopy(context) ? titleAr : titleEn;
 
   String subtitle(BuildContext context) =>
-      context.isArabicLanguage ? subtitleAr : subtitleEn;
+      _useArabicCopy(context) ? subtitleAr : subtitleEn;
+
+  String outsideDescription(BuildContext context) {
+    final productNames = products
+        .map((product) => product.title(context))
+        .where((title) => title.trim().isNotEmpty)
+        .join(' - ');
+    final description = subtitle(context);
+
+    if (productNames.isEmpty) return description;
+    return '$description - $productNames';
+  }
 
   String value(BuildContext context) =>
-      context.isArabicLanguage ? valueAr : valueEn;
+      _useArabicCopy(context) ? valueAr : valueEn;
 
   String status(BuildContext context) =>
-      context.isArabicLanguage ? statusAr : statusEn;
+      _useArabicCopy(context) ? statusAr : statusEn;
 
   String detail(BuildContext context) =>
-      context.isArabicLanguage ? detailAr : detailEn;
+      _useArabicCopy(context) ? detailAr : detailEn;
+
+  String? discountRate(BuildContext context) {
+    final value = _useArabicCopy(context) ? discountRateAr : discountRateEn;
+    return value.trim().isEmpty ? null : value;
+  }
+
+  String? linkLabel(BuildContext context) {
+    final value = _useArabicCopy(context) ? linkLabelAr : linkLabelEn;
+    final fallback = linkUrl;
+    if (value == null || value.trim().isEmpty) return fallback;
+    return value;
+  }
 
   String action(BuildContext context) =>
-      context.isArabicLanguage ? actionAr : actionEn;
+      _useArabicCopy(context) ? actionAr : actionEn;
+
+  bool get hasExternalLink => linkUrl?.trim().isNotEmpty ?? false;
 }
 
 class _OfferProduct {
@@ -1451,16 +2045,16 @@ class _OfferProduct {
   final String metaAr;
 
   String title(BuildContext context) =>
-      context.isArabicLanguage ? titleAr : titleEn;
+      _useArabicCopy(context) ? titleAr : titleEn;
 
   String brand(BuildContext context) =>
-      context.isArabicLanguage ? brandAr : brandEn;
+      _useArabicCopy(context) ? brandAr : brandEn;
 
   String badge(BuildContext context) =>
-      context.isArabicLanguage ? badgeAr : badgeEn;
+      _useArabicCopy(context) ? badgeAr : badgeEn;
 
   String meta(BuildContext context) =>
-      context.isArabicLanguage ? metaAr : metaEn;
+      _useArabicCopy(context) ? metaAr : metaEn;
 
   CartItemData toCartItem(_PromoOfferData offer, BuildContext context) {
     return CartItemData(
@@ -1470,6 +2064,10 @@ class _OfferProduct {
       title: title(context),
       price: _moneyValue(price),
       quantity: 1,
+      itemType: 'offer',
+      visibilityMode: offer.visibilityMode,
+      regionSlugs: offer.regionSlugs,
+      regionNames: offer.regionNames,
       attributes: [
         CartItemAttribute(
           label: context.isArabicLanguage ? 'عرض' : 'Offer',
@@ -1487,21 +2085,32 @@ double _moneyValue(String value) {
       0;
 }
 
-String _formatCountdown(Duration duration, BuildContext context) {
-  final totalSeconds = duration.inSeconds;
-  const secondsPerDay = 24 * 60 * 60;
-  final days = totalSeconds ~/ secondsPerDay;
-  final hours = (totalSeconds % secondsPerDay) ~/ 3600;
-  final minutes = (totalSeconds % 3600) ~/ 60;
-  final seconds = totalSeconds % 60;
+Future<void> _launchOfferLink(
+  BuildContext context,
+  _PromoOfferData offer,
+) async {
+  final rawUrl = offer.linkUrl?.trim();
+  final url = rawUrl == null ? null : Uri.tryParse(rawUrl);
+  final messenger = ScaffoldMessenger.of(context);
+  final isArabic = context.isArabicLanguage;
 
-  if (days > 0) {
-    return context.isArabicLanguage ? '$daysي $hoursس' : '${days}d ${hours}h';
+  if (url == null || !url.hasScheme) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(isArabic ? 'رابط الإعلان غير صالح' : 'Invalid ad link'),
+      ),
+    );
+    return;
   }
 
-  return [
-    hours,
-    minutes,
-    seconds,
-  ].map((part) => part.toString().padLeft(2, '0')).join(':');
+  final didLaunch = await launchUrl(url, mode: LaunchMode.externalApplication);
+  if (didLaunch || !context.mounted) return;
+
+  messenger.showSnackBar(
+    SnackBar(
+      content: Text(
+        isArabic ? 'تعذر فتح رابط الإعلان' : 'Could not open ad link',
+      ),
+    ),
+  );
 }

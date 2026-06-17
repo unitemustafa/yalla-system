@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
 
 import '../../../../../core/constants/app_colors.dart';
+import '../../../../../core/connectivity/internet_status_controller.dart';
 import '../../../../../core/presentation/widgets/images/app_avatar.dart';
 import '../../../../../core/routing/app_routes.dart';
 import '../../../../auth/presentation/cubit/auth_cubit.dart';
@@ -12,8 +13,6 @@ import '../../../../location/presentation/cubit/location_state.dart';
 import '../../../../location/presentation/widgets/city_selector_sheet.dart';
 import '../../../../store/presentation/cubit/order_history_cubit.dart';
 import '../../../../store/presentation/cubit/order_history_state.dart';
-import '../../../../store/presentation/cubit/product_catalog_cubit.dart';
-import '../../../../store/presentation/cubit/product_discovery_cubit.dart';
 import '../../controllers/user_profile_controller.dart';
 import '../../widgets/settings_menu_tile.dart';
 
@@ -96,28 +95,6 @@ class _SettingsViewState extends State<SettingsView> {
                 isDark: isDark,
                 children: [
                   SettingsMenuTile(
-                    icon: AppIcons.safe_home,
-                    title: 'My Addresses',
-                    subTitle: 'Set shopping delivery address',
-                    accentColor: AppColors.success,
-                    onTap: () =>
-                        Navigator.pushNamed(context, AppRoutes.addresses),
-                  ),
-                  BlocBuilder<LocationCubit, LocationState>(
-                    builder: (context, state) {
-                      return SettingsMenuTile(
-                        icon: AppIcons.location,
-                        title: 'Delivery City',
-                        subTitle: context.tr(
-                          state.selectedCity?.name ??
-                              'Choose the city used for available products',
-                        ),
-                        accentColor: AppColors.primary,
-                        onTap: () => _openCitySelector(context),
-                      );
-                    },
-                  ),
-                  SettingsMenuTile(
                     icon: AppIcons.shopping_cart,
                     title: 'My Cart',
                     subTitle: 'Add, remove products and move to checkout',
@@ -129,6 +106,22 @@ class _SettingsViewState extends State<SettingsView> {
                     subTitle: 'In-progress and completed orders',
                     accentColor: AppColors.warning,
                     onTap: () => Navigator.pushNamed(context, AppRoutes.orders),
+                  ),
+                  BlocBuilder<LocationCubit, LocationState>(
+                    builder: (context, locationState) {
+                      final city = locationState.selectedCity;
+                      final regionName =
+                          city?.displayName(arabic: context.isArabicLanguage) ??
+                          context.tr('General');
+
+                      return SettingsMenuTile(
+                        icon: AppIcons.location,
+                        title: 'Change region',
+                        subTitle: regionName,
+                        accentColor: AppColors.primary,
+                        onTap: () => CitySelectorSheet.show(context),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -205,17 +198,6 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ],
         );
-      },
-    );
-  }
-
-  Future<void> _openCitySelector(BuildContext context) {
-    return CitySelectorSheet.show(
-      context,
-      onCityChanged: () async {
-        await context.read<ProductCatalogCubit>().loadProducts(force: true);
-        if (!context.mounted) return;
-        await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
       },
     );
   }
@@ -388,23 +370,108 @@ class _AccountHero extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  height: 34,
-                  child: TextButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(AppIcons.edit, size: 16),
-                    label: Text(context.tr('Edit profile')),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.white.withValues(alpha: 0.14),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                Row(
+                  children: [
+                    Flexible(
+                      child: SizedBox(
+                        height: 34,
+                        child: TextButton.icon(
+                          onPressed: onEdit,
+                          icon: const Icon(AppIcons.edit, size: 16),
+                          label: Text(
+                            context.tr('Edit'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.14,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    const _ConnectionStatusBadge(),
+                  ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectionStatusBadge extends StatelessWidget {
+  const _ConnectionStatusBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final statusController = InternetStatusScope.maybeOf(context);
+
+    if (statusController == null) {
+      return _ConnectionStatusBadgeContent(
+        label: context.tr('Online'),
+        isOffline: false,
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: statusController,
+      builder: (context, _) {
+        final isOffline = statusController.isOffline;
+
+        return _ConnectionStatusBadgeContent(
+          label: context.tr(isOffline ? 'Offline' : 'Online'),
+          isOffline: isOffline,
+        );
+      },
+    );
+  }
+}
+
+class _ConnectionStatusBadgeContent extends StatelessWidget {
+  const _ConnectionStatusBadgeContent({
+    required this.label,
+    required this.isOffline,
+  });
+
+  final String label;
+  final bool isOffline;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: isOffline
+            ? AppColors.error.withValues(alpha: 0.92)
+            : Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isOffline ? Icons.wifi_off_rounded : Icons.wifi_rounded,
+            color: Colors.white,
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],

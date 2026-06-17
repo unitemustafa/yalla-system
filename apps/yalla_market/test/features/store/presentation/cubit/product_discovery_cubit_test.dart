@@ -178,7 +178,24 @@ class _FakeLocationRepository implements LocationRepository {
   }
 
   @override
+  Future<ApiResult<CityData>> detectCurrentLocation({
+    bool requestPermission = true,
+  }) async {
+    return ApiResult.success(city ?? CityData.supported.first);
+  }
+
+  @override
   Future<ApiResult<CityData>> useCurrentLocation() async {
     return ApiResult.success(city ?? CityData.supported.first);
+  }
+
+  @override
+  Future<ApiResult<void>> openAppSettings() async {
+    return const ApiResult.success(null);
+  }
+
+  @override
+  Future<ApiResult<void>> openLocationSettings() async {
+    return const ApiResult.success(null);
   }
 }

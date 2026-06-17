@@ -39,12 +39,30 @@ void registerLocationDependencies(GetIt sl) {
       () => UseCurrentLocationUseCase(sl<LocationRepository>()),
     );
   }
+  if (!sl.isRegistered<DetectCurrentLocationUseCase>()) {
+    sl.registerLazySingleton(
+      () => DetectCurrentLocationUseCase(sl<LocationRepository>()),
+    );
+  }
+  if (!sl.isRegistered<OpenLocationAppSettingsUseCase>()) {
+    sl.registerLazySingleton(
+      () => OpenLocationAppSettingsUseCase(sl<LocationRepository>()),
+    );
+  }
+  if (!sl.isRegistered<OpenDeviceLocationSettingsUseCase>()) {
+    sl.registerLazySingleton(
+      () => OpenDeviceLocationSettingsUseCase(sl<LocationRepository>()),
+    );
+  }
   if (!sl.isRegistered<LocationUseCases>()) {
     sl.registerLazySingleton(
       () => LocationUseCases(
         getSelectedCity: sl<GetSelectedCityUseCase>(),
         saveSelectedCity: sl<SaveSelectedCityUseCase>(),
+        detectCurrentLocation: sl<DetectCurrentLocationUseCase>(),
         useCurrentLocation: sl<UseCurrentLocationUseCase>(),
+        openAppSettings: sl<OpenLocationAppSettingsUseCase>(),
+        openLocationSettings: sl<OpenDeviceLocationSettingsUseCase>(),
       ),
     );
   }

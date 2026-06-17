@@ -27,7 +27,7 @@ import {
   Pagination,
   Switch,
 } from "../primitives";
-import { deliveryCityOptions } from "../reference-data";
+import { deliveryZones } from "../reference-data";
 import { useItemTableState } from "../hooks";
 import { useSnackbar } from "../snackbar";
 import { cn } from "@/lib/utils";
@@ -107,10 +107,29 @@ function formatItemPrice(price: string) {
 }
 
 function normalizeItemRow(row: ItemRow): ItemRow {
-  return { ...row, code: row.code ?? row.id, price: formatItemPrice(row.price) };
+  return {
+    ...row,
+    code: row.code ?? row.id,
+    price: formatItemPrice(row.price),
+    visibilityMode: row.visibilityMode ?? "general",
+    regionSlugs: row.regionSlugs ?? [],
+    regionNames: row.regionNames ?? [],
+  };
 }
 
-function matchesFilters(row: ItemRow, filters: ItemFilters) {
+function itemVisibilityLabel(row: ItemRow) {
+  if (row.visibilityMode !== "regions") return "عام";
+  const names = row.regionNames?.length ? row.regionNames : row.regionSlugs;
+  return names?.length ? names.join("، ") : "مناطق محددة";
+}
+
+function matchesRegion(row: ItemRow, selectedRegion: string) {
+  if (selectedRegion === "all") return true;
+  if (selectedRegion === "general") return row.visibilityMode !== "regions";
+  return row.visibilityMode !== "regions" || (row.regionSlugs ?? []).includes(selectedRegion);
+}
+
+function matchesFilters(row: ItemRow, filters: ItemFilters, selectedRegion: string) {
   const search = filters.search.trim().toLowerCase();
   const matchesSearch =
     !search ||
@@ -124,7 +143,7 @@ function matchesFilters(row: ItemRow, filters: ItemFilters) {
     filters.status === "all" ||
     (filters.status === "active" ? row.active : !row.active);
 
-  return matchesSearch && matchesCategory && matchesStatus;
+  return matchesSearch && matchesCategory && matchesStatus && matchesRegion(row, selectedRegion);
 }
 
 function MetricCards({ rows }: { rows: ItemRow[] }) {
@@ -397,15 +416,18 @@ export function ItemsPage() {
   const { showSnackbar } = useSnackbar();
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [filters, setFilters] = useState<ItemFilters>(defaultFilters);
-  const [selectedRegion, setSelectedRegion] = useState("كل المناطق");
+  const [selectedRegion, setSelectedRegion] = useState("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const visibleRows = useMemo(
-    () => rows.filter((row) => matchesFilters(row, filters)).sort(compareItems),
-    [filters, rows],
+    () =>
+      rows
+        .filter((row) => matchesFilters(row, filters, selectedRegion))
+        .sort(compareItems),
+    [filters, rows, selectedRegion],
   );
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / itemsPageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -614,10 +636,11 @@ export function ItemsPage() {
               value={selectedRegion}
               onValueChange={setSelectedRegion}
               options={[
-                { value: "كل المناطق", label: "كل المناطق" },
-                ...deliveryCityOptions.map((region) => ({
-                  value: region,
-                  label: region,
+                { value: "all", label: "كل المناطق" },
+                { value: "general", label: "عام" },
+                ...deliveryZones.map((region) => ({
+                  value: region.id,
+                  label: region.name,
                 })),
               ]}
               ariaLabel="اختيار المنطقة"
@@ -675,7 +698,7 @@ export function ItemsPage() {
           <DataTable
             minWidth={1070}
             columnWidths={[
-              48, 40, 64, 286, 116, 276, 88, 90, 62, 70,
+              48, 40, 64, 246, 116, 236, 88, 130, 90, 62, 70,
             ]}
             rowHeight="tall"
             headers={[
@@ -707,6 +730,7 @@ export function ItemsPage() {
               "Code",
               "الوصف",
               "الفئة",
+              "الظهور",
               "السعر",
               "نشط",
               "",
@@ -754,6 +778,9 @@ export function ItemsPage() {
               </div>,
               <div key={`category-${row.index}`} className="flex flex-col gap-0.5">
                 <span>{row.category}</span>
+              </div>,
+              <div key={`visibility-${row.index}`} className="flex flex-col gap-0.5">
+                <span className="line-clamp-2">{itemVisibilityLabel(row)}</span>
               </div>,
               <div key={`price-${row.index}`} className="flex gap-1">
                 <span>{formatItemPrice(row.price).split(" ")[0]}</span>

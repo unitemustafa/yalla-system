@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
@@ -6,8 +8,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/images/app_avatar.dart';
 import '../../../../core/presentation/widgets/products/cart_counter_icon.dart';
+import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/presentation/widgets/texts/section_heading.dart';
+import '../../../location/domain/entities/city_data.dart';
 import '../../../location/presentation/cubit/location_cubit.dart';
 import '../../../location/presentation/cubit/location_state.dart';
 import '../../../location/presentation/widgets/city_selector_sheet.dart';
@@ -18,8 +22,100 @@ import '../widgets/home_categories.dart';
 import '../widgets/home_products_grid.dart';
 import '../widgets/promo_slider.dart';
 
-class HomeView extends StatelessWidget {
+const _supportedRegionCheckInterval = Duration(seconds: 20);
+
+String _homeRegionLabel(BuildContext context, CityData? city) {
+  if (city == null) return context.tr('General');
+  if (city.isNamedGeneral) {
+    return city.displayName(arabic: context.isArabicLanguage);
+  }
+
+  final supportedCity =
+      CityData.fromSlug(city.slug) ?? CityData.fromName(city.name);
+
+  if (supportedCity == null || supportedCity.isGeneral) {
+    return context.tr('General');
+  }
+
+  return supportedCity.displayName(arabic: context.isArabicLanguage);
+}
+
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView> with WidgetsBindingObserver {
+  bool _isCheckingSupportedRegion = false;
+  Timer? _supportedRegionTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkForSupportedRegion();
+    });
+    _supportedRegionTimer = Timer.periodic(_supportedRegionCheckInterval, (_) {
+      if (mounted) _checkForSupportedRegion();
+    });
+  }
+
+  @override
+  void dispose() {
+    _supportedRegionTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForSupportedRegion();
+    }
+  }
+
+  Future<void> _checkForSupportedRegion() async {
+    if (_isCheckingSupportedRegion) return;
+    _isCheckingSupportedRegion = true;
+
+    try {
+      final locationCubit = context.read<LocationCubit>();
+      final currentCity = locationCubit.state.selectedCity;
+      final detectedCity = await locationCubit.previewCurrentLocation();
+
+      if (!mounted || detectedCity == null) return;
+      if (currentCity?.slug == detectedCity.slug &&
+          currentCity?.name == detectedCity.name) {
+        return;
+      }
+
+      await _switchToDetectedRegion(detectedCity);
+    } finally {
+      _isCheckingSupportedRegion = false;
+    }
+  }
+
+  Future<void> _switchToDetectedRegion(CityData detectedCity) async {
+    final selectedCity = await context.read<LocationCubit>().selectCity(
+      detectedCity,
+      source: detectedCity.source,
+    );
+    if (!mounted || selectedCity == null) return;
+
+    await context.read<ProductCatalogCubit>().loadProducts(force: true);
+    if (!mounted) return;
+    await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
+    if (!mounted) return;
+
+    CustomSnackBar.showPersistentSuccess(
+      context: context,
+      title: 'Region saved',
+      message: 'Products and offers will refresh for your region.',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,12 +166,19 @@ class _HomeTopBar extends StatelessWidget {
 
   final bool isDark;
 
+  Future<void> _openCitySelector(BuildContext context) {
+    return CitySelectorSheet.show(
+      context,
+      onCityChanged: () async {
+        await context.read<ProductCatalogCubit>().loadProducts(force: true);
+        if (!context.mounted) return;
+        await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mutedColor = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
     return ValueListenableBuilder<UserProfileController>(
       valueListenable: UserProfileController.instance,
       builder: (context, profile, _) {
@@ -104,26 +207,16 @@ class _HomeTopBar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.tr('Delivering to:'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: mutedColor,
-                      fontWeight: FontWeight.w700,
+              child: BlocBuilder<LocationCubit, LocationState>(
+                builder: (context, state) {
+                  return Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: _HomeRegionBadge(
+                      label: _homeRegionLabel(context, state.selectedCity),
+                      onTap: () => _openCitySelector(context),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  BlocBuilder<LocationCubit, LocationState>(
-                    builder: (context, state) {
-                      return _DeliveryCityButton(
-                        cityName: state.selectedCity?.name ?? 'Choose city',
-                        onTap: () => _openCitySelector(context),
-                      );
-                    },
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             _TopActionButton(
@@ -158,51 +251,51 @@ class _HomeTopBar extends StatelessWidget {
       },
     );
   }
-
-  Future<void> _openCitySelector(BuildContext context) {
-    return CitySelectorSheet.show(
-      context,
-      onCityChanged: () async {
-        await context.read<ProductCatalogCubit>().loadProducts(force: true);
-        if (!context.mounted) return;
-        await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
-      },
-    );
-  }
 }
 
-class _DeliveryCityButton extends StatelessWidget {
-  const _DeliveryCityButton({required this.cityName, required this.onTap});
+class _HomeRegionBadge extends StatelessWidget {
+  const _HomeRegionBadge({required this.label, required this.onTap});
 
-  final String cityName;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Tooltip(
+      message: context.tr('Change region'),
+      child: Material(
+        color: AppColors.warning.withValues(alpha: isDark ? 0.18 : 0.12),
         borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  context.tr(cityName),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: 4),
-              const Icon(AppIcons.arrow_down_1, size: 16),
-            ],
+                const SizedBox(width: 4),
+                const Icon(
+                  AppIcons.arrow_down_1,
+                  color: AppColors.warning,
+                  size: 13,
+                ),
+              ],
+            ),
           ),
         ),
       ),

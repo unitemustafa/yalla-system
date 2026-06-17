@@ -30,7 +30,7 @@ class _LoginViewState extends State<LoginView> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
 
   @override
   void initState() {

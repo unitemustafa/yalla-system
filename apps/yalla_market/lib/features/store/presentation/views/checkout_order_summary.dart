@@ -3,15 +3,15 @@ part of 'checkout_view.dart';
 class _OrderSummaryCard extends StatelessWidget {
   const _OrderSummaryCard({
     required this.subtotal,
-    required this.shippingFee,
-    required this.taxFee,
+    required this.shippingFeeLabel,
+    required this.isShippingFeeFixed,
     required this.total,
     required this.isDark,
   });
 
   final double subtotal;
-  final double shippingFee;
-  final double taxFee;
+  final String shippingFeeLabel;
+  final bool isShippingFeeFixed;
   final double total;
   final bool isDark;
 
@@ -60,16 +60,10 @@ class _OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: 12),
           _SummaryRow(
             label: 'Shipping Fee',
-            value: _formatMoney(shippingFee),
+            value: shippingFeeLabel,
             textColor: textColor,
             mutedColor: mutedColor,
-          ),
-          const SizedBox(height: 12),
-          _SummaryRow(
-            label: 'Tax Fee',
-            value: _formatMoney(taxFee),
-            textColor: textColor,
-            mutedColor: mutedColor,
+            valueColor: isShippingFeeFixed ? null : AppColors.primary,
           ),
           const SizedBox(height: 16),
           Divider(

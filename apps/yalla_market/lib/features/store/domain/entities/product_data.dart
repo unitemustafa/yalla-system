@@ -13,6 +13,9 @@ class ProductData {
     this.isFamilySafe = true,
     this.citySlug,
     this.cityName,
+    this.visibilityMode,
+    this.regionSlugs = const [],
+    this.regionNames = const [],
   });
 
   final String? id;
@@ -28,6 +31,25 @@ class ProductData {
   final bool isFamilySafe;
   final String? citySlug;
   final String? cityName;
+  final String? visibilityMode;
+  final List<String> regionSlugs;
+  final List<String> regionNames;
+
+  bool get isGeneralVisibility {
+    final mode = visibilityMode?.trim().toLowerCase();
+    return mode == null ||
+        mode.isEmpty ||
+        mode == 'general' ||
+        mode == 'all' ||
+        (regionSlugs.isEmpty && (citySlug == null || citySlug!.trim().isEmpty));
+  }
+
+  List<String> get effectiveRegionSlugs {
+    if (regionSlugs.isNotEmpty) return regionSlugs;
+    final legacyCity = citySlug?.trim().toLowerCase();
+    if (legacyCity == null || legacyCity.isEmpty) return const [];
+    return [legacyCity];
+  }
 
   factory ProductData.fromJson(Map<String, dynamic> json) {
     final tags = _stringList(json['tags']);
@@ -49,6 +71,13 @@ class ProductData {
       isFamilySafe: _familySafeFromJson(json, tags),
       citySlug: json['citySlug']?.toString() ?? json['city_slug']?.toString(),
       cityName: json['cityName']?.toString() ?? json['city_name']?.toString(),
+      visibilityMode:
+          json['visibilityMode']?.toString() ??
+          json['visibility_mode']?.toString(),
+      regionSlugs: _stringList(
+        json['regionSlugs'] ?? json['region_slugs'] ?? json['regions'],
+      ),
+      regionNames: _stringList(json['regionNames'] ?? json['region_names']),
     );
   }
 
@@ -67,6 +96,9 @@ class ProductData {
       'isFamilySafe': isFamilySafe,
       'citySlug': citySlug,
       'cityName': cityName,
+      'visibilityMode': visibilityMode,
+      'regionSlugs': regionSlugs,
+      'regionNames': regionNames,
     };
   }
 
@@ -94,6 +126,13 @@ class ProductData {
 }
 
 List<String> _stringList(Object? value) {
+  if (value is String) {
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
   if (value is! List) return const [];
   return value.map((item) => item.toString()).toList(growable: false);
 }

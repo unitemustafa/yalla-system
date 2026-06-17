@@ -25,6 +25,14 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/dashboard/
     price: typeof body.price === "string" ? body.price : undefined,
     variantDetails:
       typeof body.variantDetails === "string" ? body.variantDetails : undefined,
+    visibilityMode:
+      typeof body.visibilityMode === "string" ? body.visibilityMode : undefined,
+    regionSlugs: Array.isArray(body.regionSlugs)
+      ? body.regionSlugs.filter((item: unknown) => typeof item === "string")
+      : undefined,
+    regionNames: Array.isArray(body.regionNames)
+      ? body.regionNames.filter((item: unknown) => typeof item === "string")
+      : undefined,
     featured:
       typeof body.featured === "boolean" || typeof body.featured === "string"
         ? body.featured

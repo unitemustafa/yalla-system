@@ -155,10 +155,28 @@ class ProductSortButton extends StatelessWidget {
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.close_rounded),
-                              tooltip: context.tr('Close'),
+                            Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              child: InkWell(
+                                onTap: () => Navigator.pop(context),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isDark
+                                          ? Colors.white.withValues(alpha: 0.16)
+                                          : Colors.black.withValues(
+                                              alpha: 0.12,
+                                            ),
+                                    ),
+                                  ),
+                                  child: const Icon(Icons.close_rounded),
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(

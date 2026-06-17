@@ -21,6 +21,9 @@ export async function ensureDashboardSchema() {
             calories TEXT NOT NULL,
             price TEXT NOT NULL,
             variantDetails TEXT NOT NULL DEFAULT '{}',
+            visibilityMode TEXT NOT NULL DEFAULT 'general',
+            regionSlugs TEXT NOT NULL DEFAULT '[]',
+            regionNames TEXT NOT NULL DEFAULT '[]',
             featured TEXT NOT NULL,
             active BOOLEAN NOT NULL,
             createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -58,6 +61,15 @@ export async function ensureDashboardSchema() {
         );
         await prisma.$executeRawUnsafe(
           "ALTER TABLE dashboard_items ADD COLUMN variantDetails TEXT NOT NULL DEFAULT '{}'",
+        ).catch(() => undefined);
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN visibilityMode TEXT NOT NULL DEFAULT 'general'",
+        ).catch(() => undefined);
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN regionSlugs TEXT NOT NULL DEFAULT '[]'",
+        ).catch(() => undefined);
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN regionNames TEXT NOT NULL DEFAULT '[]'",
         ).catch(() => undefined);
       })
       .then(() => undefined);

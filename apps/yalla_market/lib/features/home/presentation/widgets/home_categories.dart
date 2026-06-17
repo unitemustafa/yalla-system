@@ -20,9 +20,9 @@ class HomeCategories extends StatelessWidget {
     ];
 
     return SizedBox(
-      height: 104,
+      height: 82,
       child: ListView.builder(
-        itemExtent: 96,
+        itemExtent: 94,
         itemCount: categories.length,
         scrollDirection: Axis.horizontal,
         itemBuilder: (_, index) {
@@ -59,8 +59,8 @@ class _HomeCategoryChip extends StatelessWidget {
 
     return Container(
       width: 86,
-      margin: const EdgeInsetsDirectional.only(end: 10),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsetsDirectional.only(end: 8),
+      padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
         color: panelColor,
         borderRadius: BorderRadius.circular(8),
@@ -73,9 +73,9 @@ class _HomeCategoryChip extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 46,
-            height: 46,
-            padding: const EdgeInsets.all(8),
+            width: 34,
+            height: 34,
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: data.color.withValues(alpha: isDark ? 0.20 : 0.10),
               borderRadius: BorderRadius.circular(8),
@@ -84,18 +84,19 @@ class _HomeCategoryChip extends StatelessWidget {
               child: AppImage(
                 source: data.image,
                 fit: BoxFit.contain,
-                cacheWidth: 92,
-                cacheHeight: 92,
+                cacheWidth: 72,
+                cacheHeight: 72,
                 filterQuality: FilterQuality.low,
                 fallback: Icon(Icons.category_outlined, color: data.color),
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             context.tr(data.name),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: textColor,
+              fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
             maxLines: 1,

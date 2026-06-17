@@ -25,6 +25,10 @@ class CartItemData {
     required this.price,
     required this.quantity,
     this.attributes = const [],
+    this.itemType = 'product',
+    this.visibilityMode = 'general',
+    this.regionSlugs = const [],
+    this.regionNames = const [],
   });
 
   final String id;
@@ -36,6 +40,29 @@ class CartItemData {
   final double price;
   final int quantity;
   final List<CartItemAttribute> attributes;
+  final String itemType;
+  final String visibilityMode;
+  final List<String> regionSlugs;
+  final List<String> regionNames;
+
+  bool get isOffer => itemType.trim().toLowerCase() == 'offer';
+
+  bool get isGeneralVisibility {
+    final mode = visibilityMode.trim().toLowerCase();
+    return mode.isEmpty ||
+        mode == 'general' ||
+        mode == 'all' ||
+        regionSlugs.isEmpty;
+  }
+
+  bool isAvailableForRegion(String regionSlug) {
+    final normalized = regionSlug.trim().toLowerCase();
+    if (isGeneralVisibility) return true;
+    if (normalized.isEmpty || normalized == 'general') return false;
+    return regionSlugs
+        .map((slug) => slug.trim().toLowerCase())
+        .contains(normalized);
+  }
 
   factory CartItemData.fromJson(Map<String, dynamic> json) {
     return CartItemData(
@@ -50,6 +77,16 @@ class CartItemData {
       price: _doubleFromJson(json['price'] ?? json['unitPrice']),
       quantity: _intFromJson(json['quantity']) ?? 1,
       attributes: _attributesFromJson(json['attributes']),
+      itemType:
+          json['itemType']?.toString() ??
+          json['item_type']?.toString() ??
+          'product',
+      visibilityMode:
+          json['visibilityMode']?.toString() ??
+          json['visibility_mode']?.toString() ??
+          'general',
+      regionSlugs: _stringList(json['regionSlugs'] ?? json['region_slugs']),
+      regionNames: _stringList(json['regionNames'] ?? json['region_names']),
     );
   }
 
@@ -64,6 +101,10 @@ class CartItemData {
       'price': price,
       'quantity': quantity,
       'attributes': attributes.map((attribute) => attribute.toJson()).toList(),
+      'itemType': itemType,
+      'visibilityMode': visibilityMode,
+      'regionSlugs': regionSlugs,
+      'regionNames': regionNames,
     };
   }
 
@@ -77,6 +118,10 @@ class CartItemData {
     double? price,
     int? quantity,
     List<CartItemAttribute>? attributes,
+    String? itemType,
+    String? visibilityMode,
+    List<String>? regionSlugs,
+    List<String>? regionNames,
   }) {
     return CartItemData(
       id: id ?? this.id,
@@ -88,6 +133,10 @@ class CartItemData {
       price: price ?? this.price,
       quantity: quantity ?? this.quantity,
       attributes: attributes ?? this.attributes,
+      itemType: itemType ?? this.itemType,
+      visibilityMode: visibilityMode ?? this.visibilityMode,
+      regionSlugs: regionSlugs ?? this.regionSlugs,
+      regionNames: regionNames ?? this.regionNames,
     );
   }
 }
@@ -98,6 +147,18 @@ List<CartItemAttribute> _attributesFromJson(Object? value) {
       .whereType<Map<String, dynamic>>()
       .map(CartItemAttribute.fromJson)
       .toList(growable: false);
+}
+
+List<String> _stringList(Object? value) {
+  if (value is String) {
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+  }
+  if (value is! List) return const [];
+  return value.map((item) => item.toString()).toList(growable: false);
 }
 
 double _doubleFromJson(Object? value) {

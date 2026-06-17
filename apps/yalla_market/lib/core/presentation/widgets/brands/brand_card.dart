@@ -49,9 +49,9 @@ class BrandCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
-                padding: const EdgeInsets.all(9),
+                width: 40,
+                height: 40,
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                   color: logoBackground,
                   borderRadius: BorderRadius.circular(8),
@@ -59,12 +59,12 @@ class BrandCard extends StatelessWidget {
                 child: AppImage(
                   source: logo,
                   fit: BoxFit.contain,
-                  cacheWidth: 92,
-                  cacheHeight: 92,
+                  cacheWidth: 80,
+                  cacheHeight: 80,
                   fallback: Icon(
                     AppIcons.shop,
                     color: isDark ? Colors.white : Colors.black,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
               ),
@@ -75,22 +75,32 @@ class BrandCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Text(
-                            brand,
-                            style: Theme.of(context).textTheme.titleMedium,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
                         const Icon(
                           AppIcons.verify5,
                           color: AppColors.primary,
-                          size: 14,
+                          size: 13,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            brand,
+                            textAlign: TextAlign.start,
+                            maxLines: 2,
+                            overflow: TextOverflow.fade,
+                            softWrap: true,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontSize: 15,
+                                  height: 1.08,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       context.tr(productCount),
                       style: Theme.of(

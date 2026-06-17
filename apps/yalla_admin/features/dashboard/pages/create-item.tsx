@@ -35,13 +35,14 @@ import {
   type ItemRow,
 } from "../data";
 import { AppSelect, Button, Input, Switch } from "../primitives";
-import { deliveryCityOptions } from "../reference-data";
+import { deliveryCityOptions, deliveryZones } from "../reference-data";
 import { cn } from "@/lib/utils";
 
 type Language = "ar" | "en";
 type Direction = "rtl" | "ltr";
 type CategoryKey = "clothing" | "vegetables" | "restaurants" | "other";
 type ProductLocationMode = "general" | "shop";
+type ProductVisibilityMode = "general" | "regions";
 type ChoiceInput = "swatch" | "chips" | "radio" | "checkbox" | "select";
 type CustomVariantInput = "chips" | "radio";
 type LocalizedText = Record<Language, string>;
@@ -1179,6 +1180,9 @@ export function CreateItemPage() {
     useState<ProductLocationMode>("general");
   const [selectedRegion, setSelectedRegion] = useState(t.allRegions);
   const [selectedShop, setSelectedShop] = useState(t.allShops);
+  const [visibilityMode, setVisibilityMode] =
+    useState<ProductVisibilityMode>("general");
+  const [visibleRegionSlugs, setVisibleRegionSlugs] = useState<string[]>([]);
   const [form, setForm] = useState<ProductForm>(initialForm);
   const [selectedVariants, setSelectedVariants] = useState<
     Record<string, string[]>
@@ -1277,6 +1281,8 @@ export function CreateItemPage() {
         setForm(nextForm);
         setSelectedVariants(cloneSelections(nextForm.category));
         setVariantDetails(parseVariantDetails(item.variantDetails));
+        setVisibilityMode(item.visibilityMode === "regions" ? "regions" : "general");
+        setVisibleRegionSlugs(item.regionSlugs ?? []);
         setCustomVariantFields({
           [nextForm.category]: parseCustomVariantFields(item.variantDetails),
         });
@@ -1420,11 +1426,21 @@ export function CreateItemPage() {
       !variantDetailFor(variantDetails, combination.key, form).price.trim(),
   ).length;
 
+  const visibleRegionNames = deliveryZones
+    .filter((zone) => visibleRegionSlugs.includes(zone.id))
+    .map((zone) => zone.name);
+  const visibilitySummary =
+    visibilityMode === "general"
+      ? "عام"
+      : visibleRegionNames.length
+        ? visibleRegionNames.join("، ")
+        : "مناطق محددة";
   const selectedData = [
     {
       label: t.subcategory,
       value: selectedSecondaryCategoryName,
     },
+    { label: "مناطق الظهور", value: visibilitySummary },
     { label: t.addons, value: selectedAddonSummary },
     ...variantSummary,
   ];
@@ -1460,6 +1476,14 @@ export function CreateItemPage() {
     value: ProductForm[Key],
   ) {
     setForm((currentForm) => ({ ...currentForm, [key]: value }));
+  }
+
+  function toggleVisibleRegion(regionSlug: string) {
+    setVisibleRegionSlugs((currentSlugs) =>
+      currentSlugs.includes(regionSlug)
+        ? currentSlugs.filter((slug) => slug !== regionSlug)
+        : [...currentSlugs, regionSlug],
+    );
   }
 
   function updateVariantDetail(
@@ -1881,6 +1905,11 @@ export function CreateItemPage() {
       return;
     }
 
+    if (visibilityMode === "regions" && visibleRegionSlugs.length === 0) {
+      setSaveError("اختر منطقة واحدة على الأقل أو اجعل المنتج عامًا.");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
 
@@ -1910,6 +1939,9 @@ export function CreateItemPage() {
             selectedVariants,
             variantDetails,
           }),
+          visibilityMode,
+          regionSlugs: visibilityMode === "regions" ? visibleRegionSlugs : [],
+          regionNames: visibilityMode === "regions" ? visibleRegionNames : [],
           featured: form.featured,
           active: form.available,
         }),
@@ -2231,6 +2263,69 @@ export function CreateItemPage() {
           </Section>
 
           <Section
+            icon={<MapPin className="size-4" />}
+            title="مناطق الظهور"
+            right={<StatusPill>{visibilitySummary}</StatusPill>}
+          >
+            <div className="grid gap-4">
+              <div className="grid gap-2 rounded-lg border bg-muted/20 p-1 sm:grid-cols-2">
+                {[
+                  { value: "general" as const, label: "عام" },
+                  { value: "regions" as const, label: "مناطق محددة" },
+                ].map((option) => {
+                  const selected = visibilityMode === option.value;
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setVisibilityMode(option.value)}
+                      className={cn(
+                        "inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-black transition",
+                        selected
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {visibilityMode === "regions" ? (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {deliveryZones.map((zone) => {
+                    const selected = visibleRegionSlugs.includes(zone.id);
+
+                    return (
+                      <button
+                        key={zone.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleVisibleRegion(zone.id)}
+                        className={cn(
+                          "flex min-h-11 items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-start text-sm font-bold transition hover:border-primary/50 hover:bg-accent/50",
+                          selected &&
+                            "border-primary bg-primary/10 text-primary ring-1 ring-primary/20",
+                        )}
+                      >
+                        <span className="truncate">{zone.name}</span>
+                        {selected ? <Check className="size-4 shrink-0" /> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-md border border-dashed bg-muted/20 px-3 py-3 text-sm font-medium text-muted-foreground">
+                  المنتج العام يظهر لكل المستخدمين، بما في ذلك المستخدمين في &quot;عام&quot;.
+                </p>
+              )}
+            </div>
+          </Section>
+
+          <Section
             icon={<Layers3 className="size-4" />}
             title={t.variants}
             right={
@@ -2366,6 +2461,7 @@ export function CreateItemPage() {
           onClose={() => setConfirmationOpen(false)}
           selectedSecondaryCategoryName={selectedSecondaryCategoryName}
           selectedRegion={selectedProductLocation}
+          visibilitySummary={visibilitySummary}
           selectedAddonSummary={selectedAddonSummary}
           t={t}
           priceKeys={visiblePriceDetailKeys}
@@ -4432,6 +4528,7 @@ function ConfirmationDialog({
   selectedSecondaryCategoryName,
   selectedAddonSummary,
   selectedRegion,
+  visibilitySummary,
   t,
   priceKeys,
   stockCombinations,
@@ -4449,6 +4546,7 @@ function ConfirmationDialog({
   selectedSecondaryCategoryName: string;
   selectedAddonSummary: string;
   selectedRegion: string;
+  visibilitySummary: string;
   t: (typeof copy)[Language];
   priceKeys: string[];
   stockCombinations: VariantCombination[];
@@ -4501,6 +4599,7 @@ function ConfirmationDialog({
     { label: t.description, value: form.description.trim() || t.empty },
     { label: t.image, value: imageNames.join(", ") || t.empty },
     { label: t.region, value: selectedRegion },
+    { label: "مناطق الظهور", value: visibilitySummary },
     { label: t.category, value: activeCategory.label[language] },
     { label: t.subcategory, value: selectedSecondaryCategoryName },
     { label: t.addons, value: selectedAddonSummary },

@@ -38,6 +38,9 @@ export type CreateItemInput = {
   calories?: string;
   price?: string;
   variantDetails?: string;
+  visibilityMode?: string;
+  regionSlugs?: string[];
+  regionNames?: string[];
   featured?: boolean | string;
   active?: boolean;
 };
@@ -82,6 +85,40 @@ function normalizeFeatured(value: CreateItemInput["featured"]) {
   }
 
   return trimText(value, featuredNo);
+}
+
+function normalizeVisibilityMode(value: unknown) {
+  return trimText(value).toLowerCase() === "regions" ? "regions" : "general";
+}
+
+function normalizeStringArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function stringifyList(value: unknown) {
+  return JSON.stringify(normalizeStringArray(value));
+}
+
+function parseStoredList(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return normalizeStringArray(parsed);
+  } catch {
+    return normalizeStringArray(value);
+  }
 }
 
 function normalizeOrderType(value: unknown) {
@@ -170,6 +207,9 @@ function toItemRow(item: DashboardItem): ItemRow {
     calories: item.calories,
     price: item.price,
     variantDetails: item.variantDetails ?? "{}",
+    visibilityMode: normalizeVisibilityMode(item.visibilityMode),
+    regionSlugs: parseStoredList(item.regionSlugs),
+    regionNames: parseStoredList(item.regionNames),
     featured: item.featured,
     active: item.active,
   };
@@ -220,6 +260,9 @@ async function ensureSeeded() {
             calories: item.calories,
             price: item.price,
             variantDetails: "{}",
+            visibilityMode: item.visibilityMode ?? "general",
+            regionSlugs: JSON.stringify(item.regionSlugs ?? []),
+            regionNames: JSON.stringify(item.regionNames ?? []),
             featured: item.featured,
             active: item.active,
           })),
@@ -281,6 +324,9 @@ export async function createItem(input: CreateItemInput) {
       calories: trimText(input.calories),
       price: normalizePrice(input.price),
       variantDetails: trimText(input.variantDetails, "{}"),
+      visibilityMode: normalizeVisibilityMode(input.visibilityMode),
+      regionSlugs: stringifyList(input.regionSlugs),
+      regionNames: stringifyList(input.regionNames),
       featured: normalizeFeatured(input.featured),
       active: input.active ?? true,
     },
@@ -336,6 +382,16 @@ export async function updateItem(
         typeof patch.variantDetails === "string"
           ? trimText(patch.variantDetails, "{}")
           : item.variantDetails,
+      visibilityMode:
+        typeof patch.visibilityMode === "string"
+          ? normalizeVisibilityMode(patch.visibilityMode)
+          : item.visibilityMode,
+      regionSlugs: Array.isArray(patch.regionSlugs)
+        ? stringifyList(patch.regionSlugs)
+        : item.regionSlugs,
+      regionNames: Array.isArray(patch.regionNames)
+        ? stringifyList(patch.regionNames)
+        : item.regionNames,
       featured:
         typeof patch.featured === "boolean" ||
         typeof patch.featured === "string"
@@ -375,6 +431,9 @@ export async function duplicateItem(itemId: string) {
       calories: item.calories,
       price: item.price,
       variantDetails: item.variantDetails ?? "{}",
+      visibilityMode: item.visibilityMode,
+      regionSlugs: item.regionSlugs,
+      regionNames: item.regionNames,
       featured: item.featured,
       active: item.active,
     },

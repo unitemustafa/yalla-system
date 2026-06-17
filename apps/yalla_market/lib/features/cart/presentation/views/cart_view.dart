@@ -16,6 +16,9 @@ import '../cubit/cart_cubit.dart';
 String _formatMoney(double value, {int fractionDigits = 1}) =>
     AppCurrency.format(value, fractionDigits: fractionDigits);
 
+String _notSpecifiedLabel(BuildContext context) =>
+    context.isArabicLanguage ? 'غير محدد' : 'Not specified';
+
 class CartView extends StatefulWidget {
   const CartView({super.key});
 
@@ -437,8 +440,7 @@ class _CheckoutSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const deliveryFee = 0.0;
-    final total = subtotal + deliveryFee;
+    final total = subtotal;
     final panelColor = isDark ? AppColors.darkCardColor : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.lightTextPrimary;
     final mutedColor = isDark
@@ -479,10 +481,10 @@ class _CheckoutSummary extends StatelessWidget {
             const SizedBox(height: 8),
             _SummaryRow(
               label: 'Delivery',
-              value: deliveryFee == 0 ? 'Free' : _formatMoney(deliveryFee),
+              value: _notSpecifiedLabel(context),
               textColor: textColor,
               mutedColor: mutedColor,
-              valueColor: AppColors.success,
+              valueColor: AppColors.primary,
             ),
             const SizedBox(height: 12),
             Divider(

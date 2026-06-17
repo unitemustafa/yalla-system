@@ -20,6 +20,9 @@ model DashboardItem {
   // TODO: Convert demo price strings to typed numeric currency fields in a planned migration.
   price       String
   variantDetails String @default("{}")
+  visibilityMode String @default("general")
+  regionSlugs String @default("[]")
+  regionNames String @default("[]")
   featured    String
   active      Boolean
   createdAt   DateTime @default(now())

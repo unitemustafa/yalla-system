@@ -65,7 +65,10 @@ class _CitySelectorSheetContent extends StatelessWidget {
   }
 
   Future<void> _selectCity(BuildContext context, CityData city) async {
-    final selectedCity = await context.read<LocationCubit>().selectCity(city);
+    final locationCubit = context.read<LocationCubit>();
+    final selectedCity = city.isGeneral
+        ? await locationCubit.selectGeneralRegion()
+        : await locationCubit.selectCity(city);
     if (!context.mounted || selectedCity == null) return;
 
     await onCityChanged?.call();
@@ -73,8 +76,10 @@ class _CitySelectorSheetContent extends StatelessWidget {
 
     CustomSnackBar.showSuccess(
       context: context,
-      title: 'City saved',
-      message: 'Products will refresh for your selected city.',
+      title: selectedCity.isGeneral ? 'General region saved' : 'Region saved',
+      message: selectedCity.isGeneral
+          ? 'General products and offers will be shown.'
+          : 'Products will refresh for your selected region.',
     );
     Navigator.pop(context);
   }
@@ -90,8 +95,10 @@ class _CitySelectorSheetContent extends StatelessWidget {
 
     CustomSnackBar.showSuccess(
       context: context,
-      title: 'City saved',
-      message: 'Products will refresh for your selected city.',
+      title: selectedCity.isGeneral ? 'General region saved' : 'Region saved',
+      message: selectedCity.isGeneral
+          ? 'General products and offers will be shown.'
+          : 'Products will refresh for your selected region.',
     );
     Navigator.pop(context);
   }
