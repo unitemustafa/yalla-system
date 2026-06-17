@@ -59,6 +59,51 @@ function formatReferenceCurrency(value: number) {
   return `${currency.format(value)} EGP`;
 }
 
+const fallbackCustomerAvatar = "/default-user-avatar.svg";
+
+function normalizeCustomerPhone(phone: string) {
+  return phone.replace(/[^\d]/g, "");
+}
+
+function customerForOrder(order: { customer: string; phone: string }) {
+  const orderPhone = normalizeCustomerPhone(order.phone);
+  const orderCustomer = order.customer.trim().toLowerCase();
+
+  return dashboardUsers.find((customer) => {
+    return (
+      normalizeCustomerPhone(customer.phone) === orderPhone ||
+      customer.name.trim().toLowerCase() === orderCustomer
+    );
+  });
+}
+
+function customerAvatarForOrder(order: { customer: string; phone: string }) {
+  return customerForOrder(order)?.avatar || fallbackCustomerAvatar;
+}
+
+function CustomerAvatar({
+  order,
+  className,
+}: {
+  order: { customer: string; phone: string };
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={customerAvatarForOrder(order)}
+      alt={order.customer}
+      className={cn(
+        "size-10 shrink-0 rounded-md border bg-muted object-cover",
+        className,
+      )}
+      onError={(event) => {
+        event.currentTarget.src = fallbackCustomerAvatar;
+      }}
+    />
+  );
+}
+
 function Textarea({
   placeholder,
   minHeight = "min-h-[84px]",
@@ -670,16 +715,24 @@ function OrdersMobileCards({
           className="min-w-0 overflow-hidden rounded-md border bg-card p-3 text-card-foreground shadow-sm"
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Link
-                href={`/orders/view/${encodeURIComponent(order.number)}`}
-                className="break-all text-sm font-semibold hover:text-primary"
-              >
-                {order.number}
-              </Link>
-              <div className="mt-1 text-sm">{order.customer}</div>
-              <div className="text-xs text-muted-foreground">{order.phone}</div>
-            </div>
+            <Link
+              href={`/orders/view/${encodeURIComponent(order.number)}`}
+              className="flex min-w-0 items-start gap-3 hover:text-primary"
+            >
+              <CustomerAvatar order={order} />
+              <span className="min-w-0">
+                <span className="block break-all text-sm font-semibold">
+                  {order.number}
+                </span>
+                <span className="mt-1 block truncate text-sm">{order.customer}</span>
+                <span
+                  dir="ltr"
+                  className="block truncate text-xs text-muted-foreground"
+                >
+                  {order.phone}
+                </span>
+              </span>
+            </Link>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <RefBadge tone={orderStatusTone(order.status)}>{order.status}</RefBadge>
@@ -1020,8 +1073,21 @@ export function OrdersPage() {
                       </Link>
                     </td>
                     <td className="p-2 align-middle">
-                      <div>{order.customer}</div>
-                      <div className="text-xs text-muted-foreground">{order.phone}</div>
+                      <Link
+                        href={`/orders/view/${encodeURIComponent(order.number)}`}
+                        className="flex min-w-0 items-center gap-3 rounded-md transition hover:text-primary"
+                      >
+                        <CustomerAvatar order={order} />
+                        <span className="min-w-0">
+                          <span className="block truncate">{order.customer}</span>
+                          <span
+                            dir="ltr"
+                            className="block truncate text-xs text-muted-foreground"
+                          >
+                            {order.phone}
+                          </span>
+                        </span>
+                      </Link>
                     </td>
                     <td className="p-2 align-middle">{order.type}</td>
                     <td className="p-2 align-middle">

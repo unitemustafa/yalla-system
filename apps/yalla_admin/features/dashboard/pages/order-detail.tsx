@@ -22,6 +22,7 @@ import {
 
 import { Badge, Card } from "../primitives";
 import { useSnackbar } from "../snackbar";
+import { dashboardUsers } from "../users/default-dashboard-users";
 import { cn } from "@/lib/utils";
 import type { DashboardOrder } from "@/lib/dashboard-store";
 
@@ -120,6 +121,50 @@ const demoOrderCouriers: Record<string, OrderCourier> = {
 
 function formatCurrency(value: number) {
   return `${currency.format(value)} EGP`;
+}
+
+const fallbackCustomerAvatar = "/default-user-avatar.svg";
+
+function normalizeCustomerPhone(phone: string) {
+  return phone.replace(/[^\d]/g, "");
+}
+
+function customerForOrder(order: DashboardOrder) {
+  const orderPhone = normalizeCustomerPhone(order.phone);
+  const orderCustomer = order.customer.trim().toLowerCase();
+
+  return dashboardUsers.find((customer) => {
+    return (
+      normalizeCustomerPhone(customer.phone) === orderPhone ||
+      customer.name.trim().toLowerCase() === orderCustomer
+    );
+  });
+}
+
+function customerAvatarForOrder(order: DashboardOrder) {
+  return customerForOrder(order)?.avatar || fallbackCustomerAvatar;
+}
+
+function CustomerSummary({ order }: { order: DashboardOrder }) {
+  return (
+    <div className="flex items-center gap-3 rounded-md bg-muted/25 px-3 py-3">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={customerAvatarForOrder(order)}
+        alt={order.customer}
+        className="size-12 shrink-0 rounded-md border bg-muted object-cover"
+        onError={(event) => {
+          event.currentTarget.src = fallbackCustomerAvatar;
+        }}
+      />
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold">{order.customer}</div>
+        <div dir="ltr" className="mt-1 truncate text-xs text-muted-foreground">
+          {order.phone}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function productsForOrder(order: DashboardOrder & { products?: OrderProduct[] }) {
@@ -764,6 +809,7 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
           ) : null}
 
           <InfoPanel title="بيانات العميل" icon={UserRound}>
+            <CustomerSummary order={order} />
             <DetailRow label="الاسم" value={order.customer} />
             <DetailRow
               label="رقم الموبايل"
