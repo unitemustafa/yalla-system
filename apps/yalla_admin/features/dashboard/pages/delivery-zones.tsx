@@ -169,7 +169,6 @@ function validateZoneDraft(draft: ZoneDraft) {
   const pricePerExtraKm = parseNumber(draft.pricePerExtraKm);
   const minOrderAmount = parseNumber(draft.minOrderAmount);
   const maxDistanceKm = parseNumber(draft.maxDistanceKm);
-  const estimatedDeliveryMinutes = parseNumber(draft.estimatedDeliveryMinutes);
 
   if (!draft.name.trim()) {
     errors.name = "اسم المنطقة مطلوب.";
@@ -206,10 +205,6 @@ function validateZoneDraft(draft: ZoneDraft) {
 
   if (maxDistanceKm <= 0) {
     errors.maxDistanceKm = "أقصى مسافة يجب أن تكون أكبر من صفر.";
-  }
-
-  if (estimatedDeliveryMinutes <= 0) {
-    errors.estimatedDeliveryMinutes = "وقت التوصيل يجب أن يكون أكبر من صفر.";
   }
 
   return errors;
@@ -490,15 +485,6 @@ function ZoneFormDialog({
                   error={errors.maxDistanceKm}
                   placeholder="15"
                 />
-                <NumberField
-                  label="وقت التوصيل المتوقع بالدقائق *"
-                  value={draft.estimatedDeliveryMinutes}
-                  onChange={(value) =>
-                    updateDraft("estimatedDeliveryMinutes", value)
-                  }
-                  error={errors.estimatedDeliveryMinutes}
-                  placeholder="30"
-                />
                 <Field label="الحالة">
                   <AppSelect
                     value={draft.status}
@@ -663,10 +649,10 @@ function ZonesTable({
     <div className="overflow-x-auto rounded-md border bg-card">
       <table
         className="w-full caption-bottom text-sm"
-        style={{ minWidth: 1135, tableLayout: "fixed" }}
+        style={{ minWidth: 1015, tableLayout: "fixed" }}
       >
         <colgroup>
-          {[40, 160, 115, 175, 110, 125, 120, 105, 110, 75].map(
+          {[40, 160, 115, 175, 110, 125, 105, 110, 75].map(
             (width, index) => (
               <col key={index} style={{ width }} />
             ),
@@ -683,7 +669,6 @@ function ZonesTable({
               "سعر التوصيل",
               "الحد الأدنى للطلب",
               "أقصى مسافة توصيل",
-              "وقت التوصيل المتوقع",
               "الحالة",
               "تاريخ الإنشاء",
               <span key="actions" className="block text-center">
@@ -726,9 +711,6 @@ function ZonesTable({
                 {formatCurrency(zone.minOrderAmount)}
               </td>
               <td className="p-2 align-middle">{zone.maxDistanceKm} كم</td>
-              <td className="p-2 align-middle">
-                {zone.estimatedDeliveryMinutes} دقيقة
-              </td>
               <td className="p-2 align-middle">
                 <StatusBadge status={zone.status} />
               </td>
@@ -798,10 +780,6 @@ function ZonesMobileList({
           <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
             <PreviewRow label="الحد الأدنى" value={formatCurrency(zone.minOrderAmount)} />
             <PreviewRow label="أقصى مسافة" value={`${zone.maxDistanceKm} كم`} />
-            <PreviewRow
-              label="الوقت المتوقع"
-              value={`${zone.estimatedDeliveryMinutes} دقيقة`}
-            />
             <PreviewRow label="تاريخ الإنشاء" value={formatDate(zone.createdAt)} />
           </div>
           <div className="mt-4 flex gap-2">

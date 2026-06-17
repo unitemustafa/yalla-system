@@ -64,7 +64,7 @@ export function AnimatedCircularStatCard({
   color: string;
   duration?: number;
   title?: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   footer?: ReactNode;
   tooltip?: ReactNode;
   locale?: string;

@@ -422,22 +422,24 @@ function RowActions({
 }
 
 function ProductIdentity({ row, compact = false }: { row: ItemRow; compact?: boolean }) {
+  const imageSize = compact ? 48 : 52;
+
   return (
-    <div className="flex min-w-0 items-center gap-3">
+    <div className="flex min-w-0 items-center gap-2.5">
       <DashboardImage
         alt={row.name}
         src={row.image}
-        width={compact ? 56 : 64}
-        height={compact ? 56 : 64}
-        sizes={compact ? "56px" : "64px"}
+        width={imageSize}
+        height={imageSize}
+        sizes={`${imageSize}px`}
         className={cn(
           "shrink-0 rounded-md border bg-muted/35 shadow-sm",
-          compact ? "size-14" : "size-16",
+          compact ? "size-12" : "size-[52px]",
         )}
         imageClassName="object-contain p-1"
       />
       <div className="min-w-0">
-        <h3 className="truncate text-sm font-black leading-6">{row.name}</h3>
+        <h3 className="truncate text-[13px] font-black leading-5">{row.name}</h3>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
             {row.code ?? row.id}
@@ -460,7 +462,7 @@ function ProductIdentity({ row, compact = false }: { row: ItemRow; compact?: boo
 
 function InfoPill({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-semibold text-foreground">
+    <span className="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/40 px-2 py-0.5 text-xs font-semibold text-foreground">
       <span className="truncate">{children}</span>
     </span>
   );
@@ -470,10 +472,26 @@ function PriceCell({ price }: { price: string }) {
   const { amount, currency } = splitItemPrice(price);
 
   return (
-    <div className="inline-flex min-w-[86px] items-baseline justify-center gap-1 rounded-md bg-primary/10 px-2.5 py-1.5 text-primary">
-      <span className="text-base font-black leading-none">{amount}</span>
+    <div className="inline-flex min-w-[78px] items-baseline justify-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-primary">
+      <span className="text-sm font-black leading-none">{amount}</span>
       {currency ? <span className="text-[11px] font-bold">{currency}</span> : null}
     </div>
+  );
+}
+
+function ActiveToggleButton({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: (active: boolean) => void;
+}) {
+  return (
+    <Switch
+      checked={active}
+      aria-label={active ? "إلغاء تنشيط المنتج" : "تنشيط المنتج"}
+      onCheckedChange={onToggle}
+    />
   );
 }
 
@@ -594,13 +612,10 @@ function ItemsMobileCards({
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
-                <label className="flex items-center gap-2 text-xs font-medium">
-                  نشط
-                  <Switch
-                    checked={row.active}
-                    onCheckedChange={(active) => onToggleActive(row, active)}
-                  />
-                </label>
+                <ActiveToggleButton
+                  active={row.active}
+                  onToggle={(active) => onToggleActive(row, active)}
+                />
               </div>
             </div>
           </div>
@@ -894,11 +909,11 @@ export function ItemsPage() {
         )}
         <div className="mt-4 hidden overflow-hidden rounded-md border transition-opacity duration-200 lg:block">
           <DataTable
-            minWidth={1240}
+            minWidth={1180}
             columnWidths={[
-              48, 52, 360, 230, 120, 140, 150, 120, 84,
+              48, 48, 300, 210, 110, 120, 130, 112, 70,
             ]}
-            rowHeight="tall"
+            rowHeight="normal"
             headers={[
               <div key="select-all" className="ps-4">
                 <button
@@ -930,9 +945,10 @@ export function ItemsPage() {
               "الظهور",
               "السعر",
               "نشط",
+              "",
             ]}
             rows={(loading ? [] : pagedRows).map((row, rowPosition) => [
-              <div key={`check-wrap-${row.index}`} className="flex items-center ps-4 py-3.5">
+              <div key={`check-wrap-${row.index}`} className="flex items-center ps-4 py-2">
                 <button
                   type="button"
                   role="checkbox"
@@ -954,19 +970,12 @@ export function ItemsPage() {
               </span>,
               <div
                 key={`product-${row.index}`}
-                className="flex min-w-0 items-center justify-between gap-3 py-2"
+                className="min-w-0 py-1.5"
               >
                 <ProductIdentity row={row} />
-                <RowActions
-                  row={row}
-                  open={openRow === row.index}
-                  onOpen={() => toggleRow(row.index)}
-                  onDuplicate={() => duplicateRow(row)}
-                  onDelete={() => setDeleteId(row.id)}
-                />
               </div>,
-              <div key={`description-${row.index}`} className="min-w-0 py-2">
-                <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+              <div key={`description-${row.index}`} className="min-w-0 py-1.5">
+                <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
                   {row.description}
                 </p>
               </div>,
@@ -982,11 +991,19 @@ export function ItemsPage() {
               <div key={`price-${row.index}`} className="flex justify-start">
                 <PriceCell price={row.price} />
               </div>,
-              <div key={`active-wrap-${row.index}`} className="flex items-center">
-                <Switch
-                  key={`active-${row.index}`}
-                  checked={row.active}
-                  onCheckedChange={(active) => toggleActive(row, active)}
+              <div key={`active-wrap-${row.index}`} className="flex items-center gap-3">
+                <ActiveToggleButton
+                  active={row.active}
+                  onToggle={(active) => toggleActive(row, active)}
+                />
+              </div>,
+              <div key={`actions-${row.index}`} className="flex items-center justify-center">
+                <RowActions
+                  row={row}
+                  open={openRow === row.index}
+                  onOpen={() => toggleRow(row.index)}
+                  onDuplicate={() => duplicateRow(row)}
+                  onDelete={() => setDeleteId(row.id)}
                 />
               </div>,
             ])}

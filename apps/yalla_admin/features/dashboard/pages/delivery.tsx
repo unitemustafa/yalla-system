@@ -5,7 +5,6 @@ import { Fragment, useState } from "react";
 import {
   ArrowUpDown,
   AlertCircle,
-  BadgeCheck,
   Camera,
   ChevronDown,
   CheckCircle2,
@@ -29,6 +28,7 @@ import {
 import { DashboardImage } from "../dashboard-image";
 import {
   ActionMenu,
+  AppSelect,
   Badge,
   Button,
   Card,
@@ -514,7 +514,7 @@ function CourierDetailsDrawer({
           </div>
         </div>
 
-        <div className="grid gap-3 border-b bg-muted/20 px-5 py-5 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
+        <div className="grid gap-3 border-b bg-muted/20 px-5 py-5 sm:grid-cols-3 sm:px-8">
           <CourierStat
             icon={PackageCheck}
             label="طلبات شغال عليها"
@@ -532,12 +532,6 @@ function CourierDetailsDrawer({
             label="طلبات متسلمتش"
             value={String(courier.notDeliveredOrders.length)}
             tone="text-red-500"
-          />
-          <CourierStat
-            icon={BadgeCheck}
-            label="مستوى الأداء"
-            value={courier.performance}
-            tone="text-primary"
           />
         </div>
 
@@ -1131,7 +1125,7 @@ function createCourierDraft(): CourierDraft {
     email: "",
     password: "",
     photoUrl: null,
-    vehicle: "موتوسيكل",
+    vehicle: "",
     plateNumber: "",
     zone: deliveryZones[0]?.name ?? "القاهرة",
     maxActiveOrders: "3",
@@ -1145,7 +1139,7 @@ function createCourierFromDraft(draft: CourierDraft): Courier {
     phone: draft.phone.trim() || "+201000000000",
     email: draft.email.trim() || "courier@yalla.market",
     photoUrl: draft.photoUrl,
-    vehicle: draft.vehicle,
+    vehicle: draft.vehicle.trim() || "غير محدد",
     plateNumber: draft.plateNumber.trim() || "بدون لوحة",
     zone: draft.zone,
     performance: "100%",
@@ -1299,7 +1293,11 @@ function CourierDrawer({
             />
           </Field>
           <Field label="نوع المركبة">
-            <SelectBox>{draft.vehicle}</SelectBox>
+            <Input
+              value={draft.vehicle}
+              onChange={(event) => updateDraft("vehicle", event.target.value)}
+              placeholder="اكتب نوع المركبة"
+            />
           </Field>
           <Field label="رقم اللوحة">
             <Input
@@ -1309,7 +1307,17 @@ function CourierDrawer({
             />
           </Field>
           <Field label="المنطقة">
-            <SelectBox>{draft.zone}</SelectBox>
+            <AppSelect
+              value={draft.zone}
+              onValueChange={(value) => updateDraft("zone", value)}
+              options={deliveryZones.map((zone) => ({
+                value: zone.name,
+                label: zone.name,
+              }))}
+              className="h-10 bg-input"
+              contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
+              ariaLabel="المنطقة"
+            />
           </Field>
           <Field label="أقصى عدد طلبات في نفس الوقت">
             <Input
@@ -1370,7 +1378,7 @@ function CourierCard({
           </div>
         </div>
 
-        <div className="grid gap-2 text-sm sm:grid-cols-4 lg:w-[520px]">
+        <div className="grid gap-2 text-sm sm:grid-cols-3 lg:w-[420px]">
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <div className="text-xs text-muted-foreground">المركبة</div>
             <div className="mt-1 flex items-center gap-1 font-semibold">
@@ -1381,10 +1389,6 @@ function CourierCard({
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <div className="text-xs text-muted-foreground">المنطقة</div>
             <div className="mt-1 font-semibold">{courier.zone}</div>
-          </div>
-          <div className="rounded-md bg-muted/30 px-3 py-2">
-            <div className="text-xs text-muted-foreground">الأداء</div>
-            <div className="mt-1 font-semibold">{courier.performance}</div>
           </div>
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <div className="text-xs text-muted-foreground">طلبات نشطة</div>

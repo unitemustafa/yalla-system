@@ -77,7 +77,7 @@ export function CardHeader({
   className,
 }: {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   icon?: React.ReactNode;
   className?: string;
 }) {
@@ -197,6 +197,7 @@ export function AppSelect({
   contentClassName,
   disabled,
   dir,
+  side = "bottom",
 }: {
   value?: string;
   defaultValue?: string;
@@ -209,6 +210,7 @@ export function AppSelect({
   contentClassName?: string;
   disabled?: boolean;
   dir?: "ltr" | "rtl";
+  side?: "top" | "right" | "bottom" | "left";
 }) {
   return (
     <Select.Root
@@ -242,6 +244,7 @@ export function AppSelect({
           align="start"
           dir={dir}
           position="popper"
+          side={side}
           sideOffset={8}
           className={cn(
             "z-50 max-h-[300px] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border/80 bg-popover p-1 text-popover-foreground shadow-2xl shadow-black/20 outline-none",

@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
+  Copy,
   CreditCard,
   LockKeyhole,
   MapPin,
@@ -29,7 +30,7 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
 });
 
-const orderSteps = ["قيد الانتظار", "مؤكد", "قيد التجهيز", "جاهز", "مكتمل"] as const;
+const orderSteps = ["قيد الانتظار", "مؤكد", "مكتمل"] as const;
 
 type OrderStatus = (typeof orderSteps)[number];
 
@@ -47,6 +48,8 @@ type OrderCourier = {
   plateNumber: string;
   zone: string;
   status: string;
+  currentLocation: string;
+  mapUrl: string;
 };
 
 const demoOrderProducts: Record<string, OrderProduct[]> = {
@@ -87,6 +90,8 @@ const defaultOrderCourier: OrderCourier = {
   plateNumber: "ق ر ب 2481",
   zone: "التل الكبير",
   status: "في الطريق",
+  currentLocation: "شارع البحر، بجوار موقف التل الكبير",
+  mapUrl: "https://www.google.com/maps/search/?api=1&query=El+Tall+El+Kebir",
 };
 
 const demoOrderCouriers: Record<string, OrderCourier> = {
@@ -98,6 +103,8 @@ const demoOrderCouriers: Record<string, OrderCourier> = {
     plateNumber: "س د ن 3194",
     zone: "التل الكبير",
     status: "استلم الطلب",
+    currentLocation: "مدخل التل الكبير، طريق الإسماعيلية الزراعي",
+    mapUrl: "https://www.google.com/maps/search/?api=1&query=El+Tall+El+Kebir+Ismailia",
   },
   "ORD-20260524-GK41OD": {
     name: "كابتن محمود حسن",
@@ -106,6 +113,8 @@ const demoOrderCouriers: Record<string, OrderCourier> = {
     plateNumber: "ط ل ب 5702",
     zone: "التل الكبير",
     status: "جاهز للتسليم",
+    currentLocation: "قرب سنتر السلام، التل الكبير",
+    mapUrl: "https://www.google.com/maps/search/?api=1&query=El+Salam+El+Tall+El+Kebir",
   },
 };
 
@@ -122,7 +131,7 @@ function productsForOrder(order: DashboardOrder & { products?: OrderProduct[] })
     demoOrderProducts[order.number] ?? [
       {
         name: "منتج الطلب",
-        description: `${order.type} · ${order.payment}`,
+        description: `${order.type} · نقدي`,
         quantity: 1,
         unitPrice: order.total,
       },
@@ -131,6 +140,10 @@ function productsForOrder(order: DashboardOrder & { products?: OrderProduct[] })
 }
 
 function normalizeOrderStatus(status: string): OrderStatus {
+  if (status === "قيد التجهيز" || status === "جاهز") {
+    return "مؤكد";
+  }
+
   return orderSteps.includes(status as OrderStatus)
     ? (status as OrderStatus)
     : orderSteps[0];
@@ -331,7 +344,7 @@ function StatusTimeline({
         </div>
       </div>
 
-      <ol className="grid gap-y-5 px-5 py-6 md:grid-cols-5 md:gap-y-0">
+      <ol className="grid gap-y-5 px-5 py-6 md:grid-cols-3 md:gap-y-0">
         {orderSteps.map((step, index) => {
           const isReached = index <= activeStep;
           const isActive = index === activeStep;
@@ -409,6 +422,18 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
   const finalTotal = productsSubtotal + deliveryFee;
   const assignedCourier = courierForOrder(order);
 
+  async function copyOrderNumber() {
+    try {
+      await navigator.clipboard.writeText(order.number);
+      showSnackbar({ message: `تم نسخ رقم الطلب ${order.number}.` });
+    } catch {
+      showSnackbar({
+        message: "تعذر نسخ رقم الطلب.",
+        tone: "danger",
+      });
+    }
+  }
+
   async function updateOrderStatus(nextStatus: OrderStatus) {
     if (nextStatus === currentStatus || savingStatus) {
       return;
@@ -467,12 +492,20 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
             <span dir="ltr" className="min-w-0 break-all">
               #{order.number}
             </span>
+            <button
+              type="button"
+              onClick={() => void copyOrderNumber()}
+              aria-label="نسخ رقم الطلب"
+              title="نسخ رقم الطلب"
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+            >
+              <Copy className="size-5" />
+            </button>
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>{order.date} الساعة {order.time}</span>
             <Badge>{order.type}</Badge>
             <Badge tone="blue">{currentStatus}</Badge>
-            <Badge tone="secondary">{order.payment}</Badge>
           </div>
         </div>
 
@@ -714,11 +747,17 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
               <DetailRow label="رقم اللوحة" value={assignedCourier.plateNumber} />
               <DetailRow label="منطقة العمل" value={assignedCourier.zone} />
               <DetailRow
-                label="حالة التوصيل"
+                label="موقع الطيار الحالي"
                 value={
-                  <span className="inline-flex rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-500">
-                    {assignedCourier.status}
-                  </span>
+                  <a
+                    href={assignedCourier.mapUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-500 transition hover:bg-emerald-500/15"
+                  >
+                    <MapPin className="size-3.5" />
+                    {assignedCourier.currentLocation}
+                  </a>
                 }
               />
             </InfoPanel>
@@ -738,7 +777,7 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
           </InfoPanel>
 
           <InfoPanel title="تفاصيل الدفع" icon={CreditCard}>
-            <DetailRow label="طريقة الدفع" value={order.payment} />
+            <DetailRow label="طريقة الدفع" value="نقدي" />
             <DetailRow label="نوع الطلب" value={order.type} />
           </InfoPanel>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -29,250 +29,17 @@ import {
   AnimatedChartWrapper,
   AnimatedNumber,
   AnimatedProgressBar,
-  useAnimatedValue,
 } from "../animations";
 import { AnimatedCircularStatCard } from "../animated-circular-stat-card";
 import { Button, Card, CardHeader, HoverTooltip, PageTitle } from "../primitives";
 import { useDashboardI18n } from "../i18n";
 import { cn } from "@/lib/utils";
 
-const chartSize = 250;
-const center = chartSize / 2;
-
 function formatMoney(value: number, locale: string, prefix: string, suffix: string) {
   return `${prefix}${value.toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}${suffix}`;
-}
-
-function donutSegmentPath({
-  start,
-  end,
-  outer,
-  inner,
-}: {
-  start: number;
-  end: number;
-  outer: number;
-  inner: number;
-}) {
-  const round = (value: number) => Number(value.toFixed(6));
-  const toPoint = (radius: number, angle: number) => ({
-    x: round(center + radius * Math.cos((angle * Math.PI) / 180)),
-    y: round(center + radius * Math.sin((angle * Math.PI) / 180)),
-  });
-  const outerStart = toPoint(outer, start);
-  const outerEnd = toPoint(outer, end);
-  const innerStart = toPoint(inner, start);
-  const innerEnd = toPoint(inner, end);
-  const largeArc = Math.abs(end - start) > 180 ? 1 : 0;
-
-  return [
-    `M ${outerStart.x} ${outerStart.y}`,
-    `A ${outer} ${outer} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
-    `L ${innerEnd.x} ${innerEnd.y}`,
-    `A ${inner} ${inner} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
-    "Z",
-  ].join(" ");
-}
-
-type DonutTooltipState = {
-  key: "delivery" | "discounts";
-  label: string;
-  value: number;
-  percent: number;
-  color: string;
-};
-
-function DonutBreakdown() {
-  const { numberLocale, t } = useDashboardI18n();
-  const currencyPrefix = t("common.egpPrefix");
-  const currencySuffix = t("common.egpSuffix");
-  const orangeEnd = (165 / 3050) * 360;
-  const animatedEnd = useAnimatedValue(360, { duration: 2200, delay: 220 });
-  const orangeSweep = Math.min(animatedEnd, orangeEnd);
-  const deliverySweep = Math.max(animatedEnd, orangeEnd);
-  const [tooltip, setTooltip] = useState<DonutTooltipState | null>(null);
-  const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const tooltipFrameRef = useRef<number | null>(null);
-  const deliverySegment = {
-    key: "delivery" as const,
-    label: t("overview.revenueBreakdown.delivery"),
-    value: 2885,
-    percent: 95,
-    color: "var(--chart-1)",
-  };
-  const discountsSegment = {
-    key: "discounts" as const,
-    label: t("overview.revenueBreakdown.discounts"),
-    value: 165,
-    percent: 5,
-    color: "var(--chart-3)",
-  };
-
-  function showSegmentTooltip(
-    event: PointerEvent<SVGPathElement>,
-    segment: DonutTooltipState,
-  ) {
-    const rect = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-
-    if (!rect) {
-      return;
-    }
-
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    if (tooltip?.key !== segment.key) {
-      setTooltip(segment);
-    }
-
-    if (tooltipFrameRef.current !== null) {
-      cancelAnimationFrame(tooltipFrameRef.current);
-    }
-
-    tooltipFrameRef.current = requestAnimationFrame(() => {
-      if (!tooltipRef.current) {
-        return;
-      }
-
-      tooltipRef.current.style.left = `${x}px`;
-      tooltipRef.current.style.top = `${y}px`;
-    });
-  }
-
-  function hideSegmentTooltip() {
-    setTooltip(null);
-
-    if (tooltipFrameRef.current !== null) {
-      cancelAnimationFrame(tooltipFrameRef.current);
-      tooltipFrameRef.current = null;
-    }
-  }
-
-  return (
-    <div className="relative size-[250px]" data-chart="revenue-breakdown-donut">
-      <svg
-        width={chartSize}
-        height={chartSize}
-        viewBox={`0 0 ${chartSize} ${chartSize}`}
-        className="block size-[250px]"
-        onPointerLeave={hideSegmentTooltip}
-      >
-        {deliverySweep > orangeEnd ? (
-          <path
-            d={donutSegmentPath({
-              start: orangeEnd,
-              end: deliverySweep,
-              outer: 95,
-              inner: 75,
-            })}
-            className={cn(
-              "cursor-pointer transition-opacity duration-150",
-              tooltip?.key === "discounts" && "opacity-50",
-            )}
-            fill={deliverySegment.color}
-            stroke="var(--background)"
-            strokeWidth={4}
-            onPointerEnter={(event) => showSegmentTooltip(event, deliverySegment)}
-            onPointerMove={(event) => showSegmentTooltip(event, deliverySegment)}
-          />
-        ) : null}
-        {orangeSweep > 0 ? (
-          <path
-            d={donutSegmentPath({
-              start: 0,
-              end: orangeSweep,
-              outer: 95,
-              inner: 75,
-            })}
-            className={cn(
-              "cursor-pointer transition-opacity duration-150",
-              tooltip?.key === "delivery" && "opacity-50",
-            )}
-            fill={discountsSegment.color}
-            stroke="var(--background)"
-            strokeWidth={4}
-            onPointerEnter={(event) => showSegmentTooltip(event, discountsSegment)}
-            onPointerMove={(event) => showSegmentTooltip(event, discountsSegment)}
-          />
-        ) : null}
-      </svg>
-      {tooltip ? (
-        <div
-          ref={tooltipRef}
-          role="tooltip"
-          className="pointer-events-none absolute z-30 min-w-[9rem] rounded-lg border border-border/50 bg-background px-3 py-2 text-center text-xs text-foreground opacity-100 shadow-xl"
-          style={{ transform: "translate(-50%, calc(-100% - 12px))" }}
-        >
-          <div className="mb-1 flex items-center justify-center gap-1.5 font-semibold">
-            <span
-              className="size-2 rounded-full"
-              style={{ backgroundColor: tooltip.color }}
-            />
-            {tooltip.label}
-          </div>
-          <div className="font-bold" dir="ltr">
-            {formatMoney(
-              tooltip.value,
-              numberLocale,
-              currencyPrefix,
-              currencySuffix,
-            )}
-          </div>
-          <div className="mt-1 text-muted-foreground">
-            {tooltip.percent.toLocaleString(numberLocale)}%
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function OrdersGauge() {
-  const radius = 80;
-  const circumference = 2 * Math.PI * radius;
-  const half = circumference / 2;
-  const greenLength = half * 0.615;
-  const gap = 8;
-  const orangeLength = half - greenLength - gap;
-  const animatedProgress = useAnimatedValue(1, { duration: 2200, delay: 220 });
-  const animatedGreenLength = greenLength * animatedProgress;
-  const animatedOrangeLength = orangeLength * animatedProgress;
-
-  return (
-    <svg
-      width={chartSize}
-      height={chartSize}
-      viewBox={`0 0 ${chartSize} ${chartSize}`}
-      className="block size-[250px]"
-    >
-      <circle
-        cx={center}
-        cy={center}
-        r={radius}
-        fill="none"
-        stroke="var(--chart-2)"
-        strokeLinecap="round"
-        strokeWidth={12}
-        strokeDasharray={`${animatedGreenLength} ${circumference - animatedGreenLength}`}
-        transform={`rotate(180 ${center} ${center})`}
-      />
-      <circle
-        cx={center}
-        cy={center}
-        r={radius}
-        fill="none"
-        stroke="var(--chart-3)"
-        strokeLinecap="round"
-        strokeWidth={12}
-        strokeDasharray={`${animatedOrangeLength} ${circumference - animatedOrangeLength}`}
-        strokeDashoffset={-(animatedGreenLength + gap)}
-        transform={`rotate(180 ${center} ${center})`}
-      />
-    </svg>
-  );
 }
 
 const revenueProductKeys = [
@@ -291,75 +58,85 @@ const revenueDotColors = [
   "var(--chart-5)",
 ];
 
-const topCategoryItems = [
+const topShopItems = [
   {
     rank: 1,
-    nameKey: "overview.product.potatoes",
-    orders: 30,
-    average: 2.37,
-    sold: 71,
+    nameAr: "يلا ماركت - الرئيسي",
+    nameEn: "Yalla Market - Main",
+    zoneAr: "التل الكبير",
+    zoneEn: "El Tall El Kebir",
+    orders: 74,
+    average: 3.28,
+    revenue: 18240.5,
   },
   {
     rank: 2,
-    nameKey: "overview.product.tomatoes",
-    orders: 36,
-    average: 1.61,
-    sold: 58,
+    nameAr: "خضار البلد",
+    nameEn: "Balad Produce",
+    zoneAr: "الحي الشرقي",
+    zoneEn: "East District",
+    orders: 58,
+    average: 2.84,
+    revenue: 14980,
   },
   {
     rank: 3,
-    nameKey: "overview.product.onions",
-    orders: 20,
-    average: 2.2,
-    sold: 44,
+    nameAr: "فراخ الطازة",
+    nameEn: "Fresh Chicken",
+    zoneAr: "وسط البلد",
+    zoneEn: "Downtown",
+    orders: 44,
+    average: 2.32,
+    revenue: 11275.25,
   },
   {
     rank: 4,
-    nameKey: "overview.product.bananas",
-    orders: 25,
-    average: 1.52,
-    sold: 38,
+    nameAr: "مخبوزات الصباح",
+    nameEn: "Morning Bakery",
+    zoneAr: "المحطة",
+    zoneEn: "Station",
+    orders: 38,
+    average: 1.92,
+    revenue: 7650.75,
   },
   {
     rank: 5,
-    nameKey: "overview.product.finoBread",
-    orders: 18,
-    average: 1.78,
-    sold: 32,
+    nameAr: "بيت الفاكهة",
+    nameEn: "Fruit House",
+    zoneAr: "الحي الغربي",
+    zoneEn: "West District",
+    orders: 29,
+    average: 2.14,
+    revenue: 6205.5,
   },
 ];
 
 function TopCategoriesCard() {
-  const [activeTab, setActiveTab] = useState<"quantity" | "revenue">("quantity");
   const { direction, language, numberLocale, t } = useDashboardI18n();
-  const isRevenueTab = activeTab === "revenue";
-  const totalSold = topCategoryItems.reduce((total, item) => total + item.sold, 0);
-  const totalRevenue = topItems.reduce((total, item) => total + item.revenue, 0);
+  const totalRevenue = topShopItems.reduce((total, item) => total + item.revenue, 0);
   const currencyPrefix = t("common.egpPrefix");
   const currencySuffix = t("common.egpSuffix");
-  const progressColorClass = isRevenueTab ? "bg-cyan-500" : "bg-[#22c55e]";
-  const rankBadgeClass = isRevenueTab
-    ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-200"
-    : "bg-[#dcfce7] text-[#16a34a]";
-  const displayItems = isRevenueTab
-    ? topItems.map((item, index) => ({
-        rank: index + 1,
-        name: t(revenueProductKeys[index]),
-        meta:
-          language === "ar"
-            ? `${item.sold.toLocaleString(numberLocale)} ${t("overview.topItems.sold")} · ${item.orders.toLocaleString(numberLocale)} ${t("common.order")}`
-            : `${item.sold.toLocaleString(numberLocale)} ${t("overview.topItems.sold")} · ${item.orders.toLocaleString(numberLocale)} ${t("common.orders")}`,
-        value: item.revenue,
-      }))
-    : topCategoryItems.map((item) => ({
-        rank: item.rank,
-        name: t(item.nameKey),
-        meta:
-          language === "ar"
-            ? `${item.orders.toLocaleString(numberLocale)} ${t("common.orders")} · ${t("overview.topItems.average")} ${item.average.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/${t("common.order")}`
-            : `${item.orders.toLocaleString(numberLocale)} ${t("common.orders")} · ${t("overview.topItems.average")} ${item.average.toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/${t("common.order")}`,
-        value: item.sold,
-      }));
+  const progressColorClass = "bg-cyan-500";
+  const rankBadgeClass =
+    "bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-200";
+  const zoneBadgeClass =
+    "rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium leading-[15px] text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200";
+  const shopMeta = (item: (typeof topShopItems)[number]) =>
+    `${item.orders.toLocaleString(numberLocale)} ${t("common.orders")} · ${t(
+      "overview.topItems.average",
+    )} ${item.average.toLocaleString(numberLocale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}/${t("common.order")}`;
+  const displayItems = [...topShopItems]
+    .sort((left, right) => right.revenue - left.revenue)
+    .map((item, index) => ({
+      rank: index + 1,
+      name: language === "ar" ? item.nameAr : item.nameEn,
+      zone: language === "ar" ? item.zoneAr : item.zoneEn,
+      meta: shopMeta(item),
+      value: item.revenue,
+    }));
   const maxValue = Math.max(...displayItems.map((item) => item.value));
 
   return (
@@ -373,63 +150,24 @@ function TopCategoriesCard() {
             {t("overview.topItems.title")}
           </div>
           <div className="mt-1 text-sm leading-5 text-muted-foreground">
-            {t("overview.topItems.description")}
-          </div>
-        </div>
-        <div
-          className="inline-flex w-fit rounded-xl bg-muted p-1 shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-          dir="ltr"
-        >
-          <button
-            type="button"
-            className={cn(
-              "h-8 rounded-lg px-3.5 text-sm font-medium leading-5 transition-colors",
-              !isRevenueTab
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            dir={direction}
-            aria-pressed={!isRevenueTab}
-            onClick={() => setActiveTab("quantity")}
-          >
-            {t("overview.topItems.quantityTab")}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "h-8 rounded-lg px-3.5 text-sm font-medium leading-5 transition-colors",
-              isRevenueTab
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            dir={direction}
-            aria-pressed={isRevenueTab}
-            onClick={() => setActiveTab("revenue")}
-          >
             {t("overview.topItems.revenueTab")}
-          </button>
+          </div>
         </div>
       </div>
 
       <div className="px-5 pb-5 pt-6" dir={direction}>
         <div className="text-start">
           <div className="text-sm leading-5 text-muted-foreground">
-            {isRevenueTab
-              ? t("overview.topItems.totalRevenue")
-              : t("overview.topItems.totalSales")}
+            {t("overview.topItems.totalRevenue")}
           </div>
           <div className="mt-1 text-3xl font-bold leading-9 text-card-foreground">
-            {isRevenueTab ? (
-              <AnimatedNumber
-                value={totalRevenue}
-                decimals={2}
-                locale={numberLocale}
-                prefix={currencyPrefix}
-                suffix={currencySuffix}
-              />
-            ) : (
-              <AnimatedNumber value={totalSold} locale={numberLocale} />
-            )}
+            <AnimatedNumber
+              value={totalRevenue}
+              decimals={2}
+              locale={numberLocale}
+              prefix={currencyPrefix}
+              suffix={currencySuffix}
+            />
           </div>
         </div>
 
@@ -451,8 +189,11 @@ function TopCategoriesCard() {
                       {item.rank}
                     </div>
                     <div className="min-w-0 text-start">
-                      <div className="truncate text-base font-semibold leading-5 text-card-foreground">
-                        {item.name}
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="truncate text-base font-semibold leading-5 text-card-foreground">
+                          {item.name}
+                        </span>
+                        <span className={zoneBadgeClass}>{item.zone}</span>
                       </div>
                       <div className="mt-0.5 truncate text-xs leading-4 text-muted-foreground">
                         {item.meta}
@@ -460,25 +201,14 @@ function TopCategoriesCard() {
                     </div>
                   </div>
                   <div className="shrink-0 pb-1 text-left text-sm font-bold leading-5 text-card-foreground">
-                    {isRevenueTab ? (
-                      <AnimatedNumber
-                        value={item.value}
-                        decimals={2}
-                        locale={numberLocale}
-                        prefix={currencyPrefix}
-                        suffix={currencySuffix}
-                        delay={delay}
-                      />
-                    ) : (
-                      <>
-                        <AnimatedNumber
-                          value={item.value}
-                          delay={delay}
-                          locale={numberLocale}
-                        />{" "}
-                        {t("overview.topItems.saleCount")}
-                      </>
-                    )}
+                    <AnimatedNumber
+                      value={item.value}
+                      decimals={2}
+                      delay={delay}
+                      locale={numberLocale}
+                      prefix={currencyPrefix}
+                      suffix={currencySuffix}
+                    />
                   </div>
                 </div>
                 <div
@@ -559,6 +289,23 @@ function MetricTooltip({
   );
 }
 
+function UpdateCadenceLabel({
+  children,
+  cadence,
+}: {
+  children: React.ReactNode;
+  cadence: React.ReactNode;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center justify-center gap-2">
+      <span>{children}</span>
+      <span className="rounded border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium leading-[15px] text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/15 dark:text-amber-200">
+        {cadence}
+      </span>
+    </span>
+  );
+}
+
 function OrdersKpiCard({
   height = "h-[388px]",
 }: {
@@ -574,7 +321,11 @@ function OrdersKpiCard({
     <Card className={cn("flex flex-col shadow", height)}>
       <CardHeader
         title={t("overview.ordersSummary.title")}
-        description={t("overview.ordersSummary.subtitle")}
+        description={
+          <UpdateCadenceLabel cadence={t("overview.period.daily")}>
+            {t("overview.ordersSummary.subtitle")}
+          </UpdateCadenceLabel>
+        }
       />
       <div className="flex flex-1 flex-col justify-center px-6 pb-6 pt-3">
         <HoverTooltip
@@ -684,60 +435,6 @@ function OrdersKpiCard({
             </HoverTooltip>
           </div>
         </div>
-      </div>
-    </Card>
-  );
-}
-
-function ChartCard({
-  title,
-  subtitle,
-  value,
-  label,
-  chart,
-  footer,
-  tooltip,
-  centerOverlay = true,
-  height = "h-[388px]",
-  bodyClassName,
-  footerClassName,
-}: {
-  title: string;
-  subtitle: string;
-  value?: React.ReactNode;
-  label?: string;
-  chart: React.ReactNode;
-  footer: React.ReactNode;
-  tooltip?: React.ReactNode;
-  centerOverlay?: boolean;
-  height?: string;
-  bodyClassName?: string;
-  footerClassName?: string;
-}) {
-  return (
-    <Card className={`flex flex-col shadow ${height}`}>
-      <CardHeader title={title} description={subtitle} />
-      <div className={cn("flex-1 p-6 py-4 pb-0", bodyClassName)}>
-        <HoverTooltip
-          content={tooltip}
-          className="relative mx-auto aspect-square size-[250px] max-h-[250px]"
-        >
-          {chart}
-          {centerOverlay ? (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-              <div className="text-lg font-bold leading-none">{value}</div>
-              <div className="text-xs text-muted-foreground">{label}</div>
-            </div>
-          ) : null}
-        </HoverTooltip>
-      </div>
-      <div
-        className={cn(
-          "flex flex-col items-center justify-center gap-1 p-6 pt-0 text-center text-sm",
-          footerClassName,
-        )}
-      >
-        {footer}
       </div>
     </Card>
   );
@@ -1193,10 +890,14 @@ export function OverviewPage() {
         actions={<OverviewDateActions />}
       />
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-2">
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <AnimatedCircularStatCard
           title={t("overview.totalRevenue.title")}
-          subtitle={t("overview.totalRevenue.subtitle")}
+          subtitle={
+            <UpdateCadenceLabel cadence={t("overview.period.monthly")}>
+              {t("overview.totalRevenue.subtitle")}
+            </UpdateCadenceLabel>
+          }
           value={46745.94}
           maxValue={46745.94}
           percentage={100}
@@ -1223,7 +924,7 @@ export function OverviewPage() {
               <HoverTooltip
                 content={
                   <MetricTooltip
-                    title={t("overview.totalRevenue.footer")}
+                    title={t("overview.totalRevenue.label")}
                     value={formatMoney(
                       46745.94,
                       numberLocale,
@@ -1235,7 +936,7 @@ export function OverviewPage() {
                 }
               >
                 <div className="flex items-center justify-center gap-1 font-medium leading-none">
-                  {t("overview.totalRevenue.footer")}{" "}
+                  {t("overview.totalRevenue.label")}{" "}
                   <AnimatedNumber
                     value={46745.94}
                     decimals={2}
@@ -1255,113 +956,64 @@ export function OverviewPage() {
             </>
           }
         />
-        <ChartCard
-          title={t("overview.revenueBreakdown.title")}
-          subtitle={t("overview.revenueBreakdown.subtitle")}
-          value={
-            <AnimatedNumber
-              value={3050}
-              decimals={2}
-              locale={numberLocale}
-              prefix={currencyPrefix}
-              suffix={currencySuffix}
-              delay={160}
+        <OrdersKpiCard />
+        <AnimatedCircularStatCard
+          title={t("overview.customerAnalysis.title")}
+          subtitle={
+            <UpdateCadenceLabel cadence={t("overview.period.monthly")}>
+              {t("overview.customerAnalysis.subtitle")}
+            </UpdateCadenceLabel>
+          }
+          value={0}
+          percentage={0}
+          label={t("overview.customerAnalysis.returnRateLabel")}
+          color="var(--chart-1)"
+          radius={85}
+          strokeWidth={20}
+          trackRadius={85}
+          trackStrokeWidth={20}
+          decimals={1}
+          locale={numberLocale}
+          suffix="%"
+          delay={200}
+          footerClassName="gap-2"
+          tooltip={
+            <MetricTooltip
+              title={t("overview.customerAnalysis.returnRateLabel")}
+              value="0.0%"
+              detail={`${t("overview.customerAnalysis.newCustomers")} ${(129).toLocaleString(numberLocale)} / ${t("overview.customerAnalysis.returningCustomers")} ${(0).toLocaleString(numberLocale)}`}
             />
           }
-          label={t("overview.revenueBreakdown.label")}
-          chart={<DonutBreakdown />}
           footer={
-            <div
-              className="flex w-full items-center justify-center gap-2 px-1 text-[10px] sm:gap-6 sm:px-0 sm:text-xs"
-              dir={direction}
-            >
+            <>
               <HoverTooltip
                 content={
                   <MetricTooltip
-                    title={t("overview.revenueBreakdown.delivery")}
-                    value={formatMoney(
-                      2885,
-                      numberLocale,
-                      currencyPrefix,
-                      currencySuffix,
-                    )}
-                    detail="95%"
+                    title={t("overview.customerAnalysis.returnRate")}
+                    value="0.0%"
+                    detail={`${t("overview.customerAnalysis.returningCustomers")} ${(0).toLocaleString(numberLocale)}`}
                   />
                 }
-                className="inline-flex items-center gap-1 whitespace-nowrap sm:gap-1.5"
               >
-                <span className="size-2.5 shrink-0 rounded-full bg-[var(--chart-1)]" />
-                <span className="text-muted-foreground">
-                  {t("overview.revenueBreakdown.delivery")}
-                </span>
-                <span
-                  className="flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium sm:gap-1"
-                  dir="ltr"
-                >
+                <div className="flex items-center justify-center gap-1 font-medium leading-none">
+                  {t("overview.customerAnalysis.returnRate")}{" "}
                   <AnimatedNumber
-                    value={2885}
-                    decimals={2}
+                    value={0}
+                    decimals={1}
+                    suffix="%"
+                    delay={200}
                     locale={numberLocale}
-                    prefix={currencyPrefix}
-                    suffix={currencySuffix}
-                    delay={160}
                   />
-                  <span className="text-muted-foreground">
-                    (
-                    <AnimatedNumber
-                      value={95}
-                      suffix="%"
-                      delay={160}
-                      locale={numberLocale}
-                    />
-                    )
-                  </span>
-                </span>
+                  <TrendingUp className="size-4" />
+                </div>
               </HoverTooltip>
-              <HoverTooltip
-                content={
-                  <MetricTooltip
-                    title={t("overview.revenueBreakdown.discounts")}
-                    value={formatMoney(
-                      165,
-                      numberLocale,
-                      currencyPrefix,
-                      currencySuffix,
-                    )}
-                    detail="5%"
-                  />
-                }
-                className="inline-flex items-center gap-1 whitespace-nowrap sm:gap-1.5"
-              >
-                <span className="size-2.5 shrink-0 rounded-full bg-[var(--chart-3)]" />
-                <span className="text-muted-foreground">
-                  {t("overview.revenueBreakdown.discounts")}
-                </span>
-                <span
-                  className="flex shrink-0 items-center gap-0.5 whitespace-nowrap font-medium sm:gap-1"
-                  dir="ltr"
-                >
-                  <AnimatedNumber
-                    value={165}
-                    decimals={2}
-                    locale={numberLocale}
-                    prefix={currencyPrefix}
-                    suffix={currencySuffix}
-                    delay={160}
-                  />
-                  <span className="text-muted-foreground">
-                    (
-                    <AnimatedNumber
-                      value={5}
-                      suffix="%"
-                      delay={160}
-                      locale={numberLocale}
-                    />
-                    )
-                  </span>
-                </span>
-              </HoverTooltip>
-            </div>
+              <div className="text-xs leading-none text-muted-foreground">
+                {t("overview.customerAnalysis.newCustomers")}{" "}
+                <AnimatedNumber value={129} delay={200} locale={numberLocale} />{" "}
+                · {t("overview.customerAnalysis.returningCustomers")}{" "}
+                <AnimatedNumber value={0} delay={200} locale={numberLocale} />
+              </div>
+            </>
           }
         />
       </div>
@@ -1440,190 +1092,6 @@ export function OverviewPage() {
             </div>
           </Card>
         </div>
-      </div>
-
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        {false && (
-          <ChartCard
-          title={t("overview.ordersSummary.title")}
-          subtitle={t("overview.ordersSummary.subtitle")}
-          value={<AnimatedNumber value={273} delay={120} locale={numberLocale} />}
-          label={t("overview.ordersSummary.label")}
-          height="h-[410px]"
-          bodyClassName="flex items-center"
-          footerClassName="gap-2"
-          chart={<OrdersGauge />}
-          tooltip={
-            <MetricTooltip
-              title={t("overview.ordersSummary.label")}
-              value={(273).toLocaleString(numberLocale)}
-              detail={`${t("common.completed")}: ${(168).toLocaleString(numberLocale)} / ${t("common.incomplete")}: ${(105).toLocaleString(numberLocale)}`}
-            />
-          }
-          footer={
-            <>
-              <HoverTooltip
-                content={
-                  <MetricTooltip
-                    title={t("overview.ordersSummary.completionRate")}
-                    value="61.5%"
-                    detail={`${t("common.completed")}: ${(168).toLocaleString(numberLocale)} / ${t("common.incomplete")}: ${(105).toLocaleString(numberLocale)}`}
-                  />
-                }
-              >
-                <div className="flex items-center justify-center gap-1 font-medium leading-none">
-                  {t("overview.ordersSummary.completionRate")}{" "}
-                  <AnimatedNumber
-                    value={61.5}
-                    decimals={1}
-                    suffix="%"
-                    delay={120}
-                    locale={numberLocale}
-                  />
-                  <TrendingUp className="size-4" />
-                </div>
-              </HoverTooltip>
-              <div className="text-xs leading-none text-muted-foreground">
-                {t("common.completed")}:{" "}
-                <AnimatedNumber value={168} delay={120} locale={numberLocale} /> ·{" "}
-                {t("common.incomplete")}:{" "}
-                <AnimatedNumber value={105} delay={120} locale={numberLocale} />
-              </div>
-            </>
-          }
-          />
-        )}
-        <AnimatedCircularStatCard
-          title={t("overview.customerAnalysis.title")}
-          subtitle={t("overview.customerAnalysis.subtitle")}
-          value={129}
-          percentage={100}
-          label={t("overview.customerAnalysis.label")}
-          color="var(--chart-1)"
-          height="h-[410px]"
-          radius={85}
-          strokeWidth={20}
-          trackRadius={85}
-          trackStrokeWidth={20}
-          locale={numberLocale}
-          delay={200}
-          footerClassName="gap-2"
-          tooltip={
-            <MetricTooltip
-              title={t("overview.customerAnalysis.label")}
-              value={(129).toLocaleString(numberLocale)}
-              detail={`${t("overview.customerAnalysis.newCustomers")} ${(129).toLocaleString(numberLocale)} / ${t("overview.customerAnalysis.returningCustomers")} ${(0).toLocaleString(numberLocale)}`}
-            />
-          }
-          footer={
-            <>
-              <HoverTooltip
-                content={
-                  <MetricTooltip
-                    title={t("overview.customerAnalysis.returnRate")}
-                    value="0.0%"
-                    detail={`${t("overview.customerAnalysis.returningCustomers")} ${(0).toLocaleString(numberLocale)}`}
-                  />
-                }
-              >
-                <div className="flex items-center justify-center gap-1 font-medium leading-none">
-                  {t("overview.customerAnalysis.returnRate")}{" "}
-                  <AnimatedNumber
-                    value={0}
-                    decimals={1}
-                    suffix="%"
-                    delay={200}
-                    locale={numberLocale}
-                  />
-                  <TrendingUp className="size-4" />
-                </div>
-              </HoverTooltip>
-              <div className="text-xs leading-none text-muted-foreground">
-                {t("overview.customerAnalysis.newCustomers")}{" "}
-                <AnimatedNumber value={129} delay={200} locale={numberLocale} /> ·{" "}
-                {t("overview.customerAnalysis.returningCustomers")}{" "}
-                <AnimatedNumber value={0} delay={200} locale={numberLocale} />
-              </div>
-            </>
-          }
-        />
-        <OrdersKpiCard height="h-[410px]" />
-        <AnimatedCircularStatCard
-          title={t("overview.paymentMethods.title")}
-          subtitle={t("overview.paymentMethods.subtitle")}
-          value={46745.94}
-          percentage={100}
-          label={t("overview.paymentMethods.label")}
-          color="var(--chart-1)"
-          height="h-[410px]"
-          radius={85}
-          strokeWidth={20}
-          trackRadius={85}
-          trackStrokeWidth={20}
-          decimals={2}
-          locale={numberLocale}
-          prefix={currencyPrefix}
-          suffix={currencySuffix}
-          delay={280}
-          footerClassName="gap-2"
-          tooltip={
-            <MetricTooltip
-              title={t("overview.paymentMethods.label")}
-              value={formatMoney(
-                46745.94,
-                numberLocale,
-                currencyPrefix,
-                currencySuffix,
-              )}
-              detail={`${t("common.cash")}: 100% / ${t("common.electronicPayment")}: 0%`}
-            />
-          }
-          footer={
-            <>
-              <HoverTooltip
-                content={
-                  <MetricTooltip
-                    title={t("overview.paymentMethods.label")}
-                    value={formatMoney(
-                      46745.94,
-                      numberLocale,
-                      currencyPrefix,
-                      currencySuffix,
-                    )}
-                    detail={`${t("common.cash")}: 100% / ${t("common.electronicPayment")}: 0%`}
-                  />
-                }
-              >
-                <div className="flex items-center justify-center gap-1 font-medium leading-none">
-                {t("common.cash")}:{" "}
-                <AnimatedNumber
-                  value={100}
-                  suffix="%"
-                  delay={280}
-                  locale={numberLocale}
-                />{" "}
-                · {t("common.electronicPayment")}:{" "}
-                <AnimatedNumber
-                  value={0}
-                  suffix="%"
-                  delay={280}
-                  locale={numberLocale}
-                />
-                <TrendingUp className="size-4" />
-                </div>
-              </HoverTooltip>
-              <div className="text-xs leading-none text-muted-foreground">
-                {t("common.cash")}:{" "}
-                <AnimatedNumber
-                  value={100}
-                  suffix="%"
-                  delay={280}
-                  locale={numberLocale}
-                />
-              </div>
-            </>
-          }
-        />
       </div>
 
       <TopCategoriesCard />

@@ -582,17 +582,6 @@ type DashboardOrder = {
   payment: string;
 };
 
-type OrderDraft = {
-  customer: string;
-  phone: string;
-  type: string;
-  status: string;
-  total: string;
-  date: string;
-  time: string;
-  payment: string;
-};
-
 type OrderFilters = {
   search: string;
   status: string;
@@ -604,30 +593,6 @@ const defaultOrderFilters: OrderFilters = {
 };
 
 const dashboardListPageSize = 10;
-
-const emptyOrderDraft: OrderDraft = {
-  customer: "",
-  phone: "",
-  type: "",
-  status: "",
-  total: "",
-  date: "",
-  time: "",
-  payment: "",
-};
-
-function draftFromOrder(order: DashboardOrder): OrderDraft {
-  return {
-    customer: order.customer,
-    phone: order.phone,
-    type: order.type,
-    status: order.status,
-    total: String(order.total),
-    date: order.date,
-    time: order.time,
-    payment: order.payment,
-  };
-}
 
 function uniqueOrderValues(rows: DashboardOrder[], key: "status") {
   return Array.from(new Set(rows.map((row) => row[key]).filter(Boolean)));
@@ -692,171 +657,10 @@ function OrdersFilters({
   );
 }
 
-function OrderInlineEditor({
-  order,
-  draft,
-  saving,
-  onChange,
-  onCancel,
-  onSave,
-}: {
-  order: DashboardOrder;
-  draft: OrderDraft;
-  saving: boolean;
-  onChange: (patch: Partial<OrderDraft>) => void;
-  onCancel: () => void;
-  onSave: () => void;
-}) {
-  return (
-    <form
-      className="mt-3 rounded-md border bg-muted/20 p-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave();
-      }}
-    >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold">تعديل بيانات الطلب</div>
-          <div className="mt-1 text-xs text-muted-foreground">{order.number}</div>
-        </div>
-        <RefBadge tone={orderStatusTone(draft.status)}>{draft.status}</RefBadge>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="اسم العميل">
-          <Input
-            value={draft.customer}
-            onChange={(event) => onChange({ customer: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="رقم الهاتف">
-          <Input
-            value={draft.phone}
-            onChange={(event) => onChange({ phone: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="نوع الطلب">
-          <Input
-            value={draft.type}
-            onChange={(event) => onChange({ type: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="حالة الطلب">
-          <Input
-            value={draft.status}
-            onChange={(event) => onChange({ status: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="الإجمالي">
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={draft.total}
-            onChange={(event) => onChange({ total: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="التاريخ">
-          <Input
-            value={draft.date}
-            onChange={(event) => onChange({ date: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-        <Field label="الوقت">
-          <Input
-            value={draft.time}
-            onChange={(event) => onChange({ time: event.target.value })}
-            className="h-10"
-            required
-          />
-        </Field>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          إلغاء
-        </Button>
-        <Button type="submit" size="sm" disabled={saving}>
-          <CheckCircle2 className="size-4" />
-          {saving ? "جاري الحفظ..." : "حفظ التعديل"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function OrderActionsMenu({
-  order,
-  open,
-  onToggle,
-  onStartEdit,
-  onDeleteOrder,
-}: {
-  order: DashboardOrder;
-  open: boolean;
-  onToggle: () => void;
-  onStartEdit: (order: DashboardOrder) => void;
-  onDeleteOrder: (orderNumber: string) => void;
-}) {
-  return (
-    <ActionMenu
-      open={open}
-      onToggle={onToggle}
-      label={`\u0625\u062c\u0631\u0627\u0621\u0627\u062a ${order.number}`}
-      triggerClassName="h-8 w-12"
-      menuClassName="w-44"
-      items={[
-        {
-          label: "\u062a\u0639\u062f\u064a\u0644",
-          icon: Edit,
-          onClick: () => onStartEdit(order),
-        },
-        {
-          label: "\u062d\u0630\u0641 \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629",
-          icon: Trash2,
-          onClick: () => onDeleteOrder(order.number),
-          tone: "danger",
-        },
-      ]}
-    />
-  );
-}
-
 function OrdersMobileCards({
   orders,
-  openMenu,
-  onToggleMenu,
-  editingOrderNumber,
-  editDraft,
-  savingOrderNumber,
-  onStartEdit,
-  onDraftChange,
-  onCancelEdit,
-  onSaveEdit,
-  onDeleteOrder,
 }: {
   orders: DashboardOrder[];
-  openMenu: string | null;
-  onToggleMenu: (orderNumber: string) => void;
-  editingOrderNumber: string | null;
-  editDraft: OrderDraft;
-  savingOrderNumber: string | null;
-  onStartEdit: (order: DashboardOrder) => void;
-  onDraftChange: (patch: Partial<OrderDraft>) => void;
-  onCancelEdit: () => void;
-  onSaveEdit: (orderNumber: string) => void;
-  onDeleteOrder: (orderNumber: string) => void;
 }) {
   return (
     <div className="mt-4 grid min-w-0 gap-3 lg:hidden">
@@ -876,22 +680,10 @@ function OrdersMobileCards({
               <div className="mt-1 text-sm">{order.customer}</div>
               <div className="text-xs text-muted-foreground">{order.phone}</div>
             </div>
-            <div className="shrink-0">
-              <OrderActionsMenu
-                order={order}
-                open={openMenu === order.number}
-                onToggle={() => onToggleMenu(order.number)}
-                onStartEdit={onStartEdit}
-                onDeleteOrder={onDeleteOrder}
-              />
-            </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <RefBadge tone={orderStatusTone(order.status)}>{order.status}</RefBadge>
             <RefBadge tone="gray">{order.type}</RefBadge>
-            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-              {order.payment}
-            </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-md bg-muted/40 p-2">
@@ -906,16 +698,6 @@ function OrdersMobileCards({
               <div className="text-muted-foreground">{order.time}</div>
             </div>
           </div>
-          {editingOrderNumber === order.number ? (
-            <OrderInlineEditor
-              order={order}
-              draft={editDraft}
-              saving={savingOrderNumber === order.number}
-              onChange={onDraftChange}
-              onCancel={onCancelEdit}
-              onSave={() => onSaveEdit(order.number)}
-            />
-          ) : null}
         </article>
       ))}
     </div>
@@ -1007,13 +789,8 @@ function MobileDateFilters({
 }
 
 export function OrdersPage() {
-  const { showSnackbar } = useSnackbar();
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [filters, setFilters] = useState<OrderFilters>(defaultOrderFilters);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [editingOrderNumber, setEditingOrderNumber] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<OrderDraft>(emptyOrderDraft);
-  const [savingOrderNumber, setSavingOrderNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeDate, setActiveDate] = useState<DateRangeKey>("today");
@@ -1106,116 +883,6 @@ export function OrdersPage() {
     };
   }, []);
 
-  function startEditingOrder(order: DashboardOrder) {
-    setEditingOrderNumber(order.number);
-    setEditDraft(draftFromOrder(order));
-    setOpenMenu(null);
-    setError("");
-  }
-
-  function cancelEditingOrder() {
-    setEditingOrderNumber(null);
-    setEditDraft(emptyOrderDraft);
-  }
-
-  async function saveOrder(orderNumber: string) {
-    const total = Number(editDraft.total);
-
-    if (!Number.isFinite(total) || total < 0) {
-      setError("قيمة الإجمالي غير صحيحة.");
-      showSnackbar({
-        message: "قيمة الإجمالي غير صحيحة.",
-        tone: "danger",
-      });
-      return;
-    }
-
-    setSavingOrderNumber(orderNumber);
-    setError("");
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/orders/${encodeURIComponent(orderNumber)}`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            customer: editDraft.customer,
-            phone: editDraft.phone,
-            type: editDraft.type,
-            status: editDraft.status,
-            total,
-            date: editDraft.date,
-            time: editDraft.time,
-            payment: editDraft.payment,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update order");
-      }
-
-      const data = (await response.json()) as { order: DashboardOrder };
-
-      setOrders((currentOrders) =>
-        currentOrders.map((order) =>
-          order.number === orderNumber ? data.order : order,
-        ),
-      );
-      setEditingOrderNumber(null);
-      setEditDraft(emptyOrderDraft);
-      showSnackbar({
-        message: `تم حفظ تعديل الطلب ${orderNumber}.`,
-        tone: "success",
-      });
-    } catch {
-      setError("تعذر حفظ تعديل الطلب.");
-      showSnackbar({
-        message: "تعذر حفظ تعديل الطلب.",
-        tone: "danger",
-      });
-    } finally {
-      setSavingOrderNumber(null);
-    }
-  }
-
-  async function deleteOrder(orderNumber: string) {
-    const previousOrders = orders;
-    const deletedOrderNumber = orderNumber;
-
-    setOrders((currentOrders) =>
-      currentOrders.filter((order) => order.number !== orderNumber),
-    );
-    setOpenMenu(null);
-    if (editingOrderNumber === orderNumber) {
-      cancelEditingOrder();
-    }
-    setError("");
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/orders/${encodeURIComponent(orderNumber)}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete order");
-      }
-      showSnackbar({
-        message: `تم حذف الطلب ${deletedOrderNumber}.`,
-        tone: "danger",
-      });
-    } catch {
-      setOrders(previousOrders);
-      setError("تعذر حذف الطلب.");
-      showSnackbar({
-        message: "تعذر حذف الطلب.",
-        tone: "danger",
-      });
-    }
-  }
-
   return (
     <div className="px-6 py-8">
       <PageTitle
@@ -1285,22 +952,6 @@ export function OrdersPage() {
         ) : visibleOrders.length ? (
           <OrdersMobileCards
             orders={pagedOrders}
-            openMenu={openMenu}
-            onToggleMenu={(orderNumber) =>
-              setOpenMenu((current) =>
-                current === orderNumber ? null : orderNumber,
-              )
-            }
-            editingOrderNumber={editingOrderNumber}
-            editDraft={editDraft}
-            savingOrderNumber={savingOrderNumber}
-            onStartEdit={startEditingOrder}
-            onDraftChange={(patch) =>
-              setEditDraft((currentDraft) => ({ ...currentDraft, ...patch }))
-            }
-            onCancelEdit={cancelEditingOrder}
-            onSaveEdit={saveOrder}
-            onDeleteOrder={deleteOrder}
           />
         ) : (
           <div className="mt-4 flex h-24 items-center justify-center rounded-md border text-sm text-muted-foreground lg:hidden">
@@ -1311,16 +962,16 @@ export function OrdersPage() {
           <div className="overflow-x-auto">
             <table
               className="w-full caption-bottom text-sm"
-              style={{ minWidth: 1050, tableLayout: "fixed" }}
+              style={{ minWidth: 980, tableLayout: "fixed" }}
             >
               <colgroup>
-                {[42, 190, 190, 130, 150, 160, 140, 70].map((width, index) => (
+                {[48, 215, 215, 135, 150, 165, 140].map((width, index) => (
                   <col key={index} style={{ width }} />
                 ))}
               </colgroup>
               <thead>
                 <tr className="h-10 border-b transition-colors hover:bg-muted/50">
-                  <th className="h-10 px-2 text-start align-middle text-xs font-medium text-muted-foreground">
+                  <th className="h-10 px-2 text-center align-middle text-xs font-medium text-muted-foreground">
                     #
                   </th>
                   <th className="h-10 px-2 text-start align-middle text-xs font-medium text-muted-foreground">
@@ -1347,17 +998,18 @@ export function OrdersPage() {
                   <th className="h-10 px-2 text-start align-middle text-xs font-medium text-muted-foreground">
                     تاريخ الطلب
                   </th>
-                  <th className="h-10 px-2 text-start align-middle text-xs font-medium text-muted-foreground" />
                 </tr>
               </thead>
               <tbody>
-                {(loading ? [] : pagedOrders).flatMap((order) => [
+                {(loading ? [] : pagedOrders).flatMap((order, rowIndex) => [
                   <tr
                     key={`row-${order.number}`}
                     className="h-[53px] border-b transition-colors hover:bg-muted/40"
                   >
-                    <td className="p-0 align-middle">
-                      <span className="block px-3">{order.index}</span>
+                    <td className="p-0 text-center align-middle">
+                      <span className="block px-2 tabular-nums">
+                        {pageStartIndex + rowIndex + 1}
+                      </span>
                     </td>
                     <td className="p-2 align-middle">
                       <Link
@@ -1386,9 +1038,6 @@ export function OrdersPage() {
                           <span className="block font-medium">
                             {formatReferenceCurrency(order.total)}
                           </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {order.payment}
-                          </span>
                         </span>
                       </div>
                     </td>
@@ -1396,38 +1045,7 @@ export function OrdersPage() {
                       <div>{order.date}</div>
                       <div className="text-xs text-muted-foreground">{order.time}</div>
                     </td>
-                    <td className="p-2 align-middle">
-                      <OrderActionsMenu
-                        order={order}
-                        open={openMenu === order.number}
-                        onToggle={() =>
-                          setOpenMenu((current) =>
-                            current === order.number ? null : order.number,
-                          )
-                        }
-                        onStartEdit={startEditingOrder}
-                        onDeleteOrder={deleteOrder}
-                      />                    </td>
                   </tr>,
-                  editingOrderNumber === order.number ? (
-                    <tr key={`editor-${order.number}`} className="border-b bg-muted/10">
-                      <td colSpan={8} className="p-3 align-top">
-                        <OrderInlineEditor
-                          order={order}
-                          draft={editDraft}
-                          saving={savingOrderNumber === order.number}
-                          onChange={(patch) =>
-                            setEditDraft((currentDraft) => ({
-                              ...currentDraft,
-                              ...patch,
-                            }))
-                          }
-                          onCancel={cancelEditingOrder}
-                          onSave={() => saveOrder(order.number)}
-                        />
-                      </td>
-                    </tr>
-                  ) : null,
                 ])}
               </tbody>
             </table>
@@ -1476,7 +1094,6 @@ export function CreateOrderPage() {
   const orderType = "delivery";
   const [activeOrderPanel, setActiveOrderPanel] =
     useState<"delivery" | "summary">("delivery");
-  const [payment, setPayment] = useState<"cash" | "card" | "wallet">("cash");
   const [discountPercent, setDiscountPercent] = useState("0");
   const [note, setNote] = useState("");
   const [orderLines, setOrderLines] = useState<
@@ -1580,7 +1197,6 @@ export function CreateOrderPage() {
     setOrderProductsOpen(true);
     setOrderProductSearchOpen(false);
     setActiveOrderPanel("delivery");
-    setPayment("cash");
     setDiscountPercent("0");
     setNote("");
     setOrderLines(
@@ -1595,7 +1211,7 @@ export function CreateOrderPage() {
     const formData = new FormData(orderFormRef.current ?? undefined);
     const submittedCustomer = String(formData.get("customer") ?? customer).trim();
     const submittedPhone = String(formData.get("phone") ?? phone).trim();
-    const submittedPayment = String(formData.get("payment") ?? payment);
+    const submittedPayment = "cash";
     const submittedDiscountRate = Math.min(
       Math.max(Number.parseFloat(String(formData.get("discount") ?? discountPercent)) || 0, 0),
       100,
@@ -1885,20 +1501,10 @@ export function CreateOrderPage() {
             {activeOrderPanel === "delivery" ? (
               <>
                 <Field label="طريقة الدفع">
-                  <AppSelect
-                    value={payment}
-                    onValueChange={(value) =>
-                      setPayment(value as "cash" | "card" | "wallet")
-                    }
-                    options={[
-                      { value: "cash", label: "نقدي" },
-                      { value: "card", label: "بطاقة بنكية" },
-                      { value: "wallet", label: "محفظة إلكترونية" },
-                    ]}
-                    className="h-10 bg-input"
-                    contentClassName="rounded-xl border-border/80 bg-popover p-1.5 shadow-2xl"
-                    ariaLabel="طريقة الدفع"
-                  />
+                  <input type="hidden" name="payment" value="cash" />
+                  <div className="flex h-10 items-center rounded-md border border-border bg-muted/35 px-3 text-sm font-semibold">
+                    نقدي
+                  </div>
                 </Field>
 
                 <Field label="الخصم">
