@@ -174,6 +174,7 @@ export type ItemRow = {
   description: string;
   category: string;
   subcategory: string;
+  shopName?: string;
   calories: string;
   price: string;
   variantDetails?: string;

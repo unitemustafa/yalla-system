@@ -16,6 +16,7 @@ model DashboardItem {
   description String
   category    String
   subcategory String
+  shopName    String   @default("")
   calories    String
   // TODO: Convert demo price strings to typed numeric currency fields in a planned migration.
   price       String

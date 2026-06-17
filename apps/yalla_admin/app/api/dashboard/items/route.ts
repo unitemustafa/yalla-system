@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     category: typeof body.category === "string" ? body.category : undefined,
     subcategory:
       typeof body.subcategory === "string" ? body.subcategory : undefined,
+    shopName: typeof body.shopName === "string" ? body.shopName : undefined,
     calories: typeof body.calories === "string" ? body.calories : undefined,
     price: typeof body.price === "string" ? body.price : undefined,
     variantDetails:

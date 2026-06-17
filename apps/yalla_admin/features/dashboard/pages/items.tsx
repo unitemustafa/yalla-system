@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
@@ -11,6 +12,9 @@ import {
   Minus,
   Package,
   Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -35,12 +39,16 @@ import { cn } from "@/lib/utils";
 type ItemFilters = {
   search: string;
   category: string;
+  shop: string;
+  region: string;
   status: "all" | "active" | "inactive";
 };
 
 const defaultFilters: ItemFilters = {
   search: "",
   category: "all",
+  shop: "all",
+  region: "all",
   status: "all",
 };
 
@@ -84,8 +92,14 @@ const itemSortCollator = new Intl.Collator("ar", {
   sensitivity: "base",
 });
 
-function uniqueValues(rows: ItemRow[], key: "category") {
-  return Array.from(new Set(rows.map((row) => row[key]).filter(Boolean)));
+function uniqueValues(rows: ItemRow[], key: "category" | "shopName") {
+  return Array.from(
+    new Set(
+      rows
+        .map((row) => (row[key] ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function compareText(firstValue: string, secondValue: string) {
@@ -110,6 +124,7 @@ function normalizeItemRow(row: ItemRow): ItemRow {
   return {
     ...row,
     code: row.code ?? row.id,
+    shopName: row.shopName ?? "",
     price: formatItemPrice(row.price),
     visibilityMode: row.visibilityMode ?? "general",
     regionSlugs: row.regionSlugs ?? [],
@@ -123,53 +138,116 @@ function itemVisibilityLabel(row: ItemRow) {
   return names?.length ? names.join("، ") : "مناطق محددة";
 }
 
+function itemShopLabel(row: ItemRow) {
+  return row.shopName?.trim() || "-";
+}
+
+function splitItemPrice(price: string) {
+  const normalizedPrice = formatItemPrice(price).trim();
+  const [amount = normalizedPrice, currency = ""] = normalizedPrice.split(/\s+/);
+
+  return { amount, currency };
+}
+
 function matchesRegion(row: ItemRow, selectedRegion: string) {
   if (selectedRegion === "all") return true;
   if (selectedRegion === "general") return row.visibilityMode !== "regions";
   return row.visibilityMode !== "regions" || (row.regionSlugs ?? []).includes(selectedRegion);
 }
 
-function matchesFilters(row: ItemRow, filters: ItemFilters, selectedRegion: string) {
+function matchesFilters(row: ItemRow, filters: ItemFilters) {
   const search = filters.search.trim().toLowerCase();
   const matchesSearch =
     !search ||
-    [row.code, row.id, row.name, row.description, row.category, formatItemPrice(row.price)]
+    [
+      row.code,
+      row.id,
+      row.name,
+      row.description,
+      row.category,
+      row.shopName,
+      formatItemPrice(row.price),
+    ]
       .join(" ")
       .toLowerCase()
       .includes(search);
   const matchesCategory =
     filters.category === "all" || row.category === filters.category;
+  const matchesShop =
+    filters.shop === "all" ||
+    (filters.shop === "none"
+      ? !row.shopName?.trim()
+      : row.shopName === filters.shop);
   const matchesStatus =
     filters.status === "all" ||
     (filters.status === "active" ? row.active : !row.active);
 
-  return matchesSearch && matchesCategory && matchesStatus && matchesRegion(row, selectedRegion);
+  return (
+    matchesSearch &&
+    matchesCategory &&
+    matchesShop &&
+    matchesStatus &&
+    matchesRegion(row, filters.region)
+  );
 }
 
 function MetricCards({ rows }: { rows: ItemRow[] }) {
   const activeCount = rows.filter((row) => row.active).length;
   const inactiveCount = rows.length - activeCount;
   const cards = [
-    ["إجمالي المنتجات", String(rows.length), Package, "text-primary"],
-    ["نشط", String(activeCount), CheckCircle, "text-green-500"],
-    ["غير نشط", String(inactiveCount), XCircle, "text-destructive"],
+    {
+      label: "إجمالي المنتجات",
+      value: String(rows.length),
+      detail: "حسب الفلاتر الحالية",
+      icon: Package,
+      tone: "bg-primary/10 text-primary",
+      marker: "bg-primary",
+    },
+    {
+      label: "نشط",
+      value: String(activeCount),
+      detail: "ظاهر للعملاء",
+      icon: CheckCircle,
+      tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+      marker: "bg-emerald-500",
+    },
+    {
+      label: "غير نشط",
+      value: String(inactiveCount),
+      detail: "متوقف مؤقتًا",
+      icon: XCircle,
+      tone: "bg-red-500/10 text-red-700 dark:text-red-300",
+      marker: "bg-destructive",
+    },
   ] as const;
 
   return (
-    <div className="mt-6 grid gap-3 md:grid-cols-3">
-      {cards.map(([label, value, Icon, tone]) => (
-        <Card key={label} className="h-[75px]">
-          <div className="flex items-center gap-3 p-4">
-            <div className={cn("rounded-full bg-muted/50 p-2", tone)}>
-              <Icon className="size-4" />
+    <div className="mt-4 grid gap-3 md:grid-cols-3">
+      {cards.map((card) => {
+        const Icon = card.icon;
+
+        return (
+          <Card key={card.label} className="relative min-h-[92px] overflow-hidden">
+            <span className={cn("absolute inset-y-4 end-0 w-1 rounded-s-full", card.marker)} />
+            <div className="flex h-full items-center justify-between gap-4 p-4">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-muted-foreground">
+                  {card.label}
+                </p>
+                <p className="mt-1 text-2xl font-black leading-tight">
+                  {card.value}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {card.detail}
+                </p>
+              </div>
+              <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-md", card.tone)}>
+                <Icon className="size-5" />
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs text-muted-foreground">{label}</p>
-              <p className="text-xl font-semibold leading-tight">{value}</p>
-            </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -177,55 +255,119 @@ function MetricCards({ rows }: { rows: ItemRow[] }) {
 function ItemsFilters({
   categories,
   filters,
+  hasFilters,
   onChange,
+  onReset,
+  shops,
 }: {
   categories: string[];
   filters: ItemFilters;
+  hasFilters: boolean;
   onChange: (filters: ItemFilters) => void;
+  onReset: () => void;
+  shops: string[];
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-[minmax(300px,1fr)_220px_180px] md:items-end">
-      <label className="grid gap-2 text-sm">
-        بحث
-        <input
-          value={filters.search}
-          onChange={(event) => onChange({ ...filters, search: event.target.value })}
-          placeholder="ابحث بالاسم أو الوصف..."
-          className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
-        />
-      </label>
-      <label className="grid gap-2 text-sm">
-        الفئة
-        <AppSelect
-          value={filters.category}
-          onValueChange={(category) => onChange({ ...filters, category })}
-          options={[
-            { value: "all", label: "الكل" },
-            ...categories.map((category) => ({
-              value: category,
-              label: category,
-            })),
-          ]}
-          ariaLabel="الفئة"
-          className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
-        />
-      </label>
-      <label className="grid gap-2 text-sm">
-        الحالة
-        <AppSelect
-          value={filters.status}
-          onValueChange={(status) =>
-            onChange({ ...filters, status: status as ItemFilters["status"] })
-          }
-          options={[
-            { value: "all", label: "الكل" },
-            { value: "active", label: "نشط" },
-            { value: "inactive", label: "غير نشط" },
-          ]}
-          ariaLabel="الحالة"
-          className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
-        />
-      </label>
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-sm font-black">
+          <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <SlidersHorizontal className="size-4" />
+          </span>
+          بحث وتصفية
+        </div>
+        <Button
+          className="h-8 self-start px-3 text-xs sm:self-auto"
+          disabled={!hasFilters}
+          onClick={onReset}
+          type="button"
+          variant="outline"
+        >
+          <RotateCcw className="size-3.5" />
+          إعادة ضبط
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 md:items-end xl:grid-cols-[minmax(280px,1fr)_170px_170px_190px_160px]">
+        <label className="grid gap-2 text-sm font-medium">
+          بحث
+          <span className="relative">
+            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={filters.search}
+              onChange={(event) => onChange({ ...filters, search: event.target.value })}
+              placeholder="ابحث بالاسم أو الوصف..."
+              className="h-10 w-full rounded-md border border-border bg-input px-3 ps-9 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+            />
+          </span>
+        </label>
+        <label className="grid gap-2 text-sm font-medium">
+          الفئة
+          <AppSelect
+            value={filters.category}
+            onValueChange={(category) => onChange({ ...filters, category })}
+            options={[
+              { value: "all", label: "الكل" },
+              ...categories.map((category) => ({
+                value: category,
+                label: category,
+              })),
+            ]}
+            ariaLabel="الفئة"
+            className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">
+          المحل
+          <AppSelect
+            value={filters.shop}
+            onValueChange={(shop) => onChange({ ...filters, shop })}
+            options={[
+              { value: "all", label: "الكل" },
+              { value: "none", label: "بدون محل" },
+              ...shops.map((shop) => ({
+                value: shop,
+                label: shop,
+              })),
+            ]}
+            ariaLabel="المحل"
+            className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">
+          المنطقة
+          <AppSelect
+            value={filters.region}
+            onValueChange={(region) => onChange({ ...filters, region })}
+            options={[
+              { value: "all", label: "كل المناطق" },
+              { value: "general", label: "عام" },
+              ...deliveryZones.map((region) => ({
+                value: region.id,
+                label: region.name,
+              })),
+            ]}
+            ariaLabel="المنطقة"
+            icon={<MapPin className="size-4" />}
+            className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium">
+          الحالة
+          <AppSelect
+            value={filters.status}
+            onValueChange={(status) =>
+              onChange({ ...filters, status: status as ItemFilters["status"] })
+            }
+            options={[
+              { value: "all", label: "الكل" },
+              { value: "active", label: "نشط" },
+              { value: "inactive", label: "غير نشط" },
+            ]}
+            ariaLabel="الحالة"
+            className="h-10 rounded-md border border-border bg-input px-3 text-sm shadow-sm outline-none focus:border-primary/40 focus:ring-1 focus:ring-primary/20"
+          />
+        </label>
+      </div>
     </div>
   );
 }
@@ -278,6 +420,63 @@ function RowActions({
     />
   );
 }
+
+function ProductIdentity({ row, compact = false }: { row: ItemRow; compact?: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <DashboardImage
+        alt={row.name}
+        src={row.image}
+        width={compact ? 56 : 64}
+        height={compact ? 56 : 64}
+        sizes={compact ? "56px" : "64px"}
+        className={cn(
+          "shrink-0 rounded-md border bg-muted/35 shadow-sm",
+          compact ? "size-14" : "size-16",
+        )}
+        imageClassName="object-contain p-1"
+      />
+      <div className="min-w-0">
+        <h3 className="truncate text-sm font-black leading-6">{row.name}</h3>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="max-w-full truncate rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
+            {row.code ?? row.id}
+          </span>
+          <span
+            className={cn(
+              "rounded-md px-2 py-0.5 text-[11px] font-bold",
+              row.active
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "bg-red-500/10 text-red-700 dark:text-red-300",
+            )}
+          >
+            {row.active ? "نشط" : "متوقف"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfoPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-semibold text-foreground">
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+function PriceCell({ price }: { price: string }) {
+  const { amount, currency } = splitItemPrice(price);
+
+  return (
+    <div className="inline-flex min-w-[86px] items-baseline justify-center gap-1 rounded-md bg-primary/10 px-2.5 py-1.5 text-primary">
+      <span className="text-base font-black leading-none">{amount}</span>
+      {currency ? <span className="text-[11px] font-bold">{currency}</span> : null}
+    </div>
+  );
+}
+
 function DeleteDialog({
   itemName,
   onClose,
@@ -356,22 +555,10 @@ function ItemsMobileCards({
             >
               {selectedRows.has(row.index) ? <Check className="size-3" /> : null}
             </button>
-            <DashboardImage
-              alt={row.name}
-              src={row.image}
-              width={48}
-              height={48}
-              sizes="48px"
-              className="size-12 rounded-sm"
-              imageClassName="object-contain"
-            />
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="truncate text-sm font-semibold">{row.name}</h3>
-                  <p className="mt-0.5 text-xs font-medium text-primary">
-                    {row.code ?? row.id}
-                  </p>
+                  <ProductIdentity row={row} compact />
                   <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                     {row.description}
                   </p>
@@ -384,14 +571,26 @@ function ItemsMobileCards({
                   onDelete={() => onDelete(row.id)}
                 />
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                 <div className="rounded-md bg-muted/40 p-2">
                   <div className="text-muted-foreground">الفئة</div>
                   <div className="mt-1 truncate font-medium">{row.category}</div>
                 </div>
                 <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-muted-foreground">المحل</div>
+                  <div className="mt-1 truncate font-medium">{itemShopLabel(row)}</div>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2">
                   <div className="text-muted-foreground">السعر</div>
-                  <div className="mt-1 truncate font-medium">{row.price}</div>
+                  <div className="mt-1">
+                    <PriceCell price={row.price} />
+                  </div>
+                </div>
+                <div className="rounded-md bg-muted/40 p-2">
+                  <div className="text-muted-foreground">الظهور</div>
+                  <div className="mt-1 line-clamp-1 font-medium">
+                    {itemVisibilityLabel(row)}
+                  </div>
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
@@ -416,7 +615,6 @@ export function ItemsPage() {
   const { showSnackbar } = useSnackbar();
   const [rows, setRows] = useState<ItemRow[]>([]);
   const [filters, setFilters] = useState<ItemFilters>(defaultFilters);
-  const [selectedRegion, setSelectedRegion] = useState("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
@@ -425,9 +623,9 @@ export function ItemsPage() {
   const visibleRows = useMemo(
     () =>
       rows
-        .filter((row) => matchesFilters(row, filters, selectedRegion))
+        .filter((row) => matchesFilters(row, filters))
         .sort(compareItems),
-    [filters, rows, selectedRegion],
+    [filters, rows],
   );
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / itemsPageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -437,6 +635,16 @@ export function ItemsPage() {
     () => uniqueValues(rows, "category").sort(compareText),
     [rows],
   );
+  const shops = useMemo(
+    () => uniqueValues(rows, "shopName").sort(compareText),
+    [rows],
+  );
+  const hasFilters =
+    filters.search.trim().length > 0 ||
+    filters.category !== defaultFilters.category ||
+    filters.shop !== defaultFilters.shop ||
+    filters.region !== defaultFilters.region ||
+    filters.status !== defaultFilters.status;
   const selectedState = useMemo(() => {
     if (
       pagedRows.length > 0 &&
@@ -625,36 +833,20 @@ export function ItemsPage() {
   }
 
   return (
-    <div className="px-4 py-6">
+    <div className="min-h-screen bg-muted/20 px-4 py-6 sm:px-6 lg:px-8">
       <PageTitle
         title="المنتجات"
         description="إدارة منتجات المنيو في كل الفروع"
         size="compact"
+        className="rounded-lg border bg-card p-4 shadow-sm"
         actions={
-          <>
-            <AppSelect
-              value={selectedRegion}
-              onValueChange={setSelectedRegion}
-              options={[
-                { value: "all", label: "كل المناطق" },
-                { value: "general", label: "عام" },
-                ...deliveryZones.map((region) => ({
-                  value: region.id,
-                  label: region.name,
-                })),
-              ]}
-              ariaLabel="اختيار المنطقة"
-              icon={<MapPin className="size-4" />}
-              className="w-full sm:w-[178px]"
-            />
-            <Link
-              href="/items/create"
-              className="inline-flex h-9 w-[122px] items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-            >
-              <Plus className="ms-2 size-4" />
-              منتج جديد
-            </Link>
-          </>
+          <Link
+            href="/items/create"
+            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition hover:bg-primary/90 sm:w-[132px]"
+          >
+            <Plus className="size-4" />
+            منتج جديد
+          </Link>
         }
       />
 
@@ -669,8 +861,14 @@ export function ItemsPage() {
         <ItemsFilters
           categories={categories}
           filters={filters}
+          hasFilters={hasFilters}
+          shops={shops}
           onChange={(nextFilters) => {
             setFilters(nextFilters);
+            setCurrentPage(1);
+          }}
+          onReset={() => {
+            setFilters(defaultFilters);
             setCurrentPage(1);
           }}
         />
@@ -696,9 +894,9 @@ export function ItemsPage() {
         )}
         <div className="mt-4 hidden overflow-hidden rounded-md border transition-opacity duration-200 lg:block">
           <DataTable
-            minWidth={1070}
+            minWidth={1240}
             columnWidths={[
-              48, 40, 64, 246, 116, 236, 88, 130, 90, 62, 70,
+              48, 52, 360, 230, 120, 140, 150, 120, 84,
             ]}
             rowHeight="tall"
             headers={[
@@ -725,15 +923,13 @@ export function ItemsPage() {
                 </button>
               </div>,
               "#",
-              "",
-              "الاسم",
-              "Code",
+              "المنتج",
               "الوصف",
               "الفئة",
+              "المحل",
               "الظهور",
               "السعر",
               "نشط",
-              "",
             ]}
             rows={(loading ? [] : pagedRows).map((row, rowPosition) => [
               <div key={`check-wrap-${row.index}`} className="flex items-center ps-4 py-3.5">
@@ -753,38 +949,38 @@ export function ItemsPage() {
                   {selectedRows.has(row.index) ? <Check className="size-3" /> : null}
                 </button>
               </div>,
-              pageStartIndex + rowPosition + 1,
-              <div key={`img-wrap-${row.index}`} className="flex w-12 items-center justify-center">
-                <DashboardImage
-                  alt={row.name}
-                  src={row.image}
-                  width={40}
-                  height={40}
-                  sizes="40px"
-                  className="size-10 rounded-sm"
-                  imageClassName="object-contain"
+              <span key={`index-${row.index}`} className="text-sm font-bold text-muted-foreground">
+                {pageStartIndex + rowPosition + 1}
+              </span>,
+              <div
+                key={`product-${row.index}`}
+                className="flex min-w-0 items-center justify-between gap-3 py-2"
+              >
+                <ProductIdentity row={row} />
+                <RowActions
+                  row={row}
+                  open={openRow === row.index}
+                  onOpen={() => toggleRow(row.index)}
+                  onDuplicate={() => duplicateRow(row)}
+                  onDelete={() => setDeleteId(row.id)}
                 />
               </div>,
-              <div key={`name-${row.index}`} className="flex flex-col gap-0.5">
-                <span>{row.name}</span>
+              <div key={`description-${row.index}`} className="min-w-0 py-2">
+                <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+                  {row.description}
+                </p>
               </div>,
-              <div key={`code-${row.index}`} className="flex min-w-0 items-center justify-start gap-2">
-                <span className="truncate font-medium text-primary">
-                  {row.code ?? row.id}
-                </span>
+              <div key={`category-${row.index}`} className="min-w-0">
+                <InfoPill>{row.category}</InfoPill>
               </div>,
-              <div key={`description-${row.index}`} className="flex flex-col gap-0.5">
-                <p>{row.description}</p>
+              <div key={`shop-${row.index}`} className="min-w-0">
+                <InfoPill>{itemShopLabel(row)}</InfoPill>
               </div>,
-              <div key={`category-${row.index}`} className="flex flex-col gap-0.5">
-                <span>{row.category}</span>
+              <div key={`visibility-${row.index}`} className="min-w-0">
+                <InfoPill>{itemVisibilityLabel(row)}</InfoPill>
               </div>,
-              <div key={`visibility-${row.index}`} className="flex flex-col gap-0.5">
-                <span className="line-clamp-2">{itemVisibilityLabel(row)}</span>
-              </div>,
-              <div key={`price-${row.index}`} className="flex gap-1">
-                <span>{formatItemPrice(row.price).split(" ")[0]}</span>
-                <span>{formatItemPrice(row.price).split(" ")[1]}</span>
+              <div key={`price-${row.index}`} className="flex justify-start">
+                <PriceCell price={row.price} />
               </div>,
               <div key={`active-wrap-${row.index}`} className="flex items-center">
                 <Switch
@@ -793,14 +989,6 @@ export function ItemsPage() {
                   onCheckedChange={(active) => toggleActive(row, active)}
                 />
               </div>,
-              <RowActions
-                key={`actions-${row.index}`}
-                row={row}
-                open={openRow === row.index}
-                onOpen={() => toggleRow(row.index)}
-                onDuplicate={() => duplicateRow(row)}
-                onDelete={() => setDeleteId(row.id)}
-              />,
             ])}
           />
           {loading ? (

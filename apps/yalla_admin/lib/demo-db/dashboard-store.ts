@@ -35,6 +35,7 @@ export type CreateItemInput = {
   description?: string;
   category?: string;
   subcategory?: string;
+  shopName?: string;
   calories?: string;
   price?: string;
   variantDetails?: string;
@@ -91,6 +92,10 @@ function normalizeVisibilityMode(value: unknown) {
   return trimText(value).toLowerCase() === "regions" ? "regions" : "general";
 }
 
+function normalizeShopName(value: unknown) {
+  return trimText(value);
+}
+
 function normalizeStringArray(value: unknown) {
   if (Array.isArray(value)) {
     return value
@@ -119,6 +124,32 @@ function parseStoredList(value: string) {
   } catch {
     return normalizeStringArray(value);
   }
+}
+
+async function readItemShopNames(itemIds: string[]) {
+  if (!itemIds.length) {
+    return new Map<string, string>();
+  }
+
+  const placeholders = itemIds.map(() => "?").join(", ");
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; shopName: string | null }>>(
+    `SELECT id, shopName FROM dashboard_items WHERE id IN (${placeholders})`,
+    ...itemIds,
+  );
+
+  return new Map(rows.map((row) => [row.id, normalizeShopName(row.shopName)]));
+}
+
+async function readItemShopName(itemId: string) {
+  return (await readItemShopNames([itemId])).get(itemId) ?? "";
+}
+
+async function writeItemShopName(itemId: string, shopName: string) {
+  await prisma.$executeRaw`
+    UPDATE dashboard_items
+    SET shopName = ${normalizeShopName(shopName)}
+    WHERE id = ${itemId}
+  `;
 }
 
 function normalizeOrderType(value: unknown) {
@@ -204,6 +235,7 @@ function toItemRow(item: DashboardItem): ItemRow {
     description: item.description,
     category: item.category,
     subcategory: item.subcategory,
+    shopName: normalizeShopName("shopName" in item ? item.shopName : ""),
     calories: item.calories,
     price: item.price,
     variantDetails: item.variantDetails ?? "{}",
@@ -294,8 +326,12 @@ export async function listItems() {
   const items = await prisma.dashboardItem.findMany({
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
+  const shopNames = await readItemShopNames(items.map((item) => item.id));
 
-  return items.map(toItemRow);
+  return items.map((item) => ({
+    ...toItemRow(item),
+    shopName: shopNames.get(item.id) ?? "",
+  }));
 }
 
 export async function createItem(input: CreateItemInput) {
@@ -331,8 +367,13 @@ export async function createItem(input: CreateItemInput) {
       active: input.active ?? true,
     },
   });
+  const shopName = normalizeShopName(input.shopName);
 
-  return toItemRow(item);
+  if (shopName) {
+    await writeItemShopName(item.id, shopName);
+  }
+
+  return { ...toItemRow(item), shopName };
 }
 
 export async function updateItem(
@@ -401,8 +442,16 @@ export async function updateItem(
         typeof patch.active === "boolean" ? patch.active : item.active,
     },
   });
+  const shopName =
+    typeof patch.shopName === "string"
+      ? normalizeShopName(patch.shopName)
+      : await readItemShopName(item.id);
 
-  return toItemRow(updatedItem);
+  if (typeof patch.shopName === "string") {
+    await writeItemShopName(updatedItem.id, shopName);
+  }
+
+  return { ...toItemRow(updatedItem), shopName };
 }
 
 export async function duplicateItem(itemId: string) {
@@ -438,8 +487,13 @@ export async function duplicateItem(itemId: string) {
       active: item.active,
     },
   });
+  const shopName = await readItemShopName(item.id);
 
-  return toItemRow(copy);
+  if (shopName) {
+    await writeItemShopName(copy.id, shopName);
+  }
+
+  return { ...toItemRow(copy), shopName };
 }
 
 export async function deleteItem(itemId: string) {

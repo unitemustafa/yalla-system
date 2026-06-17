@@ -131,10 +131,10 @@ const copy = {
     save: "حفظ المنتج",
     saving: "Saving...",
     saveError: "Could not save the product. Please try again.",
-    productCode: "Product code",
-    basicInfo: "Basic Info",
-    variants: "Product Variants",
-    attributes: "Options / Attributes",
+    productCode: "كود المنتج",
+    basicInfo: "البيانات الأساسية",
+    variants: "المتغيرات",
+    attributes: "الخصائص",
     livePreview: "معاينة مباشرة",
     confirmation: "تأكيد بيانات المنتج",
     close: "إغلاق",
@@ -241,7 +241,7 @@ const copy = {
     back: "Cancel",
     save: "Save product",
     saving: "Saving...",
-    saveError: "Could not save the product. Please try again.",
+    saveError: "تعذر حفظ المنتج. حاول مرة أخرى.",
     basicInfo: "Basic Info",
     variants: "Product Variants",
     attributes: "Options / Attributes",
@@ -350,6 +350,8 @@ const copy = {
 
 const textAreaClass =
   "min-h-[124px] w-full resize-none rounded-md border border-border bg-input px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15";
+const compactTextAreaClass =
+  "min-h-[92px] w-full resize-none rounded-md border border-border bg-input px-3 py-2 text-sm shadow-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15";
 
 const productCategories: ProductCategory[] = [
   {
@@ -768,6 +770,10 @@ function productFormFromItem(item: ItemRow): ProductForm {
     available: item.active,
     featured: item.featured !== "\u0644\u0627",
   };
+}
+
+function locationModeFromItem(item: ItemRow): ProductLocationMode {
+  return item.shopName?.trim() ? "shop" : "general";
 }
 
 function optionLabel(
@@ -1279,6 +1285,8 @@ export function CreateItemPage() {
 
         const nextForm = productFormFromItem(item);
         setForm(nextForm);
+        setSelectedLocationMode(locationModeFromItem(item));
+        setSelectedShop(item.shopName?.trim() || t.allShops);
         setSelectedVariants(cloneSelections(nextForm.category));
         setVariantDetails(parseVariantDetails(item.variantDetails));
         setVisibilityMode(item.visibilityMode === "regions" ? "regions" : "general");
@@ -1316,7 +1324,7 @@ export function CreateItemPage() {
     return () => {
       alive = false;
     };
-  }, [editItemId]);
+  }, [editItemId, t.allShops]);
 
   const activeCategory = categoryConfig(form.category);
   const addonCategoryOptions = useMemo(
@@ -1476,14 +1484,6 @@ export function CreateItemPage() {
     value: ProductForm[Key],
   ) {
     setForm((currentForm) => ({ ...currentForm, [key]: value }));
-  }
-
-  function toggleVisibleRegion(regionSlug: string) {
-    setVisibleRegionSlugs((currentSlugs) =>
-      currentSlugs.includes(regionSlug)
-        ? currentSlugs.filter((slug) => slug !== regionSlug)
-        : [...currentSlugs, regionSlug],
-    );
   }
 
   function updateVariantDetail(
@@ -1929,6 +1929,10 @@ export function CreateItemPage() {
           description: productDescription,
           category: activeCategory.label[language],
           subcategory: selectedSecondaryCategoryName,
+          shopName:
+            selectedLocationMode === "shop" && selectedShop !== t.allShops
+              ? selectedShop
+              : "",
           calories: form.stock ? `Stock: ${form.stock}` : "",
           price: form.price,
           variantDetails: serializeVariantDetails({
@@ -1966,31 +1970,26 @@ export function CreateItemPage() {
 
   return (
     <form
-      className="px-4 py-6 sm:px-6 lg:px-8"
+      className="min-h-screen bg-muted/20 px-4 py-6 sm:px-6 lg:px-8"
       dir={direction}
       onSubmit={openConfirmation}
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-medium text-primary">
-            <Sparkles className="size-4" />
-            <span>{t.categorySignal}</span>
+      <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm font-bold text-primary">
+              <Sparkles className="size-4" />
+              <span>{t.categorySignal}</span>
+            </div>
+            <h1 className="mt-3 text-2xl font-semibold leading-8 md:text-3xl md:leading-9">
+              {pageTitle}
+            </h1>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+              {pageSubtitle}
+            </p>
           </div>
-          <h1 className="mt-2 text-2xl font-semibold leading-8 md:text-3xl md:leading-9">
-            {pageTitle}
-          </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            {pageSubtitle}
-          </p>
-        </div>
 
-        {saveError ? (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
-            {saveError}
-          </div>
-        ) : null}
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:justify-end">
           <button
             aria-label={t.chooseProductLocation}
             className="inline-flex h-10 w-full items-center justify-between gap-3 rounded-md border border-primary/35 bg-input px-3 text-sm font-medium text-foreground shadow-sm transition hover:border-primary/60 hover:bg-accent/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 sm:w-[300px]"
@@ -2025,10 +2024,17 @@ export function CreateItemPage() {
                 ? "\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644"
                 : t.save}
           </Button>
+          </div>
         </div>
+
+        {saveError ? (
+          <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-200">
+            {saveError}
+          </div>
+        ) : null}
       </div>
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_376px]">
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_376px]">
         <div className="grid min-w-0 gap-5">
           <Section
             icon={<PackageCheck className="size-4" />}
@@ -2053,7 +2059,7 @@ export function CreateItemPage() {
 
                 <LabelText label={t.description}>
                   <textarea
-                    className={textAreaClass}
+                    className={compactTextAreaClass}
                     onChange={(event) =>
                       updateForm("description", event.target.value)
                     }
@@ -2065,7 +2071,7 @@ export function CreateItemPage() {
 
               <div className="grid gap-3">
                 <div className="text-sm font-medium">{t.image}</div>
-                <label className="group relative flex min-h-[220px] cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30 text-center transition hover:border-primary/50 hover:bg-accent/50">
+                <label className="group relative flex min-h-[164px] cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30 text-center transition hover:border-primary/50 hover:bg-accent/50">
                   <input
                     accept="image/*"
                     className="sr-only"
@@ -2077,7 +2083,7 @@ export function CreateItemPage() {
                     // eslint-disable-next-line @next/next/no-img-element -- Local object URLs are browser-only previews.
                     <img
                       alt={t.imageAlt}
-                      className="h-full max-h-[260px] w-full object-cover"
+                      className="h-full max-h-[190px] w-full object-cover"
                       src={selectedProductImage.url}
                     />
                   ) : (
@@ -2263,69 +2269,6 @@ export function CreateItemPage() {
           </Section>
 
           <Section
-            icon={<MapPin className="size-4" />}
-            title="مناطق الظهور"
-            right={<StatusPill>{visibilitySummary}</StatusPill>}
-          >
-            <div className="grid gap-4">
-              <div className="grid gap-2 rounded-lg border bg-muted/20 p-1 sm:grid-cols-2">
-                {[
-                  { value: "general" as const, label: "عام" },
-                  { value: "regions" as const, label: "مناطق محددة" },
-                ].map((option) => {
-                  const selected = visibilityMode === option.value;
-
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => setVisibilityMode(option.value)}
-                      className={cn(
-                        "inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-black transition",
-                        selected
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {visibilityMode === "regions" ? (
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {deliveryZones.map((zone) => {
-                    const selected = visibleRegionSlugs.includes(zone.id);
-
-                    return (
-                      <button
-                        key={zone.id}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => toggleVisibleRegion(zone.id)}
-                        className={cn(
-                          "flex min-h-11 items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-start text-sm font-bold transition hover:border-primary/50 hover:bg-accent/50",
-                          selected &&
-                            "border-primary bg-primary/10 text-primary ring-1 ring-primary/20",
-                        )}
-                      >
-                        <span className="truncate">{zone.name}</span>
-                        {selected ? <Check className="size-4 shrink-0" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="rounded-md border border-dashed bg-muted/20 px-3 py-3 text-sm font-medium text-muted-foreground">
-                  المنتج العام يظهر لكل المستخدمين، بما في ذلك المستخدمين في &quot;عام&quot;.
-                </p>
-              )}
-            </div>
-          </Section>
-
-          <Section
             icon={<Layers3 className="size-4" />}
             title={t.variants}
             right={
@@ -2428,7 +2371,7 @@ export function CreateItemPage() {
           </Section>
         </div>
 
-        <aside className="min-w-0 xl:sticky xl:top-20 xl:self-start">
+        <aside className="min-w-0">
           <LivePreview
             activeCategory={activeCategory}
             activeFields={activeFields}
@@ -4147,7 +4090,7 @@ function LivePreview({
     : [null, null, null, null];
 
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
+    <div className="h-full rounded-lg border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 font-semibold">
           <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">

@@ -18,6 +18,7 @@ export async function ensureDashboardSchema() {
             description TEXT NOT NULL,
             category TEXT NOT NULL,
             subcategory TEXT NOT NULL,
+            shopName TEXT NOT NULL DEFAULT '',
             calories TEXT NOT NULL,
             price TEXT NOT NULL,
             variantDetails TEXT NOT NULL DEFAULT '{}',
@@ -61,6 +62,9 @@ export async function ensureDashboardSchema() {
         );
         await prisma.$executeRawUnsafe(
           "ALTER TABLE dashboard_items ADD COLUMN variantDetails TEXT NOT NULL DEFAULT '{}'",
+        ).catch(() => undefined);
+        await prisma.$executeRawUnsafe(
+          "ALTER TABLE dashboard_items ADD COLUMN shopName TEXT NOT NULL DEFAULT ''",
         ).catch(() => undefined);
         await prisma.$executeRawUnsafe(
           "ALTER TABLE dashboard_items ADD COLUMN visibilityMode TEXT NOT NULL DEFAULT 'general'",

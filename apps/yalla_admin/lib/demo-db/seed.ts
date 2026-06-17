@@ -132,6 +132,7 @@ function isItemRow(value: unknown): value is ItemRow {
     isString(value.description) &&
     isString(value.category) &&
     isString(value.subcategory) &&
+    (value.shopName === undefined || isString(value.shopName)) &&
     isString(value.calories) &&
     isString(value.price) &&
     (value.visibilityMode === undefined || isString(value.visibilityMode)) &&
