@@ -9,6 +9,9 @@ export const authCookieName = "yalla-session";
 export const authCookieMaxAge = 60 * 60 * 8;
 export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
 
+const fallbackSessionSecret = "dev-session-secret-change-me";
+const fallbackDemoPassword = "01266666610";
+
 const demoAdmin = {
   email: "dashboard@admin.com",
   name: "Mohamed Abdeljalel",
@@ -49,9 +52,7 @@ function getSessionSecret() {
     );
   }
 
-  throw new Error(
-    "SESSION_SECRET is required for dashboard auth. Set SESSION_SECRET in your environment.",
-  );
+  return fallbackSessionSecret;
 }
 
 function getDemoPassword() {
@@ -59,15 +60,19 @@ function getDemoPassword() {
     return mutableAuthState.__yallaDemoPassword;
   }
 
-  const password = process.env.DASHBOARD_DEMO_PASSWORD;
+  const password = process.env.DASHBOARD_DEMO_PASSWORD?.trim();
 
   if (password) {
     return password;
   }
 
-  throw new Error(
-    "DASHBOARD_DEMO_PASSWORD is required for demo dashboard login.",
-  );
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "DASHBOARD_DEMO_PASSWORD is required for demo dashboard login.",
+    );
+  }
+
+  return fallbackDemoPassword;
 }
 
 export function updateDemoPassword(password: string) {
