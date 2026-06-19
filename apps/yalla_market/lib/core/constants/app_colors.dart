@@ -4,8 +4,8 @@ class AppColors {
   AppColors._();
 
   // Brand
-  static const Color primary = Color(0xFF0B6B4F);
-  static const Color currency = Color(0xFF0B6B4F);
+  static const Color primary = Color(0xFF4F60F6);
+  static const Color currency = primary;
 
   // Feedback
   static const Color success = Color(0xFF22C55E);

@@ -92,7 +92,7 @@ class BrandCard extends StatelessWidget {
                             softWrap: true,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  fontSize: 15,
+                                  fontSize: 14,
                                   height: 1.08,
                                   fontWeight: FontWeight.w900,
                                 ),

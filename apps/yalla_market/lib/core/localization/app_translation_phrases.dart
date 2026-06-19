@@ -2,6 +2,14 @@ part of 'app_translations.dart';
 
 const Map<String, Map<String, String>> _translationPhrases = {
   'ar': {
+    'Choose date': 'اختيار التاريخ',
+    'Day': 'اليوم',
+    'From': 'من',
+    'Month': 'الشهر',
+    'Reset': 'إعادة الضبط',
+    'Selected days': 'عدد الأيام المحددة',
+    'To': 'إلى',
+    'Year': 'السنة',
     'Discover Limitless Choices and Unmatched Convenience.':
         'أول أونلاين ماركت في التل الكبير',
     'All': 'الكل',
@@ -358,6 +366,8 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Shipment update': 'تحديث الشحنة',
     'Shipment on the way': 'في الطريق',
     'Shipping Address': 'عنوان الشحن',
+    'Shipping address required': 'عنوان الشحن مطلوب',
+    'Complete the delivery address first.': 'أكمل بيانات عنوان التوصيل أولًا.',
     'Shipping Date': 'تاريخ الشحن',
     'Shipping Fee': 'مصاريف الشحن',
     'Shipping date': 'تاريخ الشحن',

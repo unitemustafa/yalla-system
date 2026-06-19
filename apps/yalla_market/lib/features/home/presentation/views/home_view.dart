@@ -14,7 +14,6 @@ import '../../../../core/presentation/widgets/texts/section_heading.dart';
 import '../../../location/domain/entities/city_data.dart';
 import '../../../location/presentation/cubit/location_cubit.dart';
 import '../../../location/presentation/cubit/location_state.dart';
-import '../../../location/presentation/widgets/city_selector_sheet.dart';
 import '../../../personalization/presentation/controllers/user_profile_controller.dart';
 import '../../../store/presentation/cubit/product_catalog_cubit.dart';
 import '../../../store/presentation/cubit/product_discovery_cubit.dart';
@@ -166,17 +165,6 @@ class _HomeTopBar extends StatelessWidget {
 
   final bool isDark;
 
-  Future<void> _openCitySelector(BuildContext context) {
-    return CitySelectorSheet.show(
-      context,
-      onCityChanged: () async {
-        await context.read<ProductCatalogCubit>().loadProducts(force: true);
-        if (!context.mounted) return;
-        await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<UserProfileController>(
@@ -209,12 +197,9 @@ class _HomeTopBar extends StatelessWidget {
             Expanded(
               child: BlocBuilder<LocationCubit, LocationState>(
                 builder: (context, state) {
-                  return Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: _HomeRegionBadge(
-                      label: _homeRegionLabel(context, state.selectedCity),
-                      onTap: () => _openCitySelector(context),
-                    ),
+                  return _HomeCustomerSummary(
+                    customerName: profile.displayName,
+                    regionLabel: _homeRegionLabel(context, state.selectedCity),
                   );
                 },
               ),
@@ -253,50 +238,138 @@ class _HomeTopBar extends StatelessWidget {
   }
 }
 
+class _HomeCustomerSummary extends StatelessWidget {
+  const _HomeCustomerSummary({
+    required this.customerName,
+    required this.regionLabel,
+  });
+
+  final String customerName;
+  final String regionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _AnimatedCustomerName(name: customerName),
+          const SizedBox(height: 1),
+          _HomeRegionBadge(label: regionLabel),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnimatedCustomerName extends StatefulWidget {
+  const _AnimatedCustomerName({required this.name});
+
+  final String name;
+
+  @override
+  State<_AnimatedCustomerName> createState() => _AnimatedCustomerNameState();
+}
+
+class _AnimatedCustomerNameState extends State<_AnimatedCustomerName>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<Color?> _colorAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    );
+    _colorAnimation = TweenSequence<Color?>([
+      TweenSequenceItem(
+        tween: ColorTween(
+          begin: AppColors.primary,
+          end: const Color(0xFF7583FF),
+        ),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: ColorTween(
+          begin: const Color(0xFF7583FF),
+          end: const Color(0xFF3B82F6),
+        ),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: ColorTween(
+          begin: const Color(0xFF3B82F6),
+          end: const Color(0xFF6366F1),
+        ),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: ColorTween(
+          begin: const Color(0xFF6366F1),
+          end: AppColors.primary,
+        ),
+        weight: 25,
+      ),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Text(
+          widget.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: _colorAnimation.value,
+            fontSize: 14,
+            height: 1.05,
+            fontWeight: FontWeight.w900,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _HomeRegionBadge extends StatelessWidget {
-  const _HomeRegionBadge({required this.label, required this.onTap});
+  const _HomeRegionBadge({required this.label});
 
   final String label;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Tooltip(
-      message: context.tr('Change region'),
-      child: Material(
-        color: AppColors.warning.withValues(alpha: isDark ? 0.18 : 0.12),
-        borderRadius: BorderRadius.circular(8),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.warning,
-                      fontWeight: FontWeight.w900,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  AppIcons.arrow_down_1,
-                  color: AppColors.warning,
-                  size: 13,
-                ),
-              ],
-            ),
+    return Material(
+      color: AppColors.warning.withValues(alpha: isDark ? 0.18 : 0.12),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: AppColors.warning,
+            fontSize: 11,
+            height: 1.2,
+            fontWeight: FontWeight.w600,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

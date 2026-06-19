@@ -12,6 +12,7 @@ import '../../../data/demo/demo_orders.dart';
 import '../../../domain/entities/order.dart';
 import '../../cubit/order_history_cubit.dart';
 import '../../cubit/order_history_state.dart';
+import 'widgets/custom_date_range_sheet.dart';
 import 'widgets/order_list_item.dart';
 
 class OrdersView extends StatefulWidget {
@@ -204,17 +205,21 @@ class _OrdersViewState extends State<OrdersView> {
       return;
     }
 
-    final now = DateTime.now();
-    final range = await showDateRangePicker(
+    final now = _dateOnly(DateTime.now());
+    final range = await showModalBottomSheet<DateTimeRange>(
       context: context,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 1),
-      initialDateRange:
-          _customDateRange ??
-          DateTimeRange(
-            start: now.subtract(const Duration(days: 30)),
-            end: now,
-          ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CustomDateRangeSheet(
+        firstDate: DateTime(now.year - 5),
+        lastDate: DateTime(now.year + 1, 12, 31),
+        initialRange:
+            _customDateRange ??
+            DateTimeRange(
+              start: now.subtract(const Duration(days: 30)),
+              end: now,
+            ),
+      ),
     );
 
     if (range == null) return;

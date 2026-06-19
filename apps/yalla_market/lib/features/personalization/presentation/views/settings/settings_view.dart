@@ -8,9 +8,6 @@ import '../../../../../core/connectivity/internet_status_controller.dart';
 import '../../../../../core/presentation/widgets/images/app_avatar.dart';
 import '../../../../../core/routing/app_routes.dart';
 import '../../../../auth/presentation/cubit/auth_cubit.dart';
-import '../../../../location/presentation/cubit/location_cubit.dart';
-import '../../../../location/presentation/cubit/location_state.dart';
-import '../../../../location/presentation/widgets/city_selector_sheet.dart';
 import '../../../../store/presentation/cubit/order_history_cubit.dart';
 import '../../../../store/presentation/cubit/order_history_state.dart';
 import '../../controllers/user_profile_controller.dart';
@@ -106,22 +103,6 @@ class _SettingsViewState extends State<SettingsView> {
                     subTitle: 'In-progress and completed orders',
                     accentColor: AppColors.warning,
                     onTap: () => Navigator.pushNamed(context, AppRoutes.orders),
-                  ),
-                  BlocBuilder<LocationCubit, LocationState>(
-                    builder: (context, locationState) {
-                      final city = locationState.selectedCity;
-                      final regionName =
-                          city?.displayName(arabic: context.isArabicLanguage) ??
-                          context.tr('General');
-
-                      return SettingsMenuTile(
-                        icon: AppIcons.location,
-                        title: 'Change region',
-                        subTitle: regionName,
-                        accentColor: AppColors.primary,
-                        onTap: () => CitySelectorSheet.show(context),
-                      );
-                    },
                   ),
                 ],
               ),
