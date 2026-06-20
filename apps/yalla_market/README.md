@@ -9,10 +9,15 @@ The app expects a REST backend under `/api/v1`. Pass the API origin at build or
 run time:
 
 ```bash
+flutter run --dart-define-from-file=env/development.json
 flutter run --dart-define=API_BASE_URL=https://dev-api.yallamarket.com
 flutter build web --dart-define-from-file=env/production.json
 flutter build appbundle --dart-define-from-file=env/production.json
 ```
+
+`env/development.json` points at the local Django backend on
+`http://127.0.0.1:8000`, which is suitable for Windows/macOS/Linux desktop and
+web. For the Android emulator, use `--dart-define=API_BASE_URL=http://10.0.2.2:8000`.
 
 Debug builds without `API_BASE_URL` use local demo repositories so the UI can be
 developed before the backend is available. Release builds require

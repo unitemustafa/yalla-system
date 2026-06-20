@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
@@ -14,6 +15,101 @@ from .models import OneTimePassword
 from .services import normalize_email, verify_otp
 
 User = get_user_model()
+
+PHONE_COUNTRY_CODES = (
+    "966",
+    "964",
+    "971",
+    "44",
+    "91",
+    "92",
+    "90",
+    "20",
+    "1",
+)
+PHONE_TRUNK_ZERO_COUNTRY_CODES = set(PHONE_COUNTRY_CODES) - {"1", "91"}
+
+
+def normalize_phone(value):
+    raw_value = str(value or "").strip()
+    digits = re.sub(r"\D", "", raw_value)
+    if not digits:
+        return raw_value
+    if digits.startswith("00"):
+        digits = digits[2:]
+
+    for country_code in PHONE_COUNTRY_CODES:
+        if digits.startswith(country_code) and len(digits) > len(country_code):
+            national_number = digits[len(country_code) :]
+            if (
+                country_code in PHONE_TRUNK_ZERO_COUNTRY_CODES
+                and national_number.startswith("0")
+            ):
+                national_number = national_number[1:]
+            return f"+{country_code}{national_number}"
+
+    if re.match(r"^01[0125]\d{8}$", digits):
+        return f"+20{digits[1:]}"
+    return raw_value
+
+
+def phone_lookup_keys(value):
+    digits = re.sub(r"\D", "", str(value or ""))
+    if not digits:
+        return set()
+    if digits.startswith("00"):
+        digits = digits[2:]
+
+    keys = {digits}
+    if digits.startswith("0") and len(digits) > 1:
+        keys.add(digits[1:])
+
+    for country_code in PHONE_COUNTRY_CODES:
+        if digits.startswith(country_code) and len(digits) > len(country_code):
+            national_number = digits[len(country_code) :]
+            keys.add(national_number)
+            if national_number.startswith("0") and len(national_number) > 1:
+                national_number = national_number[1:]
+                keys.add(national_number)
+            keys.add(f"{country_code}{national_number}")
+            break
+
+    return {key for key in keys if key}
+
+
+def phones_equivalent(left, right):
+    return bool(phone_lookup_keys(left) & phone_lookup_keys(right))
+
+
+def user_by_phone(phone, queryset=None):
+    if not phone_lookup_keys(phone):
+        return None
+    users = queryset if queryset is not None else User.objects.exclude(phone="")
+    for user in users.exclude(phone=""):
+        if phones_equivalent(user.phone, phone):
+            return user
+    return None
+
+
+class CamelCaseInputMixin:
+    input_aliases = {
+        "firstName": "first_name",
+        "lastName": "last_name",
+        "passwordConfirm": "password_confirm",
+        "termsAccepted": "terms_accepted",
+    }
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        for alias, field_name in self.input_aliases.items():
+            if alias in data and field_name not in data:
+                data[field_name] = data[alias]
+
+        return super().to_internal_value(data)
 
 
 class RequiredFieldMessagesMixin:
@@ -33,11 +129,22 @@ class UserSerializer(RequiredFieldMessagesMixin, serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("id", "first_name", "last_name", "email", "phone", "role")
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "username",
+            "email",
+            "phone",
+            "role",
+        )
 
 
 class PasswordValidationMixin:
     def validate_password(self, value):
+        return self._validate_password_strength(value)
+
+    def _validate_password_strength(self, value):
         errors = []
         if len(value) < 8:
             errors.append("Password must be at least 8 characters.")
@@ -51,13 +158,14 @@ class PasswordValidationMixin:
             raise serializers.ValidationError(errors)
 
         try:
-            validate_password(value)
+            validate_password(value, user=self.context.get("user"))
         except DjangoValidationError as exc:
             raise serializers.ValidationError(list(exc.messages)) from exc
         return value
 
 
 class RegisterSerializer(
+    CamelCaseInputMixin,
     RequiredFieldMessagesMixin,
     PasswordValidationMixin,
     serializers.Serializer,
@@ -90,8 +198,8 @@ class RegisterSerializer(
         return username
 
     def validate_phone(self, value):
-        phone = value.strip()
-        user = User.objects.filter(phone=phone).first()
+        phone = normalize_phone(value)
+        user = user_by_phone(phone)
         email = normalize_email(self.initial_data.get("email", ""))
         if user and user.email.lower() != email:
             raise serializers.ValidationError(
@@ -114,24 +222,108 @@ class RegisterSerializer(
         return attrs
 
 
+class SignupSerializer(RegisterSerializer):
+    username = serializers.CharField(
+        max_length=150,
+        required=False,
+        allow_blank=True,
+        validators=[UnicodeUsernameValidator()],
+    )
+    password_confirm = serializers.CharField(
+        required=False,
+        write_only=True,
+        trim_whitespace=False,
+    )
+    terms_accepted = serializers.BooleanField(required=False, default=True)
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        if not data.get("password_confirm") and not data.get("passwordConfirm"):
+            data["password_confirm"] = data.get("password", "")
+        if "terms_accepted" not in data and "termsAccepted" not in data:
+            data["terms_accepted"] = True
+        if not str(data.get("username", "")).strip():
+            data["username"] = self._username_from_email(data.get("email", ""))
+
+        return super().to_internal_value(data)
+
+    def _username_from_email(self, email):
+        normalized_email = normalize_email(str(email))
+        local_part = normalized_email.split("@", 1)[0]
+        base = re.sub(r"[^A-Za-z0-9_.+-]+", "_", local_part).strip("._+-")
+        base = (base or "user")[:140]
+        candidate = base
+        suffix = 1
+
+        while User.objects.filter(username__iexact=candidate).exclude(
+            email__iexact=normalized_email,
+        ).exists():
+            suffix_text = f"_{suffix}"
+            candidate = f"{base[:150 - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+
+        return candidate
+
+
 class EmailOTPSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.RegexField(r"^\d{6}$")
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        if "code" in data and "otp" not in data:
+            data["otp"] = data["code"]
+
+        return super().to_internal_value(data)
 
     def validate_email(self, value):
         return normalize_email(value)
 
 
 class LoginSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.CharField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    rememberMe = serializers.BooleanField(
+        required=False,
+        default=False,
+        write_only=True,
+    )
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+
+        if "email" not in data:
+            data["email"] = data.get("identifier") or data.get("login") or ""
+
+        return super().to_internal_value(data)
 
     def validate(self, attrs):
-        email = normalize_email(attrs["email"])
-        user = User.objects.filter(email__iexact=email).first()
+        identifier = str(attrs["email"]).strip()
+        normalized_email = normalize_email(identifier)
+        user = (
+            User.objects.filter(
+                Q(email__iexact=normalized_email)
+                | Q(username__iexact=identifier)
+                | Q(phone=identifier)
+            )
+            .first()
+        )
+        if user is None:
+            user = user_by_phone(identifier)
 
         if user is None or not user.check_password(attrs["password"]):
-            raise AuthenticationFailed("Invalid email or password.")
+            raise AuthenticationFailed("Invalid login credentials.")
         if not user.is_active:
             raise serializers.ValidationError(
                 "Account email has not been verified."
@@ -148,7 +340,11 @@ class ForgotPasswordSerializer(RequiredFieldMessagesMixin, serializers.Serialize
         return normalize_email(value)
 
 
-class ResetPasswordSerializer(PasswordValidationMixin, EmailOTPSerializer):
+class ResetPasswordSerializer(
+    CamelCaseInputMixin,
+    PasswordValidationMixin,
+    EmailOTPSerializer,
+):
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
 
@@ -175,6 +371,118 @@ class ResetPasswordSerializer(PasswordValidationMixin, EmailOTPSerializer):
 
         attrs["user"] = user
         return attrs
+
+class ChangePasswordSerializer(
+    CamelCaseInputMixin,
+    RequiredFieldMessagesMixin,
+    PasswordValidationMixin,
+    serializers.Serializer,
+):
+    input_aliases = {
+        **CamelCaseInputMixin.input_aliases,
+        "currentPassword": "current_password",
+        "newPassword": "new_password",
+    }
+
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password_confirm = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_current_password(self, value):
+        user = self.context["user"]
+        if not user.check_password(value):
+            raise serializers.ValidationError("Current password is incorrect.")
+        return value
+
+    def validate_new_password(self, value):
+        return self._validate_password_strength(value)
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["password_confirm"]:
+            raise serializers.ValidationError(
+                {"password_confirm": "Passwords do not match."}
+            )
+        if attrs["current_password"] == attrs["new_password"]:
+            raise serializers.ValidationError(
+                {"new_password": "New password must be different from the current password."}
+            )
+        return attrs
+
+    def save(self, **kwargs):
+        user = self.context["user"]
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return user
+
+
+class UserProfileUpdateSerializer(
+    CamelCaseInputMixin,
+    RequiredFieldMessagesMixin,
+    serializers.Serializer,
+):
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    username = serializers.CharField(
+        max_length=150,
+        required=False,
+        allow_blank=True,
+        validators=[UnicodeUsernameValidator()],
+    )
+    email = serializers.EmailField(required=False)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+
+    def validate_email(self, value):
+        email = normalize_email(value)
+        user = User.objects.filter(email__iexact=email).exclude(
+            pk=self.instance.pk,
+        ).first()
+        if user:
+            raise serializers.ValidationError("An account with this email already exists.")
+        return email
+
+    def validate_username(self, value):
+        username = value.strip()
+        if not username:
+            raise serializers.ValidationError("Username is required.")
+
+        user = User.objects.filter(username__iexact=username).exclude(
+            pk=self.instance.pk,
+        ).first()
+        if user:
+            raise serializers.ValidationError("This username is already taken.")
+        return username
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        if not phone:
+            raise serializers.ValidationError("Phone is required.")
+
+        user = user_by_phone(phone, User.objects.exclude(pk=self.instance.pk))
+        if user:
+            raise serializers.ValidationError(
+                "An account with this phone number already exists."
+            )
+        return phone
+
+    def update(self, instance, validated_data):
+        for field in ("first_name", "last_name", "username", "email", "phone"):
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+        instance.save(
+            update_fields=[
+                field
+                for field in (
+                    "first_name",
+                    "last_name",
+                    "username",
+                    "email",
+                    "phone",
+                    "updated_at",
+                )
+                if field in validated_data or field == "updated_at"
+            ]
+        )
+        return instance
 
 
 class LogoutSerializer(RequiredFieldMessagesMixin, serializers.Serializer):

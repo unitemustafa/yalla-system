@@ -40,6 +40,7 @@ import {
   SelectBox,
 } from "../primitives";
 import { deliveryZones } from "@/features/dashboard/reference-data";
+import { removeInputWhitespace } from "@/lib/input-sanitizers";
 import { cn } from "@/lib/utils";
 
 const deliveryListPageSize = 10;
@@ -581,7 +582,7 @@ function CourierDetailsDrawer({
                     onChange={(event) =>
                       setPasswordDraft((current) => ({
                         ...current,
-                        password: event.target.value,
+                        password: removeInputWhitespace(event.target.value),
                       }))
                     }
                     placeholder="••••••"
@@ -595,7 +596,9 @@ function CourierDetailsDrawer({
                     onChange={(event) =>
                       setPasswordDraft((current) => ({
                         ...current,
-                        confirmPassword: event.target.value,
+                        confirmPassword: removeInputWhitespace(
+                          event.target.value,
+                        ),
                       }))
                     }
                     placeholder="••••••"
@@ -1280,7 +1283,9 @@ function CourierDrawer({
             <Input
               dir="ltr"
               value={draft.email}
-              onChange={(event) => updateDraft("email", event.target.value)}
+              onChange={(event) =>
+                updateDraft("email", removeInputWhitespace(event.target.value))
+              }
               placeholder="courier@example.com"
             />
           </Field>
@@ -1288,7 +1293,12 @@ function CourierDrawer({
             <Input
               type="password"
               value={draft.password}
-              onChange={(event) => updateDraft("password", event.target.value)}
+              onChange={(event) =>
+                updateDraft(
+                  "password",
+                  removeInputWhitespace(event.target.value),
+                )
+              }
               placeholder="••••••"
             />
           </Field>

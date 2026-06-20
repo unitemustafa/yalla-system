@@ -20,6 +20,21 @@ void main() {
     ),
   ];
 
+  test('normalizePhoneForCountry removes domestic trunk prefix', () {
+    expect(
+      normalizePhoneForCountry(countries.first, '01016487371'),
+      '+201016487371',
+    );
+    expect(
+      normalizePhoneForCountry(countries.first, '+2001016487371'),
+      '+201016487371',
+    );
+    expect(
+      normalizePhoneForCountry(countries[1], '0501234567'),
+      '+966501234567',
+    );
+  });
+
   testWidgets('PhoneCountryPrefix shows country code and handles taps', (
     tester,
   ) async {

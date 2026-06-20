@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
+import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/utils/validators.dart';
+import '../cubit/auth_cubit.dart';
+import '../cubit/auth_state.dart';
 import '../widgets/auth_top_bar.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -19,27 +25,33 @@ class ForgetPasswordView extends StatefulWidget {
 class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
+  Timer? _emailCheckTimer;
+  bool _isCheckingEmail = false;
+  bool? _isEmailRegistered;
+  String? _lastCheckedEmail;
 
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
+    _emailController.addListener(_scheduleEmailCheck);
   }
 
   @override
   void dispose() {
+    _emailCheckTimer?.cancel();
+    _emailController.removeListener(_scheduleEmailCheck);
     _emailController.dispose();
     super.dispose();
   }
 
-  void _onSubmit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.pushNamed(
-        context,
-        AppRoutes.passwordResetSent,
-        arguments: _emailController.text.trim(),
-      );
-    }
+  Future<void> _onSubmit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_canSubmitResetRequest) return;
+
+    await context.read<AuthCubit>().requestPasswordReset(
+      _emailController.text.trim(),
+    );
   }
 
   @override
@@ -47,55 +59,83 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: _buildBackgroundDecoration(isDarkMode),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final minHeight = (constraints.maxHeight - 20).clamp(
-                0.0,
-                double.infinity,
-              );
+    return BlocConsumer<AuthCubit, AuthState>(
+      listenWhen: (previous, current) =>
+          current is AuthPasswordResetRequested || current is AuthFailure,
+      listener: (context, state) {
+        if (state is AuthPasswordResetRequested) {
+          Navigator.pushNamed(
+            context,
+            AppRoutes.passwordResetSent,
+            arguments: state.email,
+          );
+        } else if (state is AuthFailure) {
+          CustomSnackBar.showError(
+            context: context,
+            title: context.tr('Password reset unavailable'),
+            message: state.message,
+          );
+        }
+      },
+      builder: (context, authState) {
+        final isLoading = authState is AuthLoading;
+        final canSubmit = _canSubmitResetRequest && !isLoading;
 
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: minHeight),
-                  child: Align(
-                    alignment: Alignment.topCenter,
+        return Scaffold(
+          body: DecoratedBox(
+            decoration: _buildBackgroundDecoration(isDarkMode),
+            child: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final minHeight = (constraints.maxHeight - 20).clamp(
+                    0.0,
+                    double.infinity,
+                  );
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const AuthTopBar(showClose: true),
-                            const SizedBox(height: 34),
-                            _buildHeader(context, theme, isDarkMode),
-                            const SizedBox(height: 30),
-                            CustomTextField(
-                              controller: _emailController,
-                              labelText: AppStrings.email,
-                              prefixIcon: AppIcons.direct_right,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: Validators.email,
+                      constraints: BoxConstraints(minHeight: minHeight),
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 430),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const AuthTopBar(showClose: true),
+                                const SizedBox(height: 34),
+                                _buildHeader(context, theme, isDarkMode),
+                                const SizedBox(height: 30),
+                                CustomTextField(
+                                  controller: _emailController,
+                                  labelText: AppStrings.email,
+                                  prefixIcon: AppIcons.direct_right,
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: _validateEmail,
+                                  suffix: _buildEmailStatusSuffix(isDarkMode),
+                                ),
+                                const SizedBox(height: 14),
+                                _buildSubmitButton(
+                                  isLoading: isLoading,
+                                  canSubmit: canSubmit,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 14),
-                            _buildSubmitButton(),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -173,7 +213,127 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
     );
   }
 
-  Widget _buildSubmitButton() {
-    return AppActionButton(label: AppStrings.submit, onPressed: _onSubmit);
+  Widget _buildSubmitButton({
+    required bool isLoading,
+    required bool canSubmit,
+  }) {
+    return AppActionButton(
+      label: AppStrings.submit,
+      isLoading: isLoading,
+      onPressed: canSubmit ? () => _onSubmit() : null,
+    );
+  }
+
+  bool get _canSubmitResetRequest {
+    final email = _emailController.text.trim().toLowerCase();
+    return email.isNotEmpty &&
+        _lastCheckedEmail == email &&
+        _isEmailRegistered == true &&
+        !_isCheckingEmail;
+  }
+
+  String? _validateEmail(String? value) {
+    final validationMessage = Validators.email(value);
+    if (validationMessage != null) return validationMessage;
+
+    final email = value?.trim().toLowerCase() ?? '';
+    if (_lastCheckedEmail == email && _isEmailRegistered == false) {
+      return context.isArabicLanguage ? 'راجع الإيميل' : 'Check the email';
+    }
+
+    return null;
+  }
+
+  Widget? _buildEmailStatusSuffix(bool isDarkMode) {
+    if (_isCheckingEmail) {
+      final progressColor = isDarkMode
+          ? Colors.white.withValues(alpha: 0.62)
+          : Colors.black.withValues(alpha: 0.42);
+
+      return Padding(
+        padding: const EdgeInsets.all(14),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+          ),
+        ),
+      );
+    }
+
+    if (_isEmailRegistered == true) {
+      return const Icon(
+        AppIcons.tick_circle,
+        size: 23,
+        color: AppColors.success,
+      );
+    }
+
+    if (_isEmailRegistered == false) {
+      return const Icon(AppIcons.danger, size: 23, color: AppColors.error);
+    }
+
+    return null;
+  }
+
+  void _scheduleEmailCheck() {
+    _emailCheckTimer?.cancel();
+    final email = _emailController.text.trim().toLowerCase();
+
+    if (Validators.email(email) != null) {
+      if (_isCheckingEmail || _isEmailRegistered != null) {
+        setState(() {
+          _isCheckingEmail = false;
+          _isEmailRegistered = null;
+          _lastCheckedEmail = null;
+        });
+      }
+      return;
+    }
+
+    if (_lastCheckedEmail != email || _isEmailRegistered != null) {
+      setState(() {
+        _isCheckingEmail = false;
+        _isEmailRegistered = null;
+        _lastCheckedEmail = null;
+      });
+    }
+
+    _emailCheckTimer = Timer(const Duration(milliseconds: 450), () {
+      _checkEmailRegistration(email);
+    });
+  }
+
+  Future<void> _checkEmailRegistration(String email) async {
+    if (!mounted) return;
+
+    setState(() {
+      _isCheckingEmail = true;
+      _isEmailRegistered = null;
+    });
+
+    try {
+      final isRegistered = await context.read<AuthCubit>().isEmailRegistered(
+        email,
+      );
+      if (!mounted || _emailController.text.trim().toLowerCase() != email) {
+        return;
+      }
+      setState(() {
+        _isCheckingEmail = false;
+        _isEmailRegistered = isRegistered;
+        _lastCheckedEmail = email;
+      });
+      _formKey.currentState?.validate();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingEmail = false;
+        _isEmailRegistered = null;
+        _lastCheckedEmail = null;
+      });
+    }
   }
 }

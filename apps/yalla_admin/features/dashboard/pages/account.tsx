@@ -5,14 +5,15 @@ import Image from "next/image";
 import {
   CalendarDays,
   Camera,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
   Clock3,
   Eye,
   EyeOff,
   KeyRound,
   LockKeyhole,
   Mail,
-  Send,
-  ShieldCheck,
   Upload,
   UserRound,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import { useDashboardI18n } from "@/features/dashboard/i18n";
 import { Button, Card, Input, PageTitle } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
 import { uploadDashboardImage } from "@/features/dashboard/upload-dashboard-image";
+import { removeInputWhitespace } from "@/lib/input-sanitizers";
 
 const profileImageStorageKey = "yalla-dashboard-profile-image";
 
@@ -47,11 +49,125 @@ function InfoRow({
   );
 }
 
-type PasswordResetStep = "idle" | "code-sent" | "verified";
-type EmailChangeStep = "idle" | "code-sent";
+function getPasswordRequirements(password: string) {
+  return [
+    {
+      label: "8 أحرف على الأقل",
+      isMet: password.length >= 8,
+    },
+    {
+      label: "حرف كبير وصغير",
+      isMet: /[A-Z]/.test(password) && /[a-z]/.test(password),
+    },
+    {
+      label: "رقم ورمز خاص",
+      isMet: /\d/.test(password) && /[^A-Za-z0-9]/.test(password),
+    },
+  ];
+}
 
-function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
+function PasswordStrengthMeter({
+  password,
+  showErrors,
+}: {
+  password: string;
+  showErrors: boolean;
+}) {
+  const requirements = getPasswordRequirements(password);
+
+  return (
+    <div
+      aria-label="متطلبات قوة كلمة المرور"
+      aria-live="polite"
+      className="grid grid-cols-3 gap-2 text-center"
+      role="status"
+    >
+      {requirements.map((requirement) => {
+        const RequirementIcon = requirement.isMet ? CheckCircle2 : Circle;
+
+        return (
+          <div
+            className={`flex min-w-0 items-center justify-center gap-1.5 text-xs font-semibold sm:gap-2 ${
+              requirement.isMet
+                ? "text-emerald-600 dark:text-emerald-400"
+                : showErrors
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+            }`}
+            key={requirement.label}
+          >
+            <RequirementIcon className="size-4 shrink-0" aria-hidden="true" />
+            <span>{requirement.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function useTemporaryLastPasswordCharacter(
+  password: string,
+  passwordVisible: boolean,
+) {
+  const [showLastCharacter, setShowLastCharacter] = useState(false);
+  const previousLength = useRef(password.length);
+
+  useEffect(() => {
+    const appendedCharacter = password.length > previousLength.current;
+    previousLength.current = password.length;
+
+    if (passwordVisible || !appendedCharacter) {
+      setShowLastCharacter(false);
+      return;
+    }
+
+    setShowLastCharacter(true);
+    const timeout = window.setTimeout(() => {
+      setShowLastCharacter(false);
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [password, passwordVisible]);
+
+  return showLastCharacter;
+}
+
+function HiddenPasswordValue({
+  password,
+  showLastCharacter,
+}: {
+  password: string;
+  showLastCharacter: boolean;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 start-9 end-9 flex items-center text-sm text-foreground"
+    >
+      {password
+        .split("")
+        .map((character, index) =>
+          showLastCharacter && index === password.length - 1 ? character : "•",
+        )
+        .join("")}
+    </span>
+  );
+}
+
+function translatePasswordChangeError(message: string) {
+  if (/current password is incorrect/i.test(message)) {
+    return "كلمة المرور الحالية غير صحيحة.";
+  }
+
+  if (/passwords do not match/i.test(message)) {
+    return "تأكيد كلمة المرور غير مطابق.";
+  }
+
+  if (/could not change password/i.test(message)) {
+    return "تعذر تغيير كلمة المرور. حاول مرة أخرى.";
+  }
+
+  return message;
 }
 
 export function AccountPage() {
@@ -60,13 +176,6 @@ export function AccountPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(currentUser.fullName);
   const [email, setEmail] = useState(currentUser.email);
-  const [currentEmail, setCurrentEmail] = useState(currentUser.email);
-  const [emailChangeStep, setEmailChangeStep] =
-    useState<EmailChangeStep>("idle");
-  const [emailChangeCode, setEmailChangeCode] = useState("");
-  const [emailStatus, setEmailStatus] = useState<string | null>(null);
-  const [isRequestingEmailCode, setIsRequestingEmailCode] = useState(false);
-  const [isConfirmingEmailCode, setIsConfirmingEmailCode] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(() =>
     typeof window === "undefined"
       ? null
@@ -74,19 +183,32 @@ export function AccountPage() {
   );
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [passwordStep, setPasswordStep] =
-    useState<PasswordResetStep>("idle");
-  const [passwordResetEmail, setPasswordResetEmail] =
-    useState(currentUser.email);
-  const [resetCode, setResetCode] = useState("");
-  const [resetToken, setResetToken] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isPasswordSectionOpen, setIsPasswordSectionOpen] = useState(true);
+  const [currentPasswordError, setCurrentPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
+  const [showPasswordStrengthErrors, setShowPasswordStrengthErrors] =
+    useState(false);
   const [passwordStatus, setPasswordStatus] = useState<string | null>(null);
-  const [isRequestingCode, setIsRequestingCode] = useState(false);
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [passwordStatusTone, setPasswordStatusTone] = useState<
+    "error" | "success"
+  >("error");
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const showLastCurrentPasswordCharacter = useTemporaryLastPasswordCharacter(
+    currentPassword,
+    false,
+  );
+  const showLastNewPasswordCharacter = useTemporaryLastPasswordCharacter(
+    newPassword,
+    passwordVisible,
+  );
+  const showLastConfirmPasswordCharacter = useTemporaryLastPasswordCharacter(
+    confirmPassword,
+    passwordVisible,
+  );
 
   useEffect(() => {
     let alive = true;
@@ -99,9 +221,7 @@ export function AccountPage() {
         return;
       }
 
-      setCurrentEmail(data.email);
       setEmail(data.email);
-      setPasswordResetEmail(data.email);
     }
 
     void loadAccountEmail();
@@ -139,214 +259,54 @@ export function AccountPage() {
     }
   }
 
-  const emailHasChanged = normalizeEmail(email) !== normalizeEmail(currentEmail);
-
-  async function requestEmailChangeCode() {
-    const nextEmail = normalizeEmail(email);
-
-    if (!nextEmail) {
-      setEmailStatus("اكتب الإيميل الجديد الأول.");
-      return;
-    }
-
-    if (!emailHasChanged) {
-      setStatus("تم حفظ بيانات البروفايل على الصفحة.");
-      showSnackbar({ message: "تم حفظ بيانات البروفايل." });
-      return;
-    }
-
-    setIsRequestingEmailCode(true);
-    setEmailStatus(null);
-    setEmailChangeCode("");
-
-    try {
-      const response = await fetch("/api/auth/email-change/request", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ newEmail: nextEmail }),
-      });
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.message ?? "Failed to request email change");
-      }
-
-      setEmailChangeStep("code-sent");
-      setEmailStatus(
-        data?.devCode
-          ? `تم إرسال كود التأكيد إلى الإيميل الحالي ${currentEmail}. كود التجربة: ${data.devCode}`
-          : `تم إرسال كود التأكيد إلى الإيميل الحالي ${currentEmail}.`,
-      );
-      showSnackbar({ message: "تم إرسال كود تأكيد تغيير الإيميل." });
-    } catch {
-      setEmailStatus("تعذر إرسال كود تأكيد تغيير الإيميل الآن.");
-      showSnackbar({
-        message: "تعذر إرسال كود تأكيد تغيير الإيميل.",
-        tone: "danger",
-      });
-    } finally {
-      setIsRequestingEmailCode(false);
-    }
-  }
-
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void requestEmailChangeCode();
-  }
-
-  function cancelEmailChange() {
-    setEmail(currentEmail);
-    setEmailChangeStep("idle");
-    setEmailChangeCode("");
-    setEmailStatus(null);
-    setIsConfirmingEmailCode(false);
-    setIsRequestingEmailCode(false);
-  }
-
-  async function handleConfirmEmailChange() {
-    setIsConfirmingEmailCode(true);
-    setEmailStatus(null);
-
-    try {
-      const response = await fetch("/api/auth/email-change/confirm", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code: emailChangeCode }),
-      });
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok || typeof data?.email !== "string") {
-        throw new Error(data?.message ?? "Failed to confirm email change");
-      }
-
-      setCurrentEmail(data.email);
-      setEmail(data.email);
-      setPasswordResetEmail(data.email);
-      setEmailChangeCode("");
-      setEmailChangeStep("idle");
-      setEmailStatus("تم تغيير الإيميل بنجاح.");
-      setStatus("تم حفظ بيانات البروفايل على الصفحة.");
-      showSnackbar({ message: "تم تغيير الإيميل بنجاح." });
-    } catch {
-      setEmailStatus("الكود غير صحيح أو انتهت صلاحيته.");
-      showSnackbar({
-        message: "الكود غير صحيح أو انتهت صلاحيته.",
-        tone: "danger",
-      });
-    } finally {
-      setIsConfirmingEmailCode(false);
-    }
-  }
-
-  async function handleRequestPasswordCode() {
-    const targetEmail = currentEmail.trim();
-
-    setIsRequestingCode(true);
-    setPasswordStatus(null);
-    setResetToken("");
-    setResetCode("");
-    setNewPassword("");
-    setConfirmPassword("");
-
-    try {
-      const response = await fetch("/api/auth/password-reset/request", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: targetEmail }),
-      });
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.message ?? "Failed to send reset code");
-      }
-
-      setPasswordStep("code-sent");
-      setPasswordResetEmail(targetEmail);
-      setPasswordStatus(
-        data?.devCode
-          ? `تم إرسال كود التأكيد إلى البريد. كود التجربة: ${data.devCode}`
-          : "تم إرسال كود التأكيد إلى البريد الإلكتروني.",
-      );
-      showSnackbar({ message: "تم إرسال كود تأكيد تغيير كلمة المرور." });
-    } catch {
-      setPasswordStatus("تعذر إرسال كود التأكيد الآن. حاول مرة أخرى.");
-      showSnackbar({
-        message: "تعذر إرسال كود التأكيد الآن.",
-        tone: "danger",
-      });
-    } finally {
-      setIsRequestingCode(false);
-    }
-  }
-
-  function cancelPasswordReset() {
-    setPasswordStep("idle");
-    setResetCode("");
-    setResetToken("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setPasswordStatus(null);
-    setIsRequestingCode(false);
-    setIsVerifyingCode(false);
-    setIsSavingPassword(false);
-  }
-
-  async function handleVerifyPasswordCode(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsVerifyingCode(true);
-    setPasswordStatus(null);
-
-    try {
-      const response = await fetch("/api/auth/password-reset/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: passwordResetEmail, code: resetCode }),
-      });
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok || !data?.resetToken) {
-        throw new Error(data?.message ?? "Invalid verification code");
-      }
-
-      setResetToken(data.resetToken);
-      setPasswordStep("verified");
-      setPasswordStatus("تم تأكيد الكود. يمكنك الآن إدخال كلمة مرور جديدة.");
-      showSnackbar({ message: "تم تأكيد الكود بنجاح." });
-    } catch {
-      setPasswordStatus("الكود غير صحيح أو انتهت صلاحيته.");
-      showSnackbar({
-        message: "الكود غير صحيح أو انتهت صلاحيته.",
-        tone: "danger",
-      });
-    } finally {
-      setIsVerifyingCode(false);
-    }
+    setStatus("تم حفظ بيانات البروفايل على الصفحة.");
+    showSnackbar({ message: "تم حفظ بيانات البروفايل." });
   }
 
   async function handleSavePassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setPasswordStatus(null);
 
-    if (newPassword.length < 6) {
-      setPasswordStatus("كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف.");
+    if (!currentPassword) {
+      setCurrentPasswordError("كلمة المرور الحالية مطلوبة");
+      setShowPasswordStrengthErrors(false);
+      return;
+    }
+
+    setCurrentPasswordError("");
+    const passwordRequirements = getPasswordRequirements(newPassword);
+    const passwordMeetsAllRequirements = passwordRequirements.every(
+      (requirement) => requirement.isMet,
+    );
+    setShowPasswordStrengthErrors(!passwordMeetsAllRequirements);
+
+    if (!passwordMeetsAllRequirements) {
+      return;
+    }
+
+    if (!confirmPassword) {
+      setConfirmPasswordError("تأكيد كلمة المرور مطلوب");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordStatus("تأكيد كلمة المرور غير مطابق.");
+      setConfirmPasswordError("تأكيد كلمة المرور غير مطابق");
       return;
     }
 
+    setConfirmPasswordError("");
     setIsSavingPassword(true);
-    setPasswordStatus(null);
 
     try {
-      const response = await fetch("/api/auth/password-reset/confirm", {
+      const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          email: passwordResetEmail,
-          password: newPassword,
-          resetToken,
+          currentPassword,
+          newPassword,
+          passwordConfirm: confirmPassword,
         }),
       });
       const data = await response.json().catch(() => null);
@@ -355,15 +315,24 @@ export function AccountPage() {
         throw new Error(data?.message ?? "Failed to update password");
       }
 
-      setPasswordStep("idle");
-      setResetCode("");
-      setResetToken("");
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordStatus("تم تغيير كلمة المرور بنجاح.");
+      setShowPasswordStrengthErrors(false);
+      setPasswordStatusTone("success");
+      setPasswordStatus("تم تغيير كلمة المرور. سجل الدخول تاني بالباسورد الجديد.");
       showSnackbar({ message: "تم تغيير كلمة المرور بنجاح." });
-    } catch {
-      setPasswordStatus("تعذر تغيير كلمة المرور. اطلب كود جديد وحاول مرة أخرى.");
+      window.setTimeout(() => {
+        window.location.assign("/login");
+      }, 900);
+    } catch (error) {
+      const responseMessage =
+        error instanceof Error
+          ? error.message
+          : "تعذر تغيير كلمة المرور. حاول مرة أخرى.";
+      const message = translatePasswordChangeError(responseMessage);
+      setPasswordStatusTone("error");
+      setPasswordStatus(message);
       showSnackbar({
         message: "تعذر تغيير كلمة المرور.",
         tone: "danger",
@@ -461,104 +430,20 @@ export function AccountPage() {
                 <div className="relative">
                   <Mail className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    className="pe-9 text-right"
+                    aria-readonly="true"
+                    className="pe-9 text-right cursor-not-allowed bg-muted/40 text-muted-foreground"
                     dir="ltr"
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      setEmailChangeStep("idle");
-                      setEmailChangeCode("");
-                      setEmailStatus(null);
-                    }}
+                    readOnly
                     type="email"
                     value={email}
                   />
                 </div>
               </label>
 
-              {emailHasChanged ? (
-                <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                  سيتم إرسال كود تأكيد إلى الإيميل الحالي:
-                  <span className="mx-1 font-semibold text-foreground" dir="ltr">
-                    {currentEmail}
-                  </span>
-                </div>
-              ) : null}
-
-              {emailChangeStep === "code-sent" ? (
-                <div className="grid gap-3 rounded-lg border bg-muted/20 p-4">
-                  <div className="grid gap-3">
-                    <label className="grid gap-2 text-sm font-medium">
-                      كود تأكيد الإيميل القديم
-                      <div className="relative">
-                        <ShieldCheck className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          className="ps-9 text-center text-lg tracking-[0.35em]"
-                          dir="ltr"
-                          inputMode="numeric"
-                          maxLength={6}
-                          onChange={(event) =>
-                            setEmailChangeCode(
-                              event.target.value.replace(/\D/g, "").slice(0, 6),
-                            )
-                          }
-                          placeholder="000000"
-                          value={emailChangeCode}
-                        />
-                      </div>
-                    </label>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button
-                        disabled={
-                          isConfirmingEmailCode || emailChangeCode.length !== 6
-                        }
-                        onClick={() => void handleConfirmEmailChange()}
-                        type="button"
-                      >
-                        {isConfirmingEmailCode
-                          ? "جاري التأكيد..."
-                          : "تأكيد تغيير الإيميل"}
-                      </Button>
-                      <Button
-                        disabled={isRequestingEmailCode}
-                        onClick={requestEmailChangeCode}
-                        type="button"
-                        variant="outline"
-                      >
-                        إعادة إرسال
-                      </Button>
-                      <Button
-                        disabled={isConfirmingEmailCode || isRequestingEmailCode}
-                        onClick={cancelEmailChange}
-                        type="button"
-                        variant="outline"
-                      >
-                        إلغاء
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {emailStatus ? (
-                <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                  {emailStatus}
-                </div>
-              ) : null}
-
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-                {emailChangeStep === "code-sent" ? null : (
-                  <Button
-                    className="sm:w-auto"
-                    disabled={isRequestingEmailCode}
-                    type="submit"
-                  >
-                    {isRequestingEmailCode
-                      ? "جاري إرسال الكود..."
-                      : emailHasChanged
-                        ? "إرسال كود تأكيد الإيميل"
-                        : "حفظ التغييرات"}
-                  </Button>
-                )}
+                <Button className="sm:w-auto" type="submit">
+                  حفظ التغييرات
+                </Button>
                 {status ? (
                   <span className="text-sm text-muted-foreground">{status}</span>
                 ) : null}
@@ -567,145 +452,223 @@ export function AccountPage() {
           </Card>
 
           <Card className="p-5">
-            <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-base font-bold">
+            <button
+              aria-controls="password-settings-content"
+              aria-expanded={isPasswordSectionOpen}
+              className={`flex w-full items-start justify-between gap-4 text-start ${
+                isPasswordSectionOpen ? "border-b pb-4" : ""
+              }`}
+              onClick={() => setIsPasswordSectionOpen((isOpen) => !isOpen)}
+              type="button"
+            >
+              <span>
+                <span className="flex items-center gap-2 text-base font-bold">
                   <LockKeyhole className="size-5 text-primary" />
                   كلمة المرور
-                </div>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  تغيير كلمة المرور يتم بكود تأكيد مكون من 6 أرقام يصل إلى بريد الحساب.
-                </p>
-              </div>
-              <Button
-                disabled={isRequestingCode || passwordStep !== "idle"}
-                onClick={handleRequestPasswordCode}
-                type="button"
-                variant="outline"
+                </span>
+                <span className="mt-1 block text-sm leading-6 text-muted-foreground">
+                  غيّر كلمة المرور باستخدام كلمة المرور الحالية. بعد الحفظ هتحتاج تسجل دخول من جديد.
+                </span>
+              </span>
+              <ChevronDown
+                aria-hidden="true"
+                className={`mt-1 size-5 shrink-0 text-muted-foreground transition-transform ${
+                  isPasswordSectionOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {isPasswordSectionOpen ? (
+              <form
+                className="mt-4 grid gap-4"
+                id="password-settings-content"
+                onSubmit={handleSavePassword}
               >
-                <Send className="size-4" />
-                {isRequestingCode ? "جاري الإرسال..." : "إرسال كود التغيير"}
-              </Button>
-            </div>
-
-            <div className="mt-4 grid gap-4">
-              <label className="grid gap-2 text-sm font-medium">
-                كلمة المرور الحالية
-                <div className="relative">
-                  <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="ps-9"
-                    readOnly
-                    type="password"
-                    value="********"
-                  />
-                </div>
-              </label>
-
-              {passwordStep === "code-sent" ? (
-                <form className="grid gap-4" onSubmit={handleVerifyPasswordCode}>
-                  <label className="grid gap-2 text-sm font-medium">
-                    كود التأكيد
-                    <div className="relative">
-                      <ShieldCheck className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        className="ps-9 text-center text-lg tracking-[0.35em]"
-                        dir="ltr"
-                        inputMode="numeric"
-                        maxLength={6}
-                        onChange={(event) =>
-                          setResetCode(
-                            event.target.value.replace(/\D/g, "").slice(0, 6),
-                          )
+                <label className="grid gap-2 text-sm font-medium">
+                  كلمة المرور الحالية
+                  <div className="relative">
+                    <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      aria-describedby={
+                        currentPasswordError
+                          ? "current-password-error"
+                          : undefined
+                      }
+                      aria-invalid={Boolean(currentPasswordError)}
+                      autoComplete="current-password"
+                      className={`ps-9 ${
+                        currentPassword
+                          ? "text-transparent caret-foreground"
+                          : ""
+                      } ${
+                        currentPasswordError
+                          ? "border-destructive focus-visible:ring-destructive/30"
+                          : ""
+                      }`}
+                      onChange={(event) => {
+                        const nextPassword = removeInputWhitespace(
+                          event.target.value,
+                        );
+                        setCurrentPassword(nextPassword);
+                        if (nextPassword) {
+                          setCurrentPasswordError("");
+                        } else {
+                          setNewPassword("");
+                          setConfirmPassword("");
+                          setConfirmPasswordError("");
+                          setShowPasswordStrengthErrors(false);
+                          setPasswordVisible(false);
                         }
-                        placeholder="000000"
-                        value={resetCode}
+                      }}
+                      type="password"
+                      value={currentPassword}
+                    />
+                    {currentPassword ? (
+                      <HiddenPasswordValue
+                        password={currentPassword}
+                        showLastCharacter={showLastCurrentPasswordCharacter}
                       />
-                    </div>
-                  </label>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button
-                      disabled={isVerifyingCode || resetCode.length !== 6}
-                      type="submit"
-                    >
-                      {isVerifyingCode ? "جاري التأكيد..." : "تأكيد الكود"}
-                    </Button>
-                    <Button
-                      disabled={isRequestingCode}
-                      onClick={handleRequestPasswordCode}
-                      type="button"
-                      variant="outline"
-                    >
-                      إعادة إرسال
-                    </Button>
-                    <Button
-                      disabled={isRequestingCode || isVerifyingCode}
-                      onClick={cancelPasswordReset}
-                      type="button"
-                      variant="outline"
-                    >
-                      إلغاء
-                    </Button>
+                    ) : null}
                   </div>
-                </form>
-              ) : null}
+                  {currentPasswordError ? (
+                    <span
+                      className="text-xs font-semibold text-destructive"
+                      id="current-password-error"
+                      role="alert"
+                    >
+                      {currentPasswordError}
+                    </span>
+                  ) : null}
+                </label>
 
-              {passwordStep === "verified" ? (
-                <form className="grid gap-4" onSubmit={handleSavePassword}>
-                  <label className="grid gap-2 text-sm font-medium">
-                    كلمة المرور الجديدة
-                    <div className="relative">
-                      <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        autoComplete="new-password"
-                        className="px-9"
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        type={passwordVisible ? "text" : "password"}
-                        value={newPassword}
+                <label className="grid gap-2 text-sm font-medium">
+                  كلمة المرور الجديدة
+                  <div className="relative">
+                    <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoComplete="new-password"
+                      className={`px-9 ${
+                        !passwordVisible && newPassword
+                          ? "text-transparent caret-foreground"
+                          : ""
+                      }`}
+                      disabled={!currentPassword}
+                      onChange={(event) =>
+                        setNewPassword(
+                          removeInputWhitespace(event.target.value),
+                        )
+                      }
+                      type={passwordVisible ? "text" : "password"}
+                      value={newPassword}
+                    />
+                    {!passwordVisible && newPassword ? (
+                      <HiddenPasswordValue
+                        password={newPassword}
+                        showLastCharacter={showLastNewPasswordCharacter}
                       />
-                      <button
-                        aria-label={
-                          passwordVisible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"
+                    ) : null}
+                    <button
+                      aria-label={
+                        passwordVisible
+                          ? "إخفاء كلمة المرور"
+                          : "إظهار كلمة المرور"
+                      }
+                      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!currentPassword}
+                      onClick={() =>
+                        setPasswordVisible((visible) => !visible)
+                      }
+                      type="button"
+                    >
+                      {passwordVisible ? (
+                        <Eye className="size-4" />
+                      ) : (
+                        <EyeOff className="size-4" />
+                      )}
+                    </button>
+                  </div>
+                  <PasswordStrengthMeter
+                    password={newPassword}
+                    showErrors={showPasswordStrengthErrors}
+                  />
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium">
+                  تأكيد كلمة المرور
+                  <div className="relative">
+                    <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      aria-describedby={
+                        confirmPasswordError
+                          ? "confirm-password-error"
+                          : undefined
+                      }
+                      aria-invalid={Boolean(confirmPasswordError)}
+                      autoComplete="new-password"
+                      className={`px-9 ${
+                        !passwordVisible && confirmPassword
+                          ? "text-transparent caret-foreground"
+                          : ""
+                      } ${
+                        confirmPasswordError
+                          ? "border-destructive focus-visible:ring-destructive/30"
+                          : ""
+                      }`}
+                      disabled={!currentPassword}
+                      onChange={(event) => {
+                        const nextPassword = removeInputWhitespace(
+                          event.target.value,
+                        );
+                        setConfirmPassword(nextPassword);
+                        if (nextPassword) {
+                          setConfirmPasswordError("");
                         }
-                        className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        onClick={() => setPasswordVisible((visible) => !visible)}
-                        type="button"
-                      >
-                        {passwordVisible ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </div>
-                  </label>
-
-                  <label className="grid gap-2 text-sm font-medium">
-                    تأكيد كلمة المرور
-                    <div className="relative">
-                      <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        autoComplete="new-password"
-                        className="px-9"
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        type={passwordVisible ? "text" : "password"}
-                        value={confirmPassword}
+                      }}
+                      type={passwordVisible ? "text" : "password"}
+                      value={confirmPassword}
+                    />
+                    {!passwordVisible && confirmPassword ? (
+                      <HiddenPasswordValue
+                        password={confirmPassword}
+                        showLastCharacter={showLastConfirmPasswordCharacter}
                       />
-                    </div>
-                  </label>
+                    ) : null}
+                  </div>
+                  {confirmPasswordError ? (
+                    <span
+                      className="text-xs font-semibold text-destructive"
+                      id="confirm-password-error"
+                      role="alert"
+                    >
+                      {confirmPasswordError}
+                    </span>
+                  ) : null}
+                </label>
 
-                  <Button disabled={isSavingPassword} className="sm:w-fit" type="submit">
-                    {isSavingPassword ? "جاري الحفظ..." : "حفظ كلمة المرور الجديدة"}
-                  </Button>
-                </form>
-              ) : null}
+                {passwordStatus ? (
+                  <div
+                    className={`rounded-lg border px-4 py-3 text-sm font-semibold leading-6 ${
+                      passwordStatusTone === "error"
+                        ? "border-destructive/30 bg-destructive/10 text-destructive"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    }`}
+                    role="alert"
+                  >
+                    {passwordStatus}
+                  </div>
+                ) : null}
 
-              {passwordStatus ? (
-                <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                  {passwordStatus}
-                </div>
-              ) : null}
-            </div>
+                <Button
+                  className="sm:w-fit"
+                  disabled={isSavingPassword}
+                  type="submit"
+                >
+                  {isSavingPassword
+                    ? "جاري الحفظ..."
+                    : "حفظ كلمة المرور الجديدة"}
+                </Button>
+              </form>
+            ) : null}
           </Card>
 
 

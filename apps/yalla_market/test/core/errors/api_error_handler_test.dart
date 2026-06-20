@@ -35,6 +35,42 @@ void main() {
       expect(failure.message, 'Please sign in again.');
     });
 
+    test('reads Django REST framework detail errors', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/auth/login'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/auth/login'),
+          statusCode: 401,
+          data: const {'detail': 'Invalid email or password.'},
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+      final failure = ApiErrorHandler.handle(error);
+
+      expect(failure, isA<UnauthorizedFailure>());
+      expect(failure.message, 'Invalid email or password.');
+    });
+
+    test('reads Django REST framework field errors', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/auth/signup'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/auth/signup'),
+          statusCode: 400,
+          data: const {
+            'password': ['Password must contain at least one number.'],
+          },
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+      final failure = ApiErrorHandler.handle(error);
+
+      expect(failure, isA<ValidationFailure>());
+      expect(failure.message, 'Password must contain at least one number.');
+    });
+
     test('maps non-Dio errors to unknown failure', () {
       final failure = ApiErrorHandler.handle(Exception('boom'));
 

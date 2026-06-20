@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from datetime import timedelta
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,7 +27,14 @@ SECRET_KEY = 'django-insecure-m*gme97(k%lgq+lq2tjwh48jkygaz-w8gpx67!wa0j)miv52yy
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1,0.0.0.0,testserver",
+    ).split(",")
+    if host.strip()
+]
 
 
 # Application definition
@@ -59,8 +67,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
-CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -148,8 +154,30 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
+# Non-remembered logins remain valid only for the active browser session and
+# use a shorter refresh token even if that token is copied elsewhere.
+AUTH_SESSION_REFRESH_TOKEN_LIFETIME = timedelta(hours=8)
+
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "brahmia.lokmeneabdelmoname@univ-guelma.dz"
 
 AUTH_OTP_EXPIRY_SECONDS = 10 * 60
 AUTH_OTP_INCLUDE_IN_RESPONSE = DEBUG
+
+_default_cors_allowed_origins = (
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000,"
+    "http://localhost:3001,"
+    "http://127.0.0.1:3001,"
+    "http://localhost:5173,"
+    "http://127.0.0.1:5173"
+)
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "DJANGO_CORS_ALLOWED_ORIGINS",
+        _default_cors_allowed_origins,
+    ).split(",")
+    if origin.strip()
+]
+CORS_ALLOW_CREDENTIALS = True

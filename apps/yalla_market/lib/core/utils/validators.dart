@@ -26,6 +26,14 @@ class Validators {
     return null;
   }
 
+  static String? loginIdentifier(String? value) {
+    final strings = AppTranslations.current;
+    if (value == null || value.trim().isEmpty) {
+      return strings.fieldRequired;
+    }
+    return null;
+  }
+
   static String? password(String? value) {
     final strings = AppTranslations.current;
     final password = value ?? '';

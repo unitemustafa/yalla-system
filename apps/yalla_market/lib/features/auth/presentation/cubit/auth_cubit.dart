@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_result.dart';
@@ -28,7 +30,9 @@ class AuthCubit extends Cubit<AuthState> {
     if (change.nextState is AuthAuthenticated) {
       AuthGuard.setAuthenticated();
     } else if (change.nextState is AuthInitial ||
-        change.nextState is AuthSignupSucceeded) {
+        change.nextState is AuthSignupSucceeded ||
+        change.nextState is AuthSessionExpired ||
+        change.nextState is AuthEmailVerified) {
       AuthGuard.clearAuthentication();
     }
   }
@@ -44,8 +48,8 @@ class AuthCubit extends Cubit<AuthState> {
   void _handleSessionExpired() {
     _pendingSignupSession = null;
     AuthGuard.clearAuthentication();
-    if (!isClosed && state is! AuthInitial) {
-      emit(const AuthInitial());
+    if (!isClosed) {
+      emit(const AuthSessionExpired());
     }
   }
 
@@ -110,7 +114,7 @@ class AuthCubit extends Cubit<AuthState> {
     );
     return result.when(
       success: (isAvailable) => isAvailable,
-      failure: (_) => false,
+      failure: (failure) => throw StateError(failure.message),
     );
   }
 
@@ -118,7 +122,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkEmailRegistration(email.trim());
     return result.when(
       success: (isRegistered) => isRegistered,
-      failure: (_) => false,
+      failure: (failure) => throw StateError(failure.message),
     );
   }
 
@@ -126,7 +130,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkEmailRegistration(email.trim());
     return result.when(
       success: (isRegistered) => !isRegistered,
-      failure: (_) => false,
+      failure: (failure) => throw StateError(failure.message),
     );
   }
 
@@ -134,7 +138,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkPhoneRegistration(phone.trim());
     return result.when(
       success: (isRegistered) => !isRegistered,
-      failure: (_) => false,
+      failure: (failure) => throw StateError(failure.message),
     );
   }
 
@@ -181,7 +185,8 @@ class AuthCubit extends Cubit<AuthState> {
 
     if (session.accessToken != null && session.refreshToken != null) {
       _pendingSignupSession = null;
-      emit(AuthAuthenticated(session));
+      unawaited(_authUseCases.logout());
+      emit(const AuthEmailVerified());
       return true;
     }
 
@@ -191,9 +196,10 @@ class AuthCubit extends Cubit<AuthState> {
       code: code.trim(),
     );
     return result.when(
-      success: (verifiedSession) {
+      success: (_) {
         _pendingSignupSession = null;
-        emit(AuthAuthenticated(verifiedSession));
+        unawaited(_authUseCases.logout());
+        emit(const AuthEmailVerified());
         return true;
       },
       failure: (failure) {
@@ -219,6 +225,24 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
+  Future<bool> requestPasswordReset(String email) async {
+    if (state is AuthLoading) return false;
+
+    emit(const AuthLoading());
+
+    final result = await _authUseCases.requestPasswordReset(email.trim());
+    return result.when(
+      success: (sent) {
+        emit(AuthPasswordResetRequested(email.trim()));
+        return sent;
+      },
+      failure: (failure) {
+        emit(AuthFailure(failure.message));
+        return false;
+      },
+    );
+  }
+
   Future<void> logout() async {
     _pendingSignupSession = null;
     final result = await _authUseCases.logout();
@@ -230,6 +254,17 @@ class AuthCubit extends Cubit<AuthState> {
         emit(const AuthInitial());
       },
     );
+  }
+
+  Future<void> expireSession() async {
+    if (state is AuthSessionExpired) return;
+
+    _pendingSignupSession = null;
+    AuthGuard.clearAuthentication();
+    await _authUseCases.logout();
+    if (!isClosed) {
+      emit(const AuthSessionExpired());
+    }
   }
 
   Future<bool> deleteAccountWithPassword(String password) {

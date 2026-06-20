@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   LayoutDashboard,
   MessageCircle,
   ShoppingBag,
@@ -72,6 +73,11 @@ export const navGroups: NavGroup[] = [
         ],
       },
       { label: "المستخدمين", icon: Users, href: "/customers", page: "customers" },
+      {
+        label: "العضويات",
+        icon: BadgeCheck,
+        soon: true,
+      },
       {
         label: "الشات",
         icon: MessageCircle,

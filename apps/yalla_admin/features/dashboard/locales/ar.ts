@@ -62,6 +62,7 @@ export const ar = {
   "nav.deliveryZones": "مناطق التوصيل",
   "nav.couriers": "المندوبين",
   "nav.customers": "المستخدمين",
+  "nav.memberships": "العضويات",
   "nav.chat": "الشات",
   "page.overview": "لوحة التحكم",
   "page.items": "المنتجات",

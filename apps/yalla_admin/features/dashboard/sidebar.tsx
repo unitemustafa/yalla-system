@@ -181,7 +181,10 @@ export function Sidebar({
     if (firstChildPage === "offers") return t("nav.offers");
     if (firstChildPage === "delivery-zone") return t("nav.delivery");
 
-    return item.soon ? t("nav.chat") : item.label;
+    if (item.label === "العضويات") return t("nav.memberships");
+    if (item.label === "الشات") return t("nav.chat");
+
+    return item.label;
   }
 
   function navChildLabel(page: PageKey) {

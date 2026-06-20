@@ -155,9 +155,19 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
       return;
     }
 
+    CustomSnackBar.showSuccess(
+      context: context,
+      title: _copy(context, ar: 'تم تأكيد الإيميل', en: 'Email verified'),
+      message: _copy(
+        context,
+        ar: 'سجل دخولك دلوقتي عشان تكمل اختيار المنطقة.',
+        en: 'Sign in now to continue choosing your region.',
+      ),
+    );
+
     Navigator.pushNamedAndRemoveUntil(
       context,
-      AppRoutes.selectCity,
+      AppRoutes.login,
       (route) => false,
     );
   }

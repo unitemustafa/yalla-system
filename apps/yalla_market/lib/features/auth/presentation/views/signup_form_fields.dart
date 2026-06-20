@@ -86,7 +86,7 @@ extension _SignupFormFields on _SignupViewState {
       prefixIcon: AppIcons.user_edit,
       validator: _validateUsername,
       inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z._]')),
+        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._]')),
       ],
       suffix: _buildAvailabilityStatusSuffix(
         isDarkMode,
@@ -94,7 +94,7 @@ extension _SignupFormFields on _SignupViewState {
         isAvailable: _checker.isUsernameAvailable,
         showError:
             _usernameController.text.trim().isNotEmpty &&
-            _checker.usernameAvailabilityMessage != null &&
+            _validateUsername(_usernameController.text) != null &&
             !_checker.isCheckingUsername,
       ),
     );

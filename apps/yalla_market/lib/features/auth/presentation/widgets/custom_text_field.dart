@@ -16,6 +16,7 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
+  final double? labelFontSize;
 
   const CustomTextField({
     super.key,
@@ -31,6 +32,7 @@ class CustomTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.inputFormatters,
+    this.labelFontSize,
   });
 
   @override
@@ -73,7 +75,7 @@ class CustomTextField extends StatelessWidget {
           ),
           labelStyle: TextStyle(
             color: iconColor,
-            fontSize: 14,
+            fontSize: labelFontSize ?? 14,
             fontWeight: FontWeight.w700,
           ),
           prefixIcon: Icon(prefixIcon, size: 21, color: iconColor),

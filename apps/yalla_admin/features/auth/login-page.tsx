@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
@@ -26,12 +26,15 @@ import {
   markLoginSplashSeen,
 } from "@/features/auth/login-splash";
 import type { LoginDashboardSnapshot } from "@/lib/login-dashboard-snapshot";
+import { removeInputWhitespace } from "@/lib/input-sanitizers";
 
 const productImages = [
   "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090694513-5coutf286d4.webp",
   "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1776777321164-qaj9r6n4xei.webp",
   "https://bucket.ammenu.com/yalla-market/items/1778544634562-e47zuvmo7jt.webp",
 ];
+
+const tabSessionStorageKey = "yalla-dashboard-tab-session";
 
 function LoginPageContent({
   snapshot,
@@ -44,7 +47,16 @@ function LoginPageContent({
   );
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [emailValue, setEmailValue] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    password: "",
+  });
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [showLastPasswordCharacter, setShowLastPasswordCharacter] =
+    useState(false);
+  const passwordRevealTimeout = useRef<number | null>(null);
   const stats = [
     { label: "طلبات اليوم", value: String(snapshot.todayOrders), icon: PackageCheck },
     { label: "فروع نشطة", value: String(snapshot.activeBranches), icon: Store },
@@ -56,27 +68,97 @@ function LoginPageContent({
     setShowSplash(false);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (passwordRevealTimeout.current !== null) {
+        window.clearTimeout(passwordRevealTimeout.current);
+      }
+    };
+  }, []);
+
+  function handlePasswordChange(nextValue: string) {
+    const passwordWithoutWhitespace = removeInputWhitespace(nextValue);
+    const appendedCharacter =
+      passwordWithoutWhitespace.length > passwordValue.length;
+    setPasswordValue(passwordWithoutWhitespace);
+    if (passwordWithoutWhitespace) {
+      setFieldErrors((current) => ({ ...current, password: "" }));
+    }
+
+    if (passwordRevealTimeout.current !== null) {
+      window.clearTimeout(passwordRevealTimeout.current);
+    }
+
+    if (!passwordVisible && appendedCharacter) {
+      setShowLastPasswordCharacter(true);
+      passwordRevealTimeout.current = window.setTimeout(() => {
+        setShowLastPasswordCharacter(false);
+      }, 650);
+    } else {
+      setShowLastPasswordCharacter(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setPending(true);
 
-    const formData = new FormData(event.currentTarget);
+    const nextFieldErrors = {
+      email: !emailValue
+        ? "البريد الإلكتروني مطلوب"
+        : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)
+          ? ""
+          : "اكتب إيميل صحيح",
+      password: passwordValue ? "" : "كلمة المرور مطلوبة",
+    };
+    setFieldErrors(nextFieldErrors);
+
+    if (nextFieldErrors.email || nextFieldErrors.password) {
+      return;
+    }
+
+    setPending(true);
+    const remember =
+      new FormData(event.currentTarget).get("remember") === "on";
     const response = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: formData.get("email"),
-        password: formData.get("password"),
-        remember: formData.get("remember") === "on",
+        email: emailValue,
+        password: passwordValue,
+        remember,
       }),
     });
 
     setPending(false);
 
     if (!response.ok) {
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      if (response.status === 403) {
+        setError("الحساب ده ملوش صلاحية دخول للداشبورد.");
+      } else if (response.status === 503) {
+        setError("خدمة تسجيل الدخول مش متاحة دلوقتي.");
+      } else {
+        setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      }
       return;
+    }
+
+    const data = (await response.json().catch(() => null)) as
+      | { remembered?: boolean; expiresAt?: number }
+      | null;
+
+    if (remember || data?.remembered) {
+      sessionStorage.removeItem(tabSessionStorageKey);
+    } else {
+      sessionStorage.setItem(
+        tabSessionStorageKey,
+        JSON.stringify({
+          expiresAt:
+            typeof data?.expiresAt === "number"
+              ? data.expiresAt
+              : Date.now() + 8 * 60 * 60 * 1000,
+        }),
+      );
     }
 
     const nextPath = new URLSearchParams(window.location.search).get("next");
@@ -156,44 +238,18 @@ function LoginPageContent({
                 <BarChart3 className="size-9 shrink-0 text-amber-200" />
               </div>
 
-              <div className="grid grid-cols-[1fr_0.7fr] gap-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between rounded-md bg-white/15 px-4 py-3">
-                    <span className="text-sm text-white/75">طلبات مكتملة</span>
-                    <span className="text-lg font-bold">
-                      {snapshot.completedPercent}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-md bg-white/15 px-4 py-3">
-                    <span className="text-sm text-white/75">متوسط التجهيز</span>
-                    <span className="text-lg font-bold">
-                      {snapshot.averagePreparationMinutes} د
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-white/15">
-                    <div
-                      className="h-full rounded-full bg-amber-300"
-                      style={{ width: `${snapshot.completedPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {productImages.map((src, index) => (
-                    <Image
-                      key={src}
-                      alt=""
-                      src={src}
-                      width={140}
-                      height={140}
-                      sizes="(min-width: 1024px) 140px, 33vw"
-                      className={[
-                        "h-full min-h-24 rounded-lg border border-white/20 object-cover",
-                        index === 0 ? "col-span-2 aspect-[2/1]" : "aspect-square",
-                      ].join(" ")}
-                    />
-                  ))}
-                </div>
+              <div className="mx-auto grid w-full max-w-xl grid-cols-3 gap-3">
+                {productImages.map((src) => (
+                  <Image
+                    key={src}
+                    alt=""
+                    src={src}
+                    width={180}
+                    height={180}
+                    sizes="(min-width: 1024px) 180px, 33vw"
+                    className="aspect-square w-full rounded-lg border border-white/20 object-cover"
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -229,37 +285,106 @@ function LoginPageContent({
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form className="space-y-5" noValidate onSubmit={handleSubmit}>
               <label className="block text-sm font-bold">
                 البريد الإلكتروني
-                <span className="mt-2 flex h-12 items-center gap-3 rounded-lg border border-border bg-card px-3 shadow-sm transition focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15">
+                <span
+                  className={`mt-2 flex h-12 items-center gap-3 rounded-lg border bg-card px-3 shadow-sm transition focus-within:ring-4 ${
+                    fieldErrors.email
+                      ? "border-destructive focus-within:border-destructive focus-within:ring-destructive/15"
+                      : "border-border focus-within:border-primary focus-within:ring-primary/15"
+                  }`}
+                >
                   <Mail className="size-5 text-muted-foreground" />
                   <input
-                    name="email"
-                    type="email"
-                    defaultValue="dashboard@admin.com"
-                    required
-                    className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
+                    aria-describedby={
+                      fieldErrors.email ? "login-email-error" : undefined
+                    }
+                    aria-invalid={Boolean(fieldErrors.email)}
                     autoComplete="email"
+                    name="email"
+                    onChange={(event) => {
+                      const emailWithoutWhitespace = removeInputWhitespace(
+                        event.currentTarget.value,
+                      );
+                      setEmailValue(emailWithoutWhitespace);
+                      if (emailWithoutWhitespace) {
+                        setFieldErrors((current) => ({
+                          ...current,
+                          email: "",
+                        }));
+                      }
+                    }}
+                    placeholder="البريد الإلكتروني"
+                    className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-sm placeholder:font-bold placeholder:text-muted-foreground"
+                    type="email"
+                    value={emailValue}
                   />
                 </span>
+                {fieldErrors.email ? (
+                  <span
+                    className="mt-1.5 block text-xs font-semibold text-destructive"
+                    id="login-email-error"
+                    role="alert"
+                  >
+                    {fieldErrors.email}
+                  </span>
+                ) : null}
               </label>
 
               <label className="block text-sm font-bold">
                 كلمة المرور
-                <span className="mt-2 flex h-12 items-center gap-3 rounded-lg border border-border bg-card px-3 shadow-sm transition focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15">
+                <span
+                  className={`mt-2 flex h-12 items-center gap-3 rounded-lg border bg-card px-3 shadow-sm transition focus-within:ring-4 ${
+                    fieldErrors.password
+                      ? "border-destructive focus-within:border-destructive focus-within:ring-destructive/15"
+                      : "border-border focus-within:border-primary focus-within:ring-primary/15"
+                  }`}
+                >
                   <LockKeyhole className="size-5 text-muted-foreground" />
-                  <input
-                    name="password"
-                    type={passwordVisible ? "text" : "password"}
-                    placeholder="Demo password"
-                    required
-                    className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
-                    autoComplete="current-password"
-                  />
+                  <span className="relative h-full min-w-0 flex-1">
+                    <input
+                      aria-describedby={
+                        fieldErrors.password
+                          ? "login-password-error"
+                          : undefined
+                      }
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      autoComplete="current-password"
+                      name="password"
+                      type={passwordVisible ? "text" : "password"}
+                      value={passwordValue}
+                      onChange={(event) =>
+                        handlePasswordChange(event.currentTarget.value)
+                      }
+                      placeholder="كلمة المرور"
+                      className={`h-full w-full bg-transparent text-base outline-none caret-foreground placeholder:text-sm placeholder:font-bold placeholder:text-muted-foreground ${
+                        passwordVisible ? "text-foreground" : "text-transparent"
+                      }`}
+                    />
+                    {!passwordVisible && passwordValue ? (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 flex items-center text-base text-foreground"
+                      >
+                        {passwordValue
+                          .split("")
+                          .map((character, index) =>
+                            showLastPasswordCharacter &&
+                            index === passwordValue.length - 1
+                              ? character
+                              : "•",
+                          )
+                          .join("")}
+                      </span>
+                    ) : null}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => setPasswordVisible((visible) => !visible)}
+                    onClick={() => {
+                      setPasswordVisible((visible) => !visible);
+                      setShowLastPasswordCharacter(false);
+                    }}
                     className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={
                       passwordVisible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"
@@ -269,13 +394,42 @@ function LoginPageContent({
                     }
                   >
                     {passwordVisible ? (
-                      <EyeOff className="size-5" />
-                    ) : (
                       <Eye className="size-5" />
+                    ) : (
+                      <EyeOff className="size-5" />
                     )}
                   </button>
                 </span>
+                {fieldErrors.password ? (
+                  <span
+                    className="mt-1.5 block text-xs font-semibold text-destructive"
+                    id="login-password-error"
+                    role="alert"
+                  >
+                    {fieldErrors.password}
+                  </span>
+                ) : null}
               </label>
+
+              <div className="flex items-center justify-between gap-4 text-sm font-semibold">
+                <label className="inline-flex cursor-pointer items-center gap-2">
+                  <input
+                    name="remember"
+                    type="checkbox"
+                    defaultChecked
+                    className="size-4 rounded border-border accent-primary"
+                  />
+                  <span>تذكرني</span>
+                </label>
+                <a
+                  href="https://web.whatsapp.com/send?phone=201016487371"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  الدعم الفني
+                </a>
+              </div>
 
               {error ? (
                 <div

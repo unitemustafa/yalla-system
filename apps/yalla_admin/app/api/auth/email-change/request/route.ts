@@ -1,5 +1,6 @@
 import { requireDashboardSession, unauthorizedResponse } from "@/lib/api-auth";
 import { createEmailChangeCode } from "@/lib/email-change";
+import { dashboardAuthMode } from "@/lib/backend-auth";
 
 export async function POST(request: Request) {
   const session = await requireDashboardSession();
@@ -28,7 +29,10 @@ export async function POST(request: Request) {
     expiresAt: changeRequest.expiresAt,
     newEmail: changeRequest.newEmail,
     oldEmail: changeRequest.oldEmail,
-    devCode: process.env.NODE_ENV === "production" ? undefined : changeRequest.code,
+    devCode:
+      process.env.NODE_ENV === "production" && dashboardAuthMode() !== "demo"
+        ? undefined
+        : changeRequest.code,
     message: "Email change verification code has been prepared.",
   });
 }

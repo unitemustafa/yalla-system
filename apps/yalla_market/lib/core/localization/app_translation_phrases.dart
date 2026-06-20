@@ -115,6 +115,18 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Account unavailable': 'الحساب غير متاح',
     'Account was not deleted': 'الحساب ما اتحذفش',
     'Account, orders and preferences': 'الحساب والطلبات والتفضيلات',
+    'Invalid email or password.':
+        'الإيميل/اسم المستخدم/رقم الموبايل أو كلمة السر غير صحيحين.',
+    'Invalid login credentials.':
+        'الإيميل/اسم المستخدم/رقم الموبايل أو كلمة السر غير صحيحين.',
+    'Login identifier and password are required.':
+        'اكتب الإيميل أو اليوزر أو رقم الموبايل وكلمة السر.',
+    'No account found with this email.':
+        'الإيميل ده مش مسجل عندنا. راجع الإيميل أو اعمل حساب جديد.',
+    'Password reset unavailable': 'استرجاع كلمة السر غير متاح',
+    'Session expired': 'انتهت الجلسة',
+    'Your session has expired. Please sign in again. To keep your session longer, turn on Remember Me when signing in.':
+        'انتهت الجلسة، برجاء إعادة تسجيل الدخول. للحفاظ على الجلسة لمدة أطول، فعّل خيار افتكرني عند تسجيل الدخول.',
     'Activation phone': 'رقم التفعيل',
     'Agreement required': 'الموافقة مطلوبة',
     'App Preferences': 'تفضيلات التطبيق',

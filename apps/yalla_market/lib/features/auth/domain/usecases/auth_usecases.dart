@@ -13,6 +13,7 @@ class AuthUseCases {
     required this.signup,
     required this.verifyEmail,
     required this.resendVerificationCode,
+    required this.requestPasswordReset,
     required this.refreshProfile,
     required this.updateProfile,
     required this.logout,
@@ -27,6 +28,7 @@ class AuthUseCases {
   final SignupUseCase signup;
   final VerifyEmailUseCase verifyEmail;
   final ResendVerificationCodeUseCase resendVerificationCode;
+  final RequestPasswordResetUseCase requestPasswordReset;
   final RefreshProfileUseCase refreshProfile;
   final UpdateProfileUseCase updateProfile;
   final LogoutUseCase logout;
@@ -135,6 +137,16 @@ class ResendVerificationCodeUseCase {
 
   Future<ApiResult<bool>> call(String email) {
     return _repository.resendVerificationCode(email);
+  }
+}
+
+class RequestPasswordResetUseCase {
+  const RequestPasswordResetUseCase(this._repository);
+
+  final AuthRepository _repository;
+
+  Future<ApiResult<bool>> call(String email) {
+    return _repository.requestPasswordReset(email);
   }
 }
 

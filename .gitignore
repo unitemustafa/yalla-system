@@ -26,21 +26,20 @@ apps/yalla_admin/playwright-report/
 apps/yalla_admin/blob-report/
 apps/yalla_admin/.data/
 apps/yalla_admin/.env*
+apps/yalla_admin/public/uploads/
 apps/yalla_admin/prisma/dev.db
 apps/yalla_admin/prisma/dev.db-*
 apps/yalla_admin/dev-server.*.log
 apps/yalla_admin/*.tsbuildinfo
 apps/yalla_admin/next-env.d.ts
 
-# Shared API backend
-apps/api/node_modules/
-apps/api/dist/
-apps/api/build/
-apps/api/coverage/
-apps/api/.env*
-apps/api/.data/*
-!apps/api/.data/.gitkeep
-apps/api/*.tsbuildinfo
+# Django backend
+backend/.env*
+backend/.venv/
+backend/db.sqlite3
+backend/dev.sqlite3
+backend/media/
+backend/staticfiles/
 
 # Flutter apps
 apps/*/.dart_tool/

@@ -16,6 +16,7 @@ import '../../../location/presentation/cubit/location_cubit.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/signup_phone_country_picker.dart';
 import '../widgets/warning_checkbox.dart';
 
 class LoginView extends StatefulWidget {
@@ -27,7 +28,7 @@ class LoginView extends StatefulWidget {
 
 class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _emailController;
+  late final TextEditingController _loginIdentifierController;
   late final TextEditingController _passwordController;
   bool _obscurePassword = true;
   bool _rememberMe = true;
@@ -35,13 +36,13 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController();
+    _loginIdentifierController = TextEditingController();
     _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _loginIdentifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -50,10 +51,10 @@ class _LoginViewState extends State<LoginView> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final authCubit = context.read<AuthCubit>();
-    final email = _emailController.text.trim();
+    final loginIdentifier = _normalizedLoginIdentifier();
 
     authCubit.login(
-      email: email,
+      email: loginIdentifier,
       password: _passwordController.text,
       rememberMe: _rememberMe,
     );
@@ -144,12 +145,10 @@ class _LoginViewState extends State<LoginView> {
                                       strings,
                                     ),
                                     const SizedBox(height: 30),
-                                    CustomTextField(
-                                      controller: _emailController,
-                                      labelText: strings.email,
-                                      prefixIcon: AppIcons.direct_right,
-                                      keyboardType: TextInputType.emailAddress,
-                                      validator: Validators.email,
+                                    _buildLoginIdentifierField(
+                                      theme,
+                                      isDarkMode,
+                                      strings,
                                     ),
                                     CustomTextField(
                                       controller: _passwordController,
@@ -165,6 +164,7 @@ class _LoginViewState extends State<LoginView> {
                                         });
                                       },
                                       validator: Validators.passwordRequired,
+                                      labelFontSize: 12,
                                     ),
                                     _buildRememberAndForgotRow(
                                       theme,
@@ -378,6 +378,96 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
+  Widget _buildLoginIdentifierField(
+    ThemeData theme,
+    bool isDarkMode,
+    AppTranslations strings,
+  ) {
+    return CustomTextField(
+      controller: _loginIdentifierController,
+      labelText: strings.loginIdentifier,
+      prefixIcon: AppIcons.direct_right,
+      keyboardType: TextInputType.emailAddress,
+      validator: Validators.loginIdentifier,
+      labelFontSize: 12,
+    );
+  }
+
+  String _normalizedLoginIdentifier() {
+    final rawValue = _loginIdentifierController.text.trim();
+    return _normalizePhoneIdentifier(rawValue) ?? rawValue;
+  }
+
+  String? _normalizePhoneIdentifier(String value) {
+    if (!_isPhoneCandidate(value)) return null;
+
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return null;
+
+    if (value.trim().startsWith('+')) {
+      return _normalizeInternationalPhone(digits) ?? '+$digits';
+    }
+    if (digits.startsWith('00') && digits.length > 4) {
+      final internationalDigits = digits.substring(2);
+      return _normalizeInternationalPhone(internationalDigits) ??
+          '+$internationalDigits';
+    }
+
+    for (final country in kPhoneCountries) {
+      final dialDigits = country.dialCode.replaceAll(RegExp(r'\D'), '');
+      if (digits.startsWith(dialDigits)) {
+        return normalizePhoneForCountry(country, digits);
+      }
+    }
+
+    final localCountry = _countryForLocalPhone(digits);
+    if (localCountry == null) return digits;
+    return normalizePhoneForCountry(localCountry, digits);
+  }
+
+  String? _normalizeInternationalPhone(String digits) {
+    for (final country in kPhoneCountries) {
+      final dialDigits = country.dialCode.replaceAll(RegExp(r'\D'), '');
+      if (digits.startsWith(dialDigits) && digits.length > dialDigits.length) {
+        return normalizePhoneForCountry(country, digits);
+      }
+    }
+    return null;
+  }
+
+  PhoneCountry? _countryForLocalPhone(String digits) {
+    if (RegExp(r'^01[0125]\d{8}$').hasMatch(digits) ||
+        RegExp(r'^1[0125]\d{8}$').hasMatch(digits)) {
+      return _countryByIsoCode('EG');
+    }
+
+    if (RegExp(r'^07[3-9]\d{8}$').hasMatch(digits) ||
+        RegExp(r'^7[3-9]\d{8}$').hasMatch(digits)) {
+      return _countryByIsoCode('IQ');
+    }
+
+    if (RegExp(r'^05\d{8}$').hasMatch(digits) ||
+        RegExp(r'^5\d{8}$').hasMatch(digits)) {
+      return _countryByIsoCode('SA');
+    }
+
+    return null;
+  }
+
+  PhoneCountry? _countryByIsoCode(String isoCode) {
+    for (final country in kPhoneCountries) {
+      if (country.isoCode == isoCode) return country;
+    }
+    return null;
+  }
+
+  bool _isPhoneCandidate(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return false;
+    if (trimmed.contains('@')) return false;
+    return RegExp(r'^\+?\d[\d\s().-]*$').hasMatch(trimmed);
+  }
+
   Widget _buildRememberAndForgotRow(
     ThemeData theme,
     bool isDarkMode,
@@ -485,7 +575,8 @@ class _LoginViewState extends State<LoginView> {
       return strings.signInCreateAccountTitle;
     }
 
-    if (normalizedMessage.contains('invalid email or password')) {
+    if (normalizedMessage.contains('invalid email or password') ||
+        normalizedMessage.contains('invalid login credentials')) {
       return strings.signInCredentialsTitle;
     }
 

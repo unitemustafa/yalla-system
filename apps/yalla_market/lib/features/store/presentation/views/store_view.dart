@@ -74,7 +74,7 @@ class StoreView extends StatelessWidget {
                               const SizedBox(height: 12),
                               GridLayout(
                                 itemCount: featuredCategories.length,
-                                mainAxisExtent: 78,
+                                mainAxisExtent: 88,
                                 itemBuilder: (_, index) {
                                   final category = featuredCategories[index];
                                   return BrandCard(

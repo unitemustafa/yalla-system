@@ -1,13 +1,39 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
+const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const nodePath = require("node:path");
 const { spawn } = require("node:child_process");
 
-const baseURL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
+loadEnvFile(".env.local");
+loadEnvFile(".env");
+loadEnvFile(".env.example");
+
+const baseURL = process.env.SMOKE_BASE_URL ?? "http://localhost:3010";
+const smokePort = new URL(baseURL).port || "3010";
 const demoPassword = requireEnv("DASHBOARD_DEMO_PASSWORD");
 const sessionSecret = requireEnv("SESSION_SECRET");
 const defaultAccountEmail = "m.abdeljalel@yalla-market.com";
 let serverProcess;
+
+function loadEnvFile(fileName) {
+  const filePath = nodePath.join(process.cwd(), fileName);
+
+  if (!fsSync.existsSync(filePath)) {
+    return;
+  }
+
+  const lines = fsSync.readFileSync(filePath, "utf8").split(/\r?\n/);
+
+  for (const line of lines) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
+
+    if (!match || process.env[match[1]]) {
+      continue;
+    }
+
+    process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
+  }
+}
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -48,12 +74,14 @@ async function ensureServer() {
     // Start the local server below.
   }
 
-  serverProcess = spawn("npm", ["run", "dev"], {
+  serverProcess = spawn("npm", ["run", "dev", "--", "-p", smokePort], {
     cwd: process.cwd(),
     env: {
       ...process.env,
+      DASHBOARD_AUTH_MODE: "demo",
       DASHBOARD_DEMO_PASSWORD: demoPassword,
       SESSION_SECRET: sessionSecret,
+      PORT: smokePort,
     },
     shell: process.platform === "win32",
     stdio: "ignore",
@@ -72,6 +100,17 @@ function getCookie(response) {
   }
 
   return setCookie.split(";")[0];
+}
+
+function getSessionCookieHeader(response) {
+  const setCookie = response.headers.get("set-cookie");
+  if (!setCookie) {
+    throw new Error("Login response did not include a session cookie");
+  }
+
+  return setCookie
+    .split(/,(?=\s*[^;,=]+=[^;,]+)/)
+    .find((cookieHeader) => cookieHeader.trim().startsWith("yalla-session="));
 }
 
 async function jsonRequest(path, options = {}) {
@@ -157,10 +196,33 @@ async function main() {
     body: JSON.stringify({
       email: "dashboard@admin.com",
       password: demoPassword,
+      remember: false,
     }),
   });
   if (!login.response.ok) {
     throw new Error(`Expected login to succeed, got ${login.response.status}`);
+  }
+
+  const sessionCookieHeader = getSessionCookieHeader(login.response);
+  if (!sessionCookieHeader || /(?:max-age|expires)=/i.test(sessionCookieHeader)) {
+    throw new Error("Expected unchecked remember-me login to use a session cookie");
+  }
+
+  const rememberedLogin = await jsonRequest("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "dashboard@admin.com",
+      password: demoPassword,
+      remember: true,
+    }),
+  });
+  const rememberedCookieHeader = getSessionCookieHeader(rememberedLogin.response);
+  if (
+    !rememberedLogin.response.ok ||
+    !rememberedCookieHeader ||
+    !rememberedCookieHeader.toLowerCase().includes("max-age=2592000")
+  ) {
+    throw new Error("Expected remembered login cookie to persist for 30 days");
   }
 
   const cookie = getCookie(login.response);

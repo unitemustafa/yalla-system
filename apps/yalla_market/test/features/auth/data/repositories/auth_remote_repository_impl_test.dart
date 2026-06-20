@@ -12,6 +12,13 @@ void main() {
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
         expect(request.path, '/auth/login');
+        expect(request.data, {
+          'email': 'm@example.com',
+          'identifier': 'm@example.com',
+          'login': 'm@example.com',
+          'password': 'Password123!',
+          'rememberMe': true,
+        });
         return _sessionPayload;
       });
       final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -133,6 +140,45 @@ void main() {
       },
     );
 
+    test('availability checks read Django response flags', () async {
+      final tokenStore = InMemoryTokenStore();
+      final apiClient = FakeApiClient((request) {
+        if (request.path == '/auth/check-username') {
+          expect(request.queryParameters, {'username': 'user123'});
+          return {'available': true, 'registered': false};
+        }
+        if (request.path == '/auth/check-email') {
+          expect(request.queryParameters, {'email': 'used@example.com'});
+          return {'available': false, 'registered': true};
+        }
+        if (request.path == '/auth/check-phone') {
+          expect(request.queryParameters, {'phone': '+201010000000'});
+          return {'available': true, 'registered': false};
+        }
+        fail('Unexpected request: ${request.path}');
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final usernameResult = await repository.isUsernameAvailable('user123');
+      final emailResult = await repository.isEmailRegistered(
+        'used@example.com',
+      );
+      final phoneResult = await repository.isPhoneRegistered('+201010000000');
+
+      usernameResult.when(
+        success: (isAvailable) => expect(isAvailable, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      emailResult.when(
+        success: (isRegistered) => expect(isRegistered, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      phoneResult.when(
+        success: (isRegistered) => expect(isRegistered, isFalse),
+        failure: (failure) => fail(failure.message),
+      );
+    });
+
     test('verifyEmail posts the code and stores session-only tokens', () async {
       final tokenStore = InMemoryTokenStore();
       final apiClient = FakeApiClient((request) {
@@ -156,6 +202,54 @@ void main() {
         failure: (failure) => fail(failure.message),
       );
       expect((await tokenStore.read())?.isSessionOnly, isTrue);
+    });
+
+    test('password reset checks email before sending reset request', () async {
+      final tokenStore = InMemoryTokenStore();
+      final paths = <String>[];
+      final apiClient = FakeApiClient((request) {
+        paths.add(request.path);
+        if (request.path == '/auth/check-email') {
+          expect(request.queryParameters, {'email': 'm@example.com'});
+          return {'registered': true, 'available': false};
+        }
+        if (request.path == '/auth/forgot-password') {
+          expect(request.data, {'email': 'm@example.com'});
+          return {'detail': 'Password reset OTP sent.'};
+        }
+        fail('Unexpected request: ${request.path}');
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.requestPasswordReset('m@example.com');
+
+      result.when(
+        success: (sent) => expect(sent, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      expect(paths, ['/auth/check-email', '/auth/forgot-password']);
+    });
+
+    test('password reset does not send when email is unknown', () async {
+      final tokenStore = InMemoryTokenStore();
+      final paths = <String>[];
+      final apiClient = FakeApiClient((request) {
+        paths.add(request.path);
+        expect(request.path, '/auth/check-email');
+        return {'registered': false, 'available': true};
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.requestPasswordReset(
+        'missing@example.com',
+      );
+
+      result.when(
+        success: (_) => fail('Expected password reset to fail.'),
+        failure: (failure) =>
+            expect(failure.message, 'No account found with this email.'),
+      );
+      expect(paths, ['/auth/check-email']);
     });
   });
 }

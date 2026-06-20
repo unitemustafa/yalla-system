@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -28,8 +30,21 @@ import 'features/wishlist/presentation/cubit/wishlist_cubit.dart';
 
 import 'features/splash/presentation/cubit/splash_cubit.dart';
 
-class YallaMarketApp extends StatelessWidget {
+class YallaMarketApp extends StatefulWidget {
   const YallaMarketApp({super.key});
+
+  @override
+  State<YallaMarketApp> createState() => _YallaMarketAppState();
+}
+
+class _YallaMarketAppState extends State<YallaMarketApp> {
+  Timer? _sessionExpiryTimer;
+
+  @override
+  void dispose() {
+    _sessionExpiryTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +69,13 @@ class YallaMarketApp extends StatelessWidget {
             UserProfileController.instance.updateFromAuthUser(
               state.session.user,
             );
+            _scheduleSessionExpiry(context, state);
+          } else if (state is AuthSessionExpired) {
+            _sessionExpiryTimer?.cancel();
+            UserProfileController.instance.reset();
+            _showSessionExpiredDialog(state.message);
           } else if (state is AuthInitial) {
+            _sessionExpiryTimer?.cancel();
             UserProfileController.instance.reset();
             AppNavigator.goToLogin();
           }
@@ -103,5 +124,66 @@ class YallaMarketApp extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _scheduleSessionExpiry(BuildContext context, AuthAuthenticated state) {
+    _sessionExpiryTimer?.cancel();
+
+    final expiresAt = state.session.expiresAt;
+    if (expiresAt == null) return;
+
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      unawaited(context.read<AuthCubit>().expireSession());
+      return;
+    }
+
+    _sessionExpiryTimer = Timer(remaining, () {
+      if (!mounted) return;
+      unawaited(context.read<AuthCubit>().expireSession());
+    });
+  }
+
+  void _showSessionExpiredDialog(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final navigatorState = AppNavigator.key.currentState;
+      final dialogContext = AppNavigator.key.currentContext;
+      if (navigatorState == null || dialogContext == null) return;
+
+      showDialog<void>(
+        context: dialogContext,
+        barrierDismissible: false,
+        builder: (context) {
+          final theme = Theme.of(context);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              context.tr('Session expired'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: Text(
+              context.tr(message),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  AppNavigator.goToLogin();
+                },
+                child: Text(context.tr('Sign In')),
+              ),
+            ],
+          );
+        },
+      );
+    });
   }
 }

@@ -82,6 +82,10 @@ class ApiClient {
     try {
       final tokens = await _tokenStore.read();
       if (tokens != null) {
+        if (tokens.isExpired) {
+          await _expireSession();
+          throw StateError('Session expired.');
+        }
         final refreshed = tokens.expiresSoon && !_isRefreshRequest(options)
             ? await _refreshTokens(tokens)
             : tokens;
@@ -142,10 +146,14 @@ class ApiClient {
       options: Options(extra: const {'skipAuth': true}),
     );
     final payload = _unwrap<Map<String, dynamic>>(response.data);
-    final next = _tokensFromJson(
-      payload,
-      fallbackRefreshToken: current.refreshToken,
-    ).copyWith(isSessionOnly: current.isSessionOnly);
+    final next =
+        _tokensFromJson(
+          payload,
+          fallbackRefreshToken: current.refreshToken,
+        ).copyWith(
+          isSessionOnly: current.isSessionOnly,
+          sessionExpiresAt: current.sessionExpiresAt,
+        );
     await _tokenStore.save(next);
     return next;
   }

@@ -31,65 +31,6 @@ class SignupView extends StatefulWidget {
 }
 
 class _SignupViewState extends State<SignupView> {
-  static const List<PhoneCountry> _phoneCountries = [
-    PhoneCountry(
-      name: 'Egypt',
-      isoCode: 'EG',
-      dialCode: '+20',
-      minDigits: 10,
-      maxDigits: 11,
-    ),
-    PhoneCountry(
-      name: 'United States',
-      isoCode: 'US',
-      dialCode: '+1',
-      minDigits: 10,
-      maxDigits: 10,
-    ),
-    PhoneCountry(
-      name: 'United Kingdom',
-      isoCode: 'UK',
-      dialCode: '+44',
-      minDigits: 10,
-      maxDigits: 10,
-    ),
-    PhoneCountry(
-      name: 'Saudi Arabia',
-      isoCode: 'SA',
-      dialCode: '+966',
-      minDigits: 9,
-      maxDigits: 9,
-    ),
-    PhoneCountry(
-      name: 'United Arab Emirates',
-      isoCode: 'AE',
-      dialCode: '+971',
-      minDigits: 9,
-      maxDigits: 9,
-    ),
-    PhoneCountry(
-      name: 'India',
-      isoCode: 'IN',
-      dialCode: '+91',
-      minDigits: 10,
-      maxDigits: 10,
-    ),
-    PhoneCountry(
-      name: 'Pakistan',
-      isoCode: 'PK',
-      dialCode: '+92',
-      minDigits: 10,
-      maxDigits: 10,
-    ),
-    PhoneCountry(
-      name: 'Turkey',
-      isoCode: 'TR',
-      dialCode: '+90',
-      minDigits: 10,
-      maxDigits: 10,
-    ),
-  ];
-
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _firstNameController;
   late final TextEditingController _lastNameController;
@@ -112,7 +53,7 @@ class _SignupViewState extends State<SignupView> {
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
     _passwordController = TextEditingController();
-    _selectedCountry = _phoneCountries.first;
+    _selectedCountry = kPhoneCountries.first;
     _checker = SignupAvailabilityChecker(
       emailController: _emailController,
       phoneController: _phoneController,
@@ -126,10 +67,7 @@ class _SignupViewState extends State<SignupView> {
       canCheckPhone: _canCheckPhoneAvailability,
     );
     _usernameController.addListener(_checker.scheduleUsernameCheck);
-    _usernameController.addListener(_checker.scheduleEmailCheck);
-    _usernameController.addListener(_checker.schedulePhoneCheck);
     _emailController.addListener(_checker.scheduleEmailCheck);
-    _emailController.addListener(_checker.schedulePhoneCheck);
     _phoneController.addListener(_checker.schedulePhoneCheck);
   }
 
@@ -137,10 +75,7 @@ class _SignupViewState extends State<SignupView> {
   void dispose() {
     _checker.dispose();
     _usernameController.removeListener(_checker.scheduleUsernameCheck);
-    _usernameController.removeListener(_checker.scheduleEmailCheck);
-    _usernameController.removeListener(_checker.schedulePhoneCheck);
     _emailController.removeListener(_checker.scheduleEmailCheck);
-    _emailController.removeListener(_checker.schedulePhoneCheck);
     _phoneController.removeListener(_checker.schedulePhoneCheck);
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -170,28 +105,20 @@ class _SignupViewState extends State<SignupView> {
       return;
     }
 
-    final emailAvailable = await _checker.ensureEmailAvailable(context);
-    if (!mounted) return;
-
-    final phoneAvailable = await _checker.ensurePhoneAvailable(context);
-    if (!mounted) return;
-
-    final usernameAvailable = await _checker.ensureUsernameAvailable(context);
-
-    if (!mounted) return;
-
-    if (emailAvailable && phoneAvailable && usernameAvailable) {
-      final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-      final username = _usernameController.text.trim();
-      context.read<AuthCubit>().signup(
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
-        username: username.isEmpty ? null : username,
-        email: _emailController.text.trim(),
-        phone: '${_selectedCountry.dialCode}$digits',
-        password: _passwordController.text,
-      );
+    if (_hasConfirmedUnavailableField()) {
+      _formKey.currentState?.validate();
+      return;
     }
+
+    final username = _usernameController.text.trim();
+    context.read<AuthCubit>().signup(
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      username: username.isEmpty ? null : username,
+      email: _emailController.text.trim(),
+      phone: _phoneForLookup(),
+      password: _passwordController.text,
+    );
   }
 
   bool _ensurePrivacyAccepted() {
@@ -214,6 +141,27 @@ class _SignupViewState extends State<SignupView> {
           'Please agree to the Privacy Policy and Terms of use before creating your account.',
     );
     return false;
+  }
+
+  bool _hasConfirmedUnavailableField() {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
+    final phone = _phoneForLookup();
+
+    final usernameUnavailable =
+        username.isNotEmpty &&
+        _checker.lastCheckedUsername == username &&
+        _checker.isUsernameAvailable == false;
+    final emailUnavailable =
+        email.isNotEmpty &&
+        _checker.lastCheckedEmail == email &&
+        _checker.isEmailAvailable == false;
+    final phoneUnavailable =
+        phone.isNotEmpty &&
+        _checker.lastCheckedPhone == phone &&
+        _checker.isPhoneAvailable == false;
+
+    return usernameUnavailable || emailUnavailable || phoneUnavailable;
   }
 
   void _togglePrivacyAgreement() {
@@ -312,6 +260,7 @@ class _SignupViewState extends State<SignupView> {
                                     });
                                   },
                                   validator: _validatePassword,
+                                  labelFontSize: 12,
                                 ),
                                 PasswordStrengthMeter(
                                   controller: _passwordController,
@@ -345,7 +294,10 @@ class _SignupViewState extends State<SignupView> {
     final email = value?.trim().toLowerCase() ?? '';
     if (_checker.lastCheckedEmail == email &&
         _checker.isEmailAvailable == false) {
-      return 'This email is already registered.';
+      return _signupCopy(
+        ar: 'الإيميل ده مستخدم بالفعل.',
+        en: 'This email is already registered.',
+      );
     }
 
     return null;
@@ -372,7 +324,10 @@ class _SignupViewState extends State<SignupView> {
     final phone = _phoneForLookup(value);
     if (_checker.lastCheckedPhone == phone &&
         _checker.isPhoneAvailable == false) {
-      return 'This phone number is already registered.';
+      return _signupCopy(
+        ar: 'رقم الموبايل ده مستخدم بالفعل.',
+        en: 'This phone number is already registered.',
+      );
     }
 
     return null;
@@ -398,32 +353,18 @@ class _SignupViewState extends State<SignupView> {
   }
 
   String _phoneForLookup([String? value]) {
-    final digits = (value ?? _phoneController.text).replaceAll(
-      RegExp(r'\D'),
-      '',
+    return normalizePhoneForCountry(
+      _selectedCountry,
+      value ?? _phoneController.text,
     );
-    return digits.isEmpty ? '' : '${_selectedCountry.dialCode}$digits';
   }
 
   bool _canCheckEmailAvailability() {
-    if (_firstNameController.text.trim().isEmpty ||
-        _lastNameController.text.trim().isEmpty) {
-      return false;
-    }
-
-    final username = _usernameController.text.trim();
-    if (_validateUsername(username) != null) return false;
-    if (username.isEmpty) return true;
-
-    return _checker.lastCheckedUsername == username &&
-        _checker.isUsernameAvailable == true;
+    return true;
   }
 
   bool _canCheckPhoneAvailability() {
-    final email = _emailController.text.trim().toLowerCase();
-    return _canCheckEmailAvailability() &&
-        _checker.lastCheckedEmail == email &&
-        _checker.isEmailAvailable == true;
+    return true;
   }
 
   String? _validateUsername(String? value) {
@@ -443,10 +384,10 @@ class _SignupViewState extends State<SignupView> {
           : 'Username is too long';
     }
 
-    if (!RegExp(r'^[a-zA-Z._]+$').hasMatch(username)) {
+    if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
       return context.isArabicLanguage
           ? 'استخدم حروف إنجليزي ونقطة وشرطة سفلية فقط'
-          : 'Use English letters, dots, and underscores only';
+          : 'Use English letters, numbers, dots, and underscores only';
     }
 
     if (!RegExp(r'[a-zA-Z]').hasMatch(username)) {
@@ -465,13 +406,17 @@ class _SignupViewState extends State<SignupView> {
     return null;
   }
 
+  String _signupCopy({required String ar, required String en}) {
+    return context.isArabicLanguage ? ar : en;
+  }
+
   Future<void> _showCountryPicker() async {
     final selectedCountry = await showModalBottomSheet<PhoneCountry>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CountryPickerSheet(
-        countries: _phoneCountries,
+        countries: kPhoneCountries,
         selectedCountry: _selectedCountry,
       ),
     );

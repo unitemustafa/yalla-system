@@ -142,6 +142,7 @@ class AppTranslations {
   String get welcomeBack => _text('welcomeBack');
   String get loginSubtitle => _text('loginSubtitle');
   String get email => _text('email');
+  String get loginIdentifier => _text('loginIdentifier');
   String get password => _text('password');
   String get rememberMe => _text('rememberMe');
   String get forgetPasswordLink => _text('forgetPasswordLink');

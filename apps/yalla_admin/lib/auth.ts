@@ -6,6 +6,8 @@ import {
 } from "@/lib/account-email";
 
 export const authCookieName = "yalla-session";
+export const backendAccessCookieName = "yalla-access-token";
+export const backendRefreshCookieName = "yalla-refresh-token";
 export const authCookieMaxAge = 60 * 60 * 8;
 export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
 
@@ -22,12 +24,13 @@ const mutableAuthState = globalThis as typeof globalThis & {
   __yallaDemoPassword?: string;
 };
 
-type SessionPayload = {
+export type SessionPayload = {
   sub: string;
   email: string;
   name: string;
   role: string;
   exp: number;
+  remembered?: boolean;
 };
 
 if (
@@ -124,22 +127,18 @@ export function validateDemoCredentials(email: string, password: string) {
   };
 }
 
-export function isDemoAdminEmail(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  return normalizedEmail === demoAdmin.email || isDashboardAccountEmail(normalizedEmail);
-}
-
 export function createSessionToken(user: {
   email: string;
   name: string;
   role: string;
-}, maxAge = authCookieMaxAge) {
+}, maxAge = authCookieMaxAge, remembered = false) {
   const payload = encodeJson({
     sub: user.email,
     email: user.email,
     name: user.name,
     role: user.role,
     exp: Math.floor(Date.now() / 1000) + maxAge,
+    remembered,
   });
 
   return `${payload}.${sign(payload)}`;
@@ -171,10 +170,10 @@ export function readSessionToken(token: string | undefined) {
   }
 }
 
-export function authCookieSettings(maxAge = authCookieMaxAge) {
+export function authCookieSettings(maxAge?: number) {
   return {
     httpOnly: true,
-    maxAge,
+    ...(maxAge === undefined ? {} : { maxAge }),
     path: "/",
     sameSite: "lax" as const,
     secure: process.env.NODE_ENV === "production",

@@ -53,17 +53,36 @@ abstract final class ApiErrorHandler {
   static String? _messageFromResponse(Response<dynamic>? response) {
     final data = response?.data;
     if (data is Map<String, dynamic>) {
-      final message = data['message'];
-      if (message is String && message.trim().isNotEmpty) {
-        return message;
+      for (final key in const ['message', 'detail', 'error']) {
+        final message = _stringFromValue(data[key]);
+        if (message != null) return message;
       }
 
-      final error = data['error'];
-      if (error is String && error.trim().isNotEmpty) {
-        return error;
+      final nonFieldError = _stringFromValue(data['non_field_errors']);
+      if (nonFieldError != null) return nonFieldError;
+
+      for (final entry in data.entries) {
+        final message = _stringFromValue(entry.value);
+        if (message != null) return message;
       }
     }
 
+    return null;
+  }
+
+  static String? _stringFromValue(Object? value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    if (value is List && value.isNotEmpty) {
+      return _stringFromValue(value.first);
+    }
+    if (value is Map && value.isNotEmpty) {
+      for (final nestedValue in value.values) {
+        final message = _stringFromValue(nestedValue);
+        if (message != null) return message;
+      }
+    }
     return null;
   }
 

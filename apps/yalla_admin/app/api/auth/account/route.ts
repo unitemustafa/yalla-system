@@ -1,5 +1,4 @@
 import { requireDashboardSession, unauthorizedResponse } from "@/lib/api-auth";
-import { getDashboardAccountEmail } from "@/lib/account-email";
 
 export async function GET() {
   const session = await requireDashboardSession();
@@ -9,6 +8,8 @@ export async function GET() {
   }
 
   return Response.json({
-    email: getDashboardAccountEmail(),
+    email: session.email,
+    name: session.name,
+    role: session.role,
   });
 }

@@ -4,12 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
+import '../../../../core/session/session_expired_notifier.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   static const String _sessionKey = 'auth.local_session';
+  static const String _sessionMarkerKey = 'auth.local_session_marker';
   static const String _accountsKey = 'auth.local_accounts';
   static const String _demoEmail = 'm@example.com';
   static const String _demoPassword = 'Password123!';
@@ -21,6 +23,8 @@ class AuthRepositoryImpl implements AuthRepository {
     'yallamarket',
     'taken_user',
   };
+  static const _sessionOnlyLifetime = Duration(hours: 8);
+  static const _rememberedLifetime = Duration(days: 30);
 
   AuthSession? _session;
 
@@ -107,6 +111,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<ApiResult<bool>> requestPasswordReset(String email) {
+    return _guard(
+      () => _requestPasswordReset(email),
+      'Could not send a password reset code.',
+    );
+  }
+
+  @override
   Future<ApiResult<AuthUser>> me() {
     return _guard(_me, 'Could not load your profile.');
   }
@@ -177,17 +189,29 @@ class AuthRepositoryImpl implements AuthRepository {
 
     final preferences = await SharedPreferences.getInstance();
     final rawSession = preferences.getString(_sessionKey);
-    if (rawSession == null || rawSession.trim().isEmpty) return null;
+    if (rawSession == null || rawSession.trim().isEmpty) {
+      if (await _consumeExpiredSessionMarker(preferences)) {
+        SessionExpiredNotifier.instance.notifyExpired();
+      }
+      return null;
+    }
 
     final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
     final savedUser = _userFromJson(decoded);
+    final expiresAt = _dateFromString(decoded['expiresAt']);
+    if (expiresAt != null && !expiresAt.isAfter(DateTime.now())) {
+      await _clearSession();
+      SessionExpiredNotifier.instance.notifyExpired();
+      return null;
+    }
+
     final account = (await _loadAccounts())._byUserId(savedUser.id);
     if (account == null) {
       await _clearSession();
       return null;
     }
 
-    _session = AuthSession(user: account.user);
+    _session = AuthSession(user: account.user, expiresAt: expiresAt);
     return _session;
   }
 
@@ -196,18 +220,21 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
     bool rememberMe = false,
   }) async {
-    final normalizedEmail = _normalizeEmail(email);
-    if (normalizedEmail.isEmpty || password.isEmpty) {
+    final normalizedIdentifier = email.trim().toLowerCase();
+    if (normalizedIdentifier.isEmpty || password.isEmpty) {
       throw const _AuthRepositoryException(
-        ValidationFailure('Email and password are required.'),
+        ValidationFailure('Login identifier and password are required.'),
       );
     }
 
-    final account = (await _loadAccounts())._byEmail(normalizedEmail);
+    final account = (await _loadAccounts())._byLoginIdentifier(
+      normalizedIdentifier,
+    );
     if (account == null ||
-        account.passwordDigest != _passwordDigest(normalizedEmail, password)) {
+        account.passwordDigest !=
+            _passwordDigest(account.user.email, password)) {
       throw const _AuthRepositoryException(
-        UnauthorizedFailure('Invalid email or password.'),
+        UnauthorizedFailure('Invalid login credentials.'),
       );
     }
 
@@ -345,6 +372,23 @@ class AuthRepositoryImpl implements AuthRepository {
     return true;
   }
 
+  Future<bool> _requestPasswordReset(String email) async {
+    final normalizedEmail = _normalizeEmail(email);
+    if (normalizedEmail.isEmpty) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Email is required.'),
+      );
+    }
+
+    if ((await _loadAccounts())._byEmail(normalizedEmail) == null) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('No account found with this email.'),
+      );
+    }
+
+    return true;
+  }
+
   Future<AuthUser> _me() async {
     final session = _session ?? await _restoreSavedSession();
     if (session == null) {
@@ -479,7 +523,10 @@ class AuthRepositoryImpl implements AuthRepository {
     AuthUser user, {
     required bool rememberSession,
   }) async {
-    final session = AuthSession(user: user);
+    final expiresAt = DateTime.now().add(
+      rememberSession ? _rememberedLifetime : _sessionOnlyLifetime,
+    );
+    final session = AuthSession(user: user, expiresAt: expiresAt);
     _session = session;
 
     if (rememberSession) {
@@ -487,6 +534,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } else {
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove(_sessionKey);
+      await _saveSessionMarker(preferences, session);
     }
 
     return session;
@@ -520,14 +568,39 @@ class AuthRepositoryImpl implements AuthRepository {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
       _sessionKey,
-      jsonEncode(_userToJson(session.user)),
+      jsonEncode({
+        ..._userToJson(session.user),
+        'expiresAt': session.expiresAt?.toIso8601String(),
+      }),
     );
+    await _saveSessionMarker(preferences, session);
   }
 
   Future<void> _clearSession() async {
     _session = null;
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_sessionKey);
+    await preferences.remove(_sessionMarkerKey);
+  }
+
+  Future<void> _saveSessionMarker(
+    SharedPreferences preferences,
+    AuthSession session,
+  ) async {
+    await preferences.setString(
+      _sessionMarkerKey,
+      jsonEncode({'expiresAt': session.expiresAt?.toIso8601String()}),
+    );
+  }
+
+  Future<bool> _consumeExpiredSessionMarker(
+    SharedPreferences preferences,
+  ) async {
+    final rawMarker = preferences.getString(_sessionMarkerKey);
+    if (rawMarker == null || rawMarker.trim().isEmpty) return false;
+
+    await preferences.remove(_sessionMarkerKey);
+    return true;
   }
 
   List<_LocalAuthAccount> _seedAccounts() {
@@ -689,6 +762,25 @@ extension _LocalAuthAccountsLookup on List<_LocalAuthAccount> {
     final normalized = email.trim().toLowerCase();
     for (final account in this) {
       if (account.user.email.trim().toLowerCase() == normalized) {
+        return account;
+      }
+    }
+    return null;
+  }
+
+  _LocalAuthAccount? _byLoginIdentifier(String identifier) {
+    final normalized = identifier.trim().toLowerCase();
+    final normalizedPhone = identifier.replaceAll(RegExp(r'\D'), '');
+    for (final account in this) {
+      if (account.user.email.trim().toLowerCase() == normalized) {
+        return account;
+      }
+      if ((account.user.username ?? '').trim().toLowerCase() == normalized) {
+        return account;
+      }
+      if (normalizedPhone.isNotEmpty &&
+          (account.user.phone ?? '').replaceAll(RegExp(r'\D'), '') ==
+              normalizedPhone) {
         return account;
       }
     }

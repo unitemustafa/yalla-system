@@ -1,6 +1,6 @@
 # Yalla Admin
 
-لوحة تحكم تجريبية مبنية بـ Next.js App Router لإدارة منتجات وطلبات Yalla Market. المشروع يحتوي على تسجيل دخول تجريبي، API محمية، تخزين SQLite عبر Prisma، وتجارب موبايل محسنة للجداول.
+لوحة تحكم مبنية بـ Next.js App Router لإدارة منتجات وطلبات Yalla Market. تسجيل الدخول يتصل بباك Django عبر JWT، مع API محمية، تخزين SQLite عبر Prisma، وتجارب موبايل محسنة للجداول.
 
 ## المتطلبات
 
@@ -28,17 +28,28 @@ Email: dashboard@admin.com
 Password: 01266666610
 ```
 
-Demo auth is only for this dashboard preview. There is no real backend user
-database, hashed password storage, or roles system yet. Configure the demo
-password and session signing secret with environment variables:
+For backend mode, sign in with a real active Django user whose role is included
+in `DASHBOARD_ALLOWED_ROLES`.
+
+Dashboard auth uses the Django backend by default. Configure the backend URL,
+allowed dashboard roles, and session signing secret with environment variables:
 
 ```bash
-DASHBOARD_DEMO_PASSWORD=01266666610
+BACKEND_API_BASE_URL=http://127.0.0.1:8000/api/v1
+DASHBOARD_AUTH_MODE=backend
+DASHBOARD_ALLOWED_ROLES=admin
 SESSION_SECRET=replace-with-a-strong-random-secret
 ```
 
 `SESSION_SECRET` is required and the app will throw a clear error in production
 when it is missing.
+
+Demo auth is still available for smoke/e2e previews by setting:
+
+```bash
+DASHBOARD_AUTH_MODE=demo
+DASHBOARD_DEMO_PASSWORD=01266666610
+```
 
 ## قاعدة البيانات
 

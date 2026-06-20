@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
@@ -14,6 +15,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .models import OneTimePassword
 from .serializers import (
+    ChangePasswordSerializer,
     EmailOTPSerializer,
     EmailTokenRefreshSerializer,
     ForgotPasswordSerializer,
@@ -21,30 +23,57 @@ from .serializers import (
     LogoutSerializer,
     RegisterSerializer,
     ResetPasswordSerializer,
+    SignupSerializer,
+    UserProfileUpdateSerializer,
     UserSerializer,
+    normalize_phone,
+    user_by_phone,
 )
 from .services import issue_otp, otp_response_data, verify_otp
 
 User = get_user_model()
 
 
-def token_payload(user):
-    refresh = RefreshToken.for_user(user)
+class SessionRefreshToken(RefreshToken):
+    lifetime = settings.AUTH_SESSION_REFRESH_TOKEN_LIFETIME
+
+
+def blacklist_user_tokens(user):
+    BlacklistedToken.objects.bulk_create(
+        [
+            BlacklistedToken(token=token)
+            for token in OutstandingToken.objects.filter(user=user)
+        ],
+        ignore_conflicts=True,
+    )
+
+
+def token_payload(user, remember_me=None):
+    refresh_class = (
+        SessionRefreshToken if remember_me is False else RefreshToken
+    )
+    refresh = refresh_class.for_user(user)
     access = str(refresh.access_token)
     refresh_value = str(refresh)
-    return {
+    access_lifetime = settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"]
+    payload = {
         "accessToken": access,
         "refreshToken": refresh_value,
+        "expiresIn": int(access_lifetime.total_seconds()),
         "user": UserSerializer(user).data,
     }
+    if remember_me is not None:
+        payload["rememberMe"] = remember_me
+    return payload
 
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    serializer_class = RegisterSerializer
 
     @transaction.atomic
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
+        serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
@@ -75,6 +104,10 @@ class RegisterView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class SignupView(RegisterView):
+    serializer_class = SignupSerializer
 
 
 class VerifyRegistrationOTPView(APIView):
@@ -141,20 +174,109 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return Response(token_payload(serializer.validated_data["user"]))
+        return Response(
+            token_payload(
+                serializer.validated_data["user"],
+                remember_me=serializer.validated_data["rememberMe"],
+            )
+        )
 
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = LogoutSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        refresh = request.data.get("refresh") or request.data.get("refreshToken")
+        if refresh:
+            serializer = LogoutSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        else:
+            blacklist_user_tokens(request.user)
         return Response(
             {"detail": "Logout successful."},
             status=status.HTTP_200_OK,
         )
+
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({"user": UserSerializer(request.user).data})
+
+    def patch(self, request):
+        serializer = UserProfileUpdateSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response({"user": UserSerializer(user).data})
+
+    def delete(self, request):
+        password = request.data.get("password", "")
+        if not password or not request.user.check_password(password):
+            return Response(
+                {"password": ["Invalid password."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request.user.is_active = False
+        request.user.save(update_fields=["is_active"])
+        blacklist_user_tokens(request.user)
+        return Response({"detail": "Account closed successfully."})
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(
+            data=request.data,
+            context={"request": request, "user": request.user},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        blacklist_user_tokens(request.user)
+        return Response({"detail": "Password changed successfully."})
+
+
+class CheckEmailView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        email = str(request.query_params.get("email", "")).strip()
+        registered = bool(email) and User.objects.filter(
+            email__iexact=email,
+            is_active=True,
+        ).exists()
+        return Response({"registered": registered, "available": not registered})
+
+
+class CheckPhoneView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        phone = normalize_phone(request.query_params.get("phone", ""))
+        registered = bool(phone) and user_by_phone(
+            phone,
+            User.objects.filter(is_active=True),
+        ) is not None
+        return Response({"registered": registered, "available": not registered})
+
+
+class CheckUsernameView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        username = str(request.query_params.get("username", "")).strip()
+        available = not bool(username) or not User.objects.filter(
+            username__iexact=username,
+            is_active=True,
+        ).exists()
+        return Response({"available": available, "registered": not available})
 
 
 class ForgotPasswordView(APIView):
@@ -171,9 +293,14 @@ class ForgotPasswordView(APIView):
         response_data = {
             "detail": "If an active account exists, a password reset OTP has been sent."
         }
-        if user is not None:
-            _, code = issue_otp(user, OneTimePassword.Purpose.PASSWORD_RESET)
-            response_data.update(otp_response_data(code))
+        if user is None:
+            return Response(
+                {"email": ["No account found with this email."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        _, code = issue_otp(user, OneTimePassword.Purpose.PASSWORD_RESET)
+        response_data.update(otp_response_data(code))
         return Response(response_data)
 
 
@@ -187,13 +314,7 @@ class ResetPasswordView(APIView):
         user = serializer.validated_data["user"]
         user.set_password(serializer.validated_data["password"])
         user.save(update_fields=["password"])
-        BlacklistedToken.objects.bulk_create(
-            [
-                BlacklistedToken(token=token)
-                for token in OutstandingToken.objects.filter(user=user)
-            ],
-            ignore_conflicts=True,
-        )
+        blacklist_user_tokens(user)
         return Response({"detail": "Password reset successfully."})
 
 
