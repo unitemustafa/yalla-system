@@ -6,6 +6,8 @@ from .views import (
     CheckPhoneView,
     CheckUsernameView,
     CurrentUserView,
+    CourierListCreateView,
+    CourierLoginView,
     ForgotPasswordView,
     LoginView,
     LogoutView,
@@ -50,6 +52,12 @@ urlpatterns += auth_path(
     "resend-verification",
 )
 urlpatterns += auth_path("login", LoginView.as_view(), "login")
+urlpatterns += auth_path(
+    "courier-login",
+    CourierLoginView.as_view(),
+    "courier-login",
+)
+urlpatterns += auth_path("couriers", CourierListCreateView.as_view(), "couriers")
 urlpatterns += auth_path("refresh", RefreshTokenView.as_view(), "token-refresh")
 urlpatterns += auth_path("logout", LogoutView.as_view(), "logout")
 urlpatterns += auth_path("me", CurrentUserView.as_view(), "current-user")

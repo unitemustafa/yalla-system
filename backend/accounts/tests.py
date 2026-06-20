@@ -156,6 +156,75 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(phone_response.status_code, status.HTTP_200_OK)
         self.assertEqual(phone_response.data["user"]["email"], self.email)
 
+    def test_admin_creates_courier_that_can_login_to_courier_app(self):
+        admin = User.objects.create_user(
+            username="dashboard_admin",
+            email="admin@example.com",
+            phone="+201000000010",
+            password=self.password,
+            role=User.Role.ADMIN,
+            is_staff=True,
+        )
+        self.client.force_authenticate(admin)
+
+        create_response = self.client.post(
+            "/api/v1/auth/couriers",
+            {
+                "name": "مصطفى علي",
+                "phone": "+201001234567",
+                "email": "courier@example.com",
+                "password": self.password,
+                "vehicle": "موتوسيكل",
+                "plateNumber": "ABC-123",
+                "zone": "القاهرة",
+                "maxActiveOrders": 4,
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        courier = User.objects.get(email="courier@example.com")
+        self.assertEqual(courier.role, User.Role.REPRESENTATIVE)
+        self.assertTrue(courier.check_password(self.password))
+        self.assertEqual(courier.courier_profile.vehicle, "موتوسيكل")
+
+        self.client.force_authenticate(user=None)
+        login_response = self.client.post(
+            "/api/v1/auth/courier-login",
+            {
+                "identifier": "+201001234567",
+                "password": self.password,
+                "rememberMe": True,
+            },
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            login_response.data["user"]["role"],
+            User.Role.REPRESENTATIVE,
+        )
+
+    def test_non_admin_cannot_create_courier(self):
+        user = self.create_active_user()
+        self.client.force_authenticate(user)
+        response = self.client.post(
+            "/api/v1/auth/couriers",
+            {
+                "name": "Courier",
+                "phone": "+201001234568",
+                "email": "courier@example.com",
+                "password": self.password,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_customer_cannot_login_to_courier_app(self):
+        self.create_active_user()
+        response = self.client.post(
+            "/api/v1/auth/courier-login",
+            {"identifier": self.email, "password": self.password},
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_login_accepts_egyptian_phone_with_or_without_leading_zero(self):
         User.objects.create_user(
             username="egypt_customer",

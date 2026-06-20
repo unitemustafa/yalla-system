@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
@@ -11,7 +12,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import OneTimePassword
+from .models import CourierProfile, OneTimePassword
 from .services import normalize_email, verify_otp
 
 User = get_user_model()
@@ -138,6 +139,159 @@ class UserSerializer(RequiredFieldMessagesMixin, serializers.ModelSerializer):
             "phone",
             "role",
         )
+
+
+class CourierSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+    name = serializers.SerializerMethodField()
+    photoUrl = serializers.CharField(source="courier_profile.photo_url", read_only=True)
+    vehicle = serializers.CharField(source="courier_profile.vehicle", read_only=True)
+    plateNumber = serializers.CharField(
+        source="courier_profile.plate_number",
+        read_only=True,
+    )
+    zone = serializers.CharField(source="courier_profile.zone", read_only=True)
+    maxActiveOrders = serializers.IntegerField(
+        source="courier_profile.max_active_orders",
+        read_only=True,
+    )
+    status = serializers.SerializerMethodField()
+    performance = serializers.SerializerMethodField()
+    activeOrders = serializers.SerializerMethodField()
+    deliveredOrders = serializers.SerializerMethodField()
+    notDeliveredOrders = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "name",
+            "phone",
+            "email",
+            "photoUrl",
+            "vehicle",
+            "plateNumber",
+            "zone",
+            "maxActiveOrders",
+            "status",
+            "performance",
+            "activeOrders",
+            "deliveredOrders",
+            "notDeliveredOrders",
+        )
+
+    def get_name(self, user):
+        return user.get_full_name().strip() or user.username
+
+    def get_status(self, user):
+        labels = {
+            CourierProfile.Status.AVAILABLE: "متاح",
+            CourierProfile.Status.BUSY: "مشغول",
+            CourierProfile.Status.OFFLINE: "غير متصل",
+        }
+        return labels.get(user.courier_profile.status, "غير متصل")
+
+    def get_performance(self, _user):
+        return "100%"
+
+    def get_activeOrders(self, _user):
+        return []
+
+    def get_deliveredOrders(self, _user):
+        return []
+
+    def get_notDeliveredOrders(self, _user):
+        return []
+
+
+class CourierCreateSerializer(
+    RequiredFieldMessagesMixin,
+    serializers.Serializer,
+):
+    name = serializers.CharField(max_length=300)
+    phone = serializers.CharField(max_length=30)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    photoUrl = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    vehicle = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    plateNumber = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    zone = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    maxActiveOrders = serializers.IntegerField(min_value=1, max_value=50, default=3)
+
+    def validate_password(self, value):
+        errors = []
+        if len(value) < 8:
+            errors.append("Password must be at least 8 characters.")
+        if not re.search(r"[A-Z]", value):
+            errors.append("Password must contain at least one uppercase letter.")
+        if not re.search(r"\d", value):
+            errors.append("Password must contain at least one number.")
+        if not re.search(r"[^A-Za-z0-9]", value):
+            errors.append("Password must contain at least one special character.")
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        try:
+            validate_password(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
+
+    def validate_email(self, value):
+        email = normalize_email(value)
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return email
+
+    def validate_phone(self, value):
+        phone = normalize_phone(value)
+        if user_by_phone(phone):
+            raise serializers.ValidationError(
+                "An account with this phone number already exists."
+            )
+        return phone
+
+    @transaction.atomic
+    def create(self, validated_data):
+        name_parts = validated_data.pop("name").strip().split(maxsplit=1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        email = validated_data.pop("email")
+        phone = validated_data.pop("phone")
+        password = validated_data.pop("password")
+        username = self._available_username(email)
+
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            phone=phone,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            role=User.Role.REPRESENTATIVE,
+            is_active=True,
+        )
+        CourierProfile.objects.create(
+            user=user,
+            photo_url=validated_data.get("photoUrl") or "",
+            vehicle=validated_data.get("vehicle", ""),
+            plate_number=validated_data.get("plateNumber", ""),
+            zone=validated_data.get("zone", ""),
+            max_active_orders=validated_data["maxActiveOrders"],
+        )
+        return user
+
+    def _available_username(self, email):
+        local_part = email.split("@", 1)[0]
+        base = re.sub(r"[^A-Za-z0-9_.+-]+", "_", local_part).strip("._+-")
+        base = (base or "courier")[:140]
+        candidate = base
+        suffix = 1
+        while User.objects.filter(username__iexact=candidate).exists():
+            suffix_text = f"_{suffix}"
+            candidate = f"{base[:150 - len(suffix_text)]}{suffix_text}"
+            suffix += 1
+        return candidate
 
 
 class PasswordValidationMixin:

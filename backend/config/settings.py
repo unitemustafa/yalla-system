@@ -94,11 +94,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "yalla_db",
-        "USER": "yalla_user",
-        "PASSWORD": "1234",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": os.getenv("POSTGRES_DB", "yalla_db"),
+        "USER": os.getenv("POSTGRES_USER", "yalla_user"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "1234"),
+        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "60")),
+        "OPTIONS": {
+            "connect_timeout": int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "5")),
+        },
     }
 }
 

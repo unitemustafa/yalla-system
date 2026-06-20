@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/presentation/widgets/app_action_button.dart';
 import '../../../../core/routing/app_routes.dart';
+import '../../data/courier_auth_service.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -24,8 +25,8 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    _identifierController = TextEditingController(text: 'yalla@admin.com');
-    _passwordController = TextEditingController(text: '01266666610');
+    _identifierController = TextEditingController();
+    _passwordController = TextEditingController();
   }
 
   @override
@@ -39,10 +40,34 @@ class _LoginViewState extends State<LoginView> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _isLoading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    _goToDashboard();
+    try {
+      await CourierAuthService.instance.login(
+        identifier: _identifierController.text,
+        password: _passwordController.text,
+        rememberMe: _rememberMe,
+      );
+      if (!mounted) return;
+      _goToDashboard();
+    } on CourierAuthException catch (error) {
+      if (!mounted) return;
+      _showLoginError(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showLoginError('تعذر الاتصال بالخادم. تأكد من الإنترنت وحاول مرة أخرى.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showLoginError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message, textAlign: TextAlign.right),
+          backgroundColor: AppColors.error,
+        ),
+      );
   }
 
   void _goToDashboard() {

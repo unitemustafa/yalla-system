@@ -10,9 +10,9 @@ dashboard, and the Django API they use.
 - `apps/yalla_admin`: Next.js admin dashboard.
 - `backend`: Django REST API, including the shared authentication service.
 
-The admin dashboard still keeps its catalog and order demo data in a local
-Prisma/SQLite database. Authentication can use the Django backend or an explicit
-demo mode for dashboard smoke and end-to-end tests.
+PostgreSQL is the primary database for both Django accounts and the Prisma-backed
+dashboard catalog/order data. Authentication can use the Django backend or an
+explicit demo mode for dashboard smoke and end-to-end tests.
 
 ## Structure
 
@@ -50,18 +50,37 @@ Admin dashboard:
 ```bash
 cd apps/yalla_admin
 npm install
+npm run db:deploy
 npm run lint
 npm run build
 ```
 
-Django API with the local SQLite development settings:
+Start PostgreSQL (Docker Compose is optional if PostgreSQL is already installed):
+
+```bash
+docker compose up -d postgres
+```
+
+Django API using PostgreSQL:
 
 ```bash
 cd backend
 python -m pip install -r requirements.txt
 python manage.py migrate --settings=config.dev_settings
+# One-time import of the previous local data, only on an empty PostgreSQL DB:
+python manage.py loaddata legacy-postgres-import.json --settings=config.dev_settings
 python manage.py runserver --settings=config.dev_settings
 ```
+
+Default local connection values are `yalla_db`, `yalla_user`, `1234`,
+`127.0.0.1:5432`. Override them with `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `POSTGRES_HOST`, and `POSTGRES_PORT`. The dashboard uses
+the matching `DATABASE_URL` in `apps/yalla_admin/.env.local`.
+Backend tests also use PostgreSQL and create `test_yalla_db` by default; the
+configured PostgreSQL role therefore needs permission to create test databases.
+The one-time legacy fixture is local-only and ignored by Git because it contains
+account data. The previous SQLite files are retained only as backups and are no
+longer referenced by runtime settings.
 
 ## Architecture Notes
 

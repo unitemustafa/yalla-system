@@ -126,32 +126,6 @@ function parseStoredList(value: string) {
   }
 }
 
-async function readItemShopNames(itemIds: string[]) {
-  if (!itemIds.length) {
-    return new Map<string, string>();
-  }
-
-  const placeholders = itemIds.map(() => "?").join(", ");
-  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; shopName: string | null }>>(
-    `SELECT id, shopName FROM dashboard_items WHERE id IN (${placeholders})`,
-    ...itemIds,
-  );
-
-  return new Map(rows.map((row) => [row.id, normalizeShopName(row.shopName)]));
-}
-
-async function readItemShopName(itemId: string) {
-  return (await readItemShopNames([itemId])).get(itemId) ?? "";
-}
-
-async function writeItemShopName(itemId: string, shopName: string) {
-  await prisma.$executeRaw`
-    UPDATE dashboard_items
-    SET shopName = ${normalizeShopName(shopName)}
-    WHERE id = ${itemId}
-  `;
-}
-
 function normalizeOrderType(value: unknown) {
   const text = trimText(value);
   if (text === "delivery") return deliveryType;
@@ -289,6 +263,7 @@ async function ensureSeeded() {
             description: item.description,
             category: item.category,
             subcategory: item.subcategory,
+            shopName: normalizeShopName(item.shopName),
             calories: item.calories,
             price: item.price,
             variantDetails: "{}",
@@ -326,12 +301,8 @@ export async function listItems() {
   const items = await prisma.dashboardItem.findMany({
     orderBy: [{ position: "asc" }, { createdAt: "asc" }],
   });
-  const shopNames = await readItemShopNames(items.map((item) => item.id));
 
-  return items.map((item) => ({
-    ...toItemRow(item),
-    shopName: shopNames.get(item.id) ?? "",
-  }));
+  return items.map(toItemRow);
 }
 
 export async function createItem(input: CreateItemInput) {
@@ -357,6 +328,7 @@ export async function createItem(input: CreateItemInput) {
       description: trimText(input.description),
       category: trimText(input.category, "\u063a\u064a\u0631 \u0645\u0635\u0646\u0641"),
       subcategory: trimText(input.subcategory, "\u0639\u0627\u0645"),
+      shopName: normalizeShopName(input.shopName),
       calories: trimText(input.calories),
       price: normalizePrice(input.price),
       variantDetails: trimText(input.variantDetails, "{}"),
@@ -367,13 +339,7 @@ export async function createItem(input: CreateItemInput) {
       active: input.active ?? true,
     },
   });
-  const shopName = normalizeShopName(input.shopName);
-
-  if (shopName) {
-    await writeItemShopName(item.id, shopName);
-  }
-
-  return { ...toItemRow(item), shopName };
+  return toItemRow(item);
 }
 
 export async function updateItem(
@@ -411,6 +377,10 @@ export async function updateItem(
         typeof patch.subcategory === "string" && patch.subcategory.trim()
           ? trimText(patch.subcategory, item.subcategory)
           : item.subcategory,
+      shopName:
+        typeof patch.shopName === "string"
+          ? normalizeShopName(patch.shopName)
+          : item.shopName,
       calories:
         typeof patch.calories === "string"
           ? trimText(patch.calories)
@@ -442,16 +412,7 @@ export async function updateItem(
         typeof patch.active === "boolean" ? patch.active : item.active,
     },
   });
-  const shopName =
-    typeof patch.shopName === "string"
-      ? normalizeShopName(patch.shopName)
-      : await readItemShopName(item.id);
-
-  if (typeof patch.shopName === "string") {
-    await writeItemShopName(updatedItem.id, shopName);
-  }
-
-  return { ...toItemRow(updatedItem), shopName };
+  return toItemRow(updatedItem);
 }
 
 export async function duplicateItem(itemId: string) {
@@ -477,6 +438,7 @@ export async function duplicateItem(itemId: string) {
       description: item.description,
       category: item.category,
       subcategory: item.subcategory,
+      shopName: item.shopName,
       calories: item.calories,
       price: item.price,
       variantDetails: item.variantDetails ?? "{}",
@@ -487,13 +449,7 @@ export async function duplicateItem(itemId: string) {
       active: item.active,
     },
   });
-  const shopName = await readItemShopName(item.id);
-
-  if (shopName) {
-    await writeItemShopName(copy.id, shopName);
-  }
-
-  return { ...toItemRow(copy), shopName };
+  return toItemRow(copy);
 }
 
 export async function deleteItem(itemId: string) {

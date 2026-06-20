@@ -38,6 +38,7 @@ backend/.env*
 backend/.venv/
 backend/db.sqlite3
 backend/dev.sqlite3
+backend/legacy-postgres-import.json
 backend/media/
 backend/staticfiles/
 
