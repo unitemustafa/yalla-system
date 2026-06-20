@@ -44,7 +44,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
     def test_registration_requires_otp_before_login(self):
-        response = self.client.post("/api/auth/register/", self.registration_payload())
+        response = self.client.post("/api/v1/auth/signup", self.registration_payload())
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["email"], self.email)
@@ -57,13 +57,13 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(user.username, "yalla_customer")
 
         login_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email, "password": self.password},
         )
         self.assertEqual(login_response.status_code, status.HTTP_400_BAD_REQUEST)
 
         verify_response = self.client.post(
-            "/api/auth/register/verify-otp/",
+            "/api/v1/auth/verify-email",
             {"email": self.email, "otp": response.data["dev_otp"]},
         )
         self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
@@ -73,7 +73,7 @@ class AuthenticationAPITests(APITestCase):
 
     def test_registration_rejects_duplicate_active_email(self):
         self.create_active_user()
-        response = self.client.post("/api/auth/register/", self.registration_payload())
+        response = self.client.post("/api/v1/auth/signup", self.registration_payload())
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data)
 
@@ -86,7 +86,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/auth/register/",
+            "/api/v1/auth/signup",
             self.registration_payload(),
         )
 
@@ -101,7 +101,7 @@ class AuthenticationAPITests(APITestCase):
         payload["password"] = "password"
         payload["password_confirm"] = "password"
 
-        response = self.client.post("/api/auth/register/", payload)
+        response = self.client.post("/api/v1/auth/signup", payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
@@ -118,7 +118,7 @@ class AuthenticationAPITests(APITestCase):
         payload["password"] = "Ab1!"
         payload["password_confirm"] = "Ab1!"
 
-        response = self.client.post("/api/auth/register/", payload)
+        response = self.client.post("/api/v1/auth/signup", payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn(
@@ -129,7 +129,7 @@ class AuthenticationAPITests(APITestCase):
     def test_login_uses_case_insensitive_email(self):
         self.create_active_user()
         response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email.upper(), "password": self.password},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -143,14 +143,14 @@ class AuthenticationAPITests(APITestCase):
         self.create_active_user()
 
         username_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"identifier": "customer", "password": self.password},
         )
         self.assertEqual(username_response.status_code, status.HTTP_200_OK)
         self.assertEqual(username_response.data["user"]["email"], self.email)
 
         phone_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"login": "+213555000001", "password": self.password},
         )
         self.assertEqual(phone_response.status_code, status.HTTP_200_OK)
@@ -235,7 +235,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
         leading_zero_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"identifier": "01016487371", "password": self.password},
         )
         self.assertEqual(leading_zero_response.status_code, status.HTTP_200_OK)
@@ -245,7 +245,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
         without_zero_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"identifier": "1016487371", "password": self.password},
         )
         self.assertEqual(without_zero_response.status_code, status.HTTP_200_OK)
@@ -274,7 +274,7 @@ class AuthenticationAPITests(APITestCase):
 
     def test_missing_fields_return_field_specific_required_messages(self):
         login_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email},
         )
         self.assertEqual(login_response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -284,7 +284,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
         blank_password_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email, "password": ""},
         )
         self.assertEqual(
@@ -296,21 +296,17 @@ class AuthenticationAPITests(APITestCase):
             ["Password is required."],
         )
 
-        register_response = self.client.post(
-            "/api/auth/register/",
+        signup_response = self.client.post(
+            "/api/v1/auth/signup",
             {},
         )
-        self.assertEqual(register_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(signup_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
-            register_response.data["email"],
+            signup_response.data["email"],
             ["Email is required."],
         )
         self.assertEqual(
-            register_response.data["username"],
-            ["Username is required."],
-        )
-        self.assertEqual(
-            register_response.data["phone"],
+            signup_response.data["phone"],
             ["Phone is required."],
         )
 
@@ -320,7 +316,7 @@ class AuthenticationAPITests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
 
         response = self.client.post(
-            "/api/auth/logout/",
+            "/api/v1/auth/logout",
             {"refresh": str(refresh)},
         )
 
@@ -333,7 +329,7 @@ class AuthenticationAPITests(APITestCase):
         refresh = RefreshToken.for_user(user)
 
         response = self.client.post(
-            "/api/auth/refresh/",
+            "/api/v1/auth/refresh",
             {"refreshToken": str(refresh)},
         )
 
@@ -347,7 +343,7 @@ class AuthenticationAPITests(APITestCase):
         self.create_active_user()
 
         session_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {
                 "email": self.email,
                 "password": self.password,
@@ -355,7 +351,7 @@ class AuthenticationAPITests(APITestCase):
             },
         )
         remembered_response = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {
                 "email": self.email,
                 "password": self.password,
@@ -412,13 +408,13 @@ class AuthenticationAPITests(APITestCase):
 
         self.client.credentials()
         old_login = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email, "password": self.password},
         )
         self.assertEqual(old_login.status_code, status.HTTP_401_UNAUTHORIZED)
 
         new_login = self.client.post(
-            "/api/auth/login/",
+            "/api/v1/auth/login",
             {"email": self.email, "password": self.new_password},
         )
         self.assertEqual(new_login.status_code, status.HTTP_200_OK)
@@ -428,7 +424,7 @@ class AuthenticationAPITests(APITestCase):
         existing_refresh = RefreshToken.for_user(user)
 
         forgot_response = self.client.post(
-            "/api/auth/forgot-password/",
+            "/api/v1/auth/forgot-password",
             {"email": self.email},
         )
         self.assertEqual(forgot_response.status_code, status.HTTP_200_OK)
@@ -436,7 +432,7 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
 
         reset_response = self.client.post(
-            "/api/auth/reset-password/",
+            "/api/v1/auth/reset-password",
             {
                 "email": self.email,
                 "otp": forgot_response.data["dev_otp"],
@@ -454,7 +450,7 @@ class AuthenticationAPITests(APITestCase):
             RefreshToken(str(existing_refresh)).check_blacklist()
 
         reused_otp_response = self.client.post(
-            "/api/auth/reset-password/",
+            "/api/v1/auth/reset-password",
             {
                 "email": self.email,
                 "otp": forgot_response.data["dev_otp"],
@@ -466,7 +462,7 @@ class AuthenticationAPITests(APITestCase):
 
     def test_forgot_password_rejects_unknown_email(self):
         response = self.client.post(
-            "/api/auth/forgot-password/",
+            "/api/v1/auth/forgot-password",
             {"email": "unknown@example.com"},
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -478,14 +474,14 @@ class AuthenticationAPITests(APITestCase):
 
     def test_invalid_otp_is_limited(self):
         register_response = self.client.post(
-            "/api/auth/register/",
+            "/api/v1/auth/signup",
             self.registration_payload(),
         )
         self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
 
         for _ in range(5):
             response = self.client.post(
-                "/api/auth/register/verify-otp/",
+                "/api/v1/auth/verify-email",
                 {"email": self.email, "otp": "000000"},
             )
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

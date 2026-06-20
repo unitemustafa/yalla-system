@@ -66,10 +66,10 @@ Django API using PostgreSQL:
 ```bash
 cd backend
 python -m pip install -r requirements.txt
-python manage.py migrate --settings=config.dev_settings
+python manage.py migrate
 # One-time import of the previous local data, only on an empty PostgreSQL DB:
-python manage.py loaddata legacy-postgres-import.json --settings=config.dev_settings
-python manage.py runserver --settings=config.dev_settings
+python manage.py loaddata legacy-postgres-import.json
+python manage.py runserver
 ```
 
 Default local connection values are `yalla_db`, `yalla_user`, `1234`,
