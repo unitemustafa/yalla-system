@@ -12,6 +12,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/utils/validators.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
+import '../auth_error_localizer.dart';
 import '../widgets/auth_top_bar.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -73,7 +74,7 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
           CustomSnackBar.showError(
             context: context,
             title: context.tr('Password reset unavailable'),
-            message: state.message,
+            message: localizeAuthError(context, state.message),
           );
         }
       },

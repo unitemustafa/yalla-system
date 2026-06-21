@@ -15,6 +15,7 @@ import '../../../../core/utils/validators.dart';
 import '../../../location/presentation/cubit/location_cubit.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
+import '../auth_error_localizer.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/signup_phone_country_picker.dart';
 import '../widgets/warning_checkbox.dart';
@@ -95,7 +96,7 @@ class _LoginViewState extends State<LoginView> {
           CustomSnackBar.showError(
             context: context,
             title: _signInErrorTitle(state.message, strings),
-            message: state.message,
+            message: localizeAuthError(context, state.message),
           );
         }
       },

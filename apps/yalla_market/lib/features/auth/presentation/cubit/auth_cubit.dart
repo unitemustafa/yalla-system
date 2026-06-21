@@ -31,6 +31,7 @@ class AuthCubit extends Cubit<AuthState> {
       AuthGuard.setAuthenticated();
     } else if (change.nextState is AuthInitial ||
         change.nextState is AuthSignupSucceeded ||
+        change.nextState is AuthPasswordResetSucceeded ||
         change.nextState is AuthSessionExpired ||
         change.nextState is AuthEmailVerified) {
       AuthGuard.clearAuthentication();
@@ -147,8 +148,8 @@ class AuthCubit extends Cubit<AuthState> {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) async {
     if (state is AuthLoading) return;
 
@@ -160,8 +161,8 @@ class AuthCubit extends Cubit<AuthState> {
       lastName: lastName.trim(),
       email: email.trim(),
       password: password,
+      phone: phone.trim(),
       username: username?.trim(),
-      phone: phone?.trim(),
     );
     result.when(
       success: (session) {
@@ -243,6 +244,33 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
+  Future<bool> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    if (state is AuthLoading) return false;
+
+    emit(const AuthLoading());
+    final result = await _authUseCases.resetPassword(
+      email: email.trim(),
+      code: code.trim(),
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+    );
+    return result.when(
+      success: (reset) {
+        emit(const AuthPasswordResetSucceeded());
+        return reset;
+      },
+      failure: (failure) {
+        emit(AuthFailure(failure.message));
+        return false;
+      },
+    );
+  }
+
   Future<void> logout() async {
     _pendingSignupSession = null;
     final result = await _authUseCases.logout();
@@ -274,12 +302,13 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<AuthUser?> refreshProfile() async {
-    if (state is! AuthAuthenticated) return null;
+    final currentState = state;
+    if (currentState is! AuthAuthenticated) return null;
 
     final result = await _authUseCases.refreshProfile();
     return result.when(
       success: (user) {
-        emit(AuthAuthenticated(AuthSession(user: user)));
+        emit(AuthAuthenticated(currentState.session.copyWith(user: user)));
         return user;
       },
       failure: (_) => null,
@@ -295,6 +324,9 @@ class AuthCubit extends Cubit<AuthState> {
     String? gender,
     DateTime? birthDate,
   }) async {
+    final currentSession = state is AuthAuthenticated
+        ? (state as AuthAuthenticated).session
+        : null;
     final result = await _authUseCases.updateProfile(
       firstName: firstName,
       lastName: lastName,
@@ -306,7 +338,11 @@ class AuthCubit extends Cubit<AuthState> {
     );
     return result.when(
       success: (user) {
-        emit(AuthAuthenticated(AuthSession(user: user)));
+        emit(
+          AuthAuthenticated(
+            currentSession?.copyWith(user: user) ?? AuthSession(user: user),
+          ),
+        );
         return user;
       },
       failure: (failure) {

@@ -12,4 +12,18 @@ class AuthSession {
   final String? accessToken;
   final String? refreshToken;
   final DateTime? expiresAt;
+
+  AuthSession copyWith({
+    AuthUser? user,
+    String? accessToken,
+    String? refreshToken,
+    DateTime? expiresAt,
+  }) {
+    return AuthSession(
+      user: user ?? this.user,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
+      expiresAt: expiresAt ?? this.expiresAt,
+    );
+  }
 }

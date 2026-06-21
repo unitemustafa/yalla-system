@@ -111,8 +111,8 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) {
     return _guard(() async {
       await _tokenStore.clear();
@@ -124,7 +124,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
           'email': email,
           'password': password,
           if (username?.trim().isNotEmpty == true) 'username': username,
-          if (phone?.trim().isNotEmpty == true) 'phone': phone,
+          'phone': phone,
         },
       );
       return _signupSessionFromPayload(
@@ -174,8 +174,14 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
   @override
   Future<ApiResult<bool>> logout() {
     return _guard(() async {
+      final tokens = await _tokenStore.read();
       try {
-        await _apiClient.post<Object?>('/auth/logout');
+        await _apiClient.post<Object?>(
+          '/auth/logout',
+          data: {
+            if (tokens != null) 'refreshToken': tokens.refreshToken,
+          },
+        );
       } finally {
         await _tokenStore.clear();
       }
@@ -296,6 +302,28 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         '/auth/forgot-password',
         data: {'email': normalizedEmail},
       );
+      return payload is bool ? payload : true;
+    });
+  }
+
+  @override
+  Future<ApiResult<bool>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) {
+    return _guard(() async {
+      final payload = await _apiClient.post<Object?>(
+        '/auth/reset-password',
+        data: {
+          'email': email.trim(),
+          'code': code.trim(),
+          'password': password,
+          'passwordConfirm': passwordConfirmation,
+        },
+      );
+      await _tokenStore.clear();
       return payload is bool ? payload : true;
     });
   }

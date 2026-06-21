@@ -1,6 +1,6 @@
 # Yalla Admin
 
-لوحة تحكم مبنية بـ Next.js App Router لإدارة منتجات وطلبات Yalla Market. تسجيل الدخول يتصل بباك Django عبر JWT، مع API محمية، تخزين PostgreSQL عبر Prisma، وتجارب موبايل محسنة للجداول.
+لوحة تحكم مبنية بـ Next.js App Router لإدارة منتجات وطلبات Yalla Market. تسجيل الدخول والبيانات يتصلان بباك Django REST API عبر JWT، وتجارب الجداول محسنة للموبايل.
 
 ## المتطلبات
 
@@ -36,7 +36,6 @@ allowed dashboard roles, and session signing secret with environment variables:
 
 ```bash
 BACKEND_API_BASE_URL=http://127.0.0.1:8000/api/v1
-DATABASE_URL=postgresql://yalla_user:1234@127.0.0.1:5432/yalla_db?schema=public
 DASHBOARD_AUTH_MODE=backend
 DASHBOARD_ALLOWED_ROLES=admin
 SESSION_SECRET=replace-with-a-strong-random-secret
@@ -52,22 +51,9 @@ DASHBOARD_AUTH_MODE=demo
 DASHBOARD_DEMO_PASSWORD=01266666610
 ```
 
-## قاعدة البيانات
+## البيانات
 
-يستخدم المشروع Prisma مع PostgreSQL. بعد تشغيل PostgreSQL طبّق migrations:
-
-```bash
-npm run db:deploy
-```
-
-أوامر مفيدة:
-
-```bash
-npm run db:generate
-npm run db:migrate
-npm run db:deploy
-npm run db:studio
-```
+الداشبورد لا تتصل بقاعدة البيانات مباشرة. كل عمليات المنتجات والطلبات تمر عبر Django REST API تحت `/api/v1/dashboard/`، وقاعدة البيانات وإدارتها مسؤولية الباك فقط.
 
 ## الصور والأداء
 

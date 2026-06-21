@@ -11,6 +11,7 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/utils/validators.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
+import '../auth_error_localizer.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/auth_top_bar.dart';
 import '../widgets/password_strength_meter.dart';
@@ -209,7 +210,7 @@ class _SignupViewState extends State<SignupView> {
           CustomSnackBar.showError(
             context: context,
             title: _signupErrorTitle(state.message),
-            message: state.message,
+            message: localizeAuthError(context, state.message),
           );
         }
       },

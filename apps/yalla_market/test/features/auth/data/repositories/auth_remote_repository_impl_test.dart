@@ -93,6 +93,7 @@ void main() {
           firstName: 'Mustafa',
           lastName: 'Ali',
           email: 'mustafa@example.com',
+          phone: '+201000000000',
           password: 'Password123!',
         );
 
@@ -250,6 +251,59 @@ void main() {
             expect(failure.message, 'No account found with this email.'),
       );
       expect(paths, ['/auth/check-email']);
+    });
+
+    test('resetPassword posts OTP and the confirmed password', () async {
+      final tokenStore = InMemoryTokenStore();
+      final apiClient = FakeApiClient((request) {
+        expect(request.method, 'POST');
+        expect(request.path, '/auth/reset-password');
+        expect(request.data, {
+          'email': 'm@example.com',
+          'code': '123456',
+          'password': 'NewPassword123!',
+          'passwordConfirm': 'NewPassword123!',
+        });
+        return {'detail': 'Password reset successfully.'};
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.resetPassword(
+        email: 'm@example.com',
+        code: '123456',
+        password: 'NewPassword123!',
+        passwordConfirmation: 'NewPassword123!',
+      );
+
+      result.when(
+        success: (reset) => expect(reset, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+    });
+
+    test('logout sends the stored refresh token', () async {
+      final tokenStore = InMemoryTokenStore();
+      await tokenStore.save(
+        StoredAuthTokens(
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      final apiClient = FakeApiClient((request) {
+        expect(request.path, '/auth/logout');
+        expect(request.data, {'refreshToken': 'refresh-token'});
+        return {'detail': 'Logout successful.'};
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.logout();
+
+      result.when(
+        success: (loggedOut) => expect(loggedOut, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      expect(await tokenStore.read(), isNull);
     });
   });
 }

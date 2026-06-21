@@ -1,9 +1,30 @@
 import type { Metadata } from "next";
-import { Cairo } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
+const cairo = localFont({
+  src: [
+    {
+      path: "../public/fonts/tajawal/Tajawal-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-ExtraBold.ttf",
+      weight: "800",
+      style: "normal",
+    },
+  ],
   variable: "--font-cairo",
   display: "swap",
 });

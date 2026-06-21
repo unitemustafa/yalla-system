@@ -64,6 +64,7 @@ void main() {
         firstName: 'Mustafa',
         lastName: 'Ali',
         email: 'mustafa@example.com',
+        phone: '+201000000000',
         password: 'Secret123!',
       );
       await repository.logout();

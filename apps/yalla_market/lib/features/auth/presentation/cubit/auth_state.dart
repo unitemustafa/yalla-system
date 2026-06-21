@@ -39,6 +39,10 @@ final class AuthPasswordResetRequested extends AuthState {
   final String email;
 }
 
+final class AuthPasswordResetSucceeded extends AuthState {
+  const AuthPasswordResetSucceeded();
+}
+
 final class AuthEmailVerified extends AuthState {
   const AuthEmailVerified();
 }

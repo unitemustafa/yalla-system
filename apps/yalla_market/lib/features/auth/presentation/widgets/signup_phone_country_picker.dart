@@ -275,46 +275,49 @@ class _CountryPickerSheetState extends State<CountryPickerSheet> {
                         final country = countries[index];
                         final isSelected = country == widget.selectedCountry;
 
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          minLeadingWidth: 42,
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: AppColors.primary.withValues(
-                              alpha: isSelected ? 0.18 : 0.08,
-                            ),
-                            child: Text(
-                              country.isoCode,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : textColor.withValues(alpha: 0.72),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
+                        return Material(
+                          color: Colors.transparent,
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            minLeadingWidth: 42,
+                            leading: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: AppColors.primary.withValues(
+                                alpha: isSelected ? 0.18 : 0.08,
+                              ),
+                              child: Text(
+                                country.isoCode,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : textColor.withValues(alpha: 0.72),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          ),
-                          title: Text(
-                            context.tr(country.name),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: textColor,
-                              fontWeight: FontWeight.w800,
+                            title: Text(
+                              context.tr(country.name),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: textColor,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                          subtitle: Text(
-                            country.dialCode,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: mutedColor,
-                              fontWeight: FontWeight.w700,
+                            subtitle: Text(
+                              country.dialCode,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: mutedColor,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
+                            trailing: isSelected
+                                ? const Icon(
+                                    AppIcons.tick_circle,
+                                    color: AppColors.primary,
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(context).pop(country),
                           ),
-                          trailing: isSelected
-                              ? const Icon(
-                                  AppIcons.tick_circle,
-                                  color: AppColors.primary,
-                                )
-                              : null,
-                          onTap: () => Navigator.of(context).pop(country),
                         );
                       },
                     ),

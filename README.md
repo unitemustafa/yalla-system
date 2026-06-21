@@ -10,9 +10,8 @@ dashboard, and the Django API they use.
 - `apps/yalla_admin`: Next.js admin dashboard.
 - `backend`: Django REST API, including the shared authentication service.
 
-PostgreSQL is the primary database for both Django accounts and the Prisma-backed
-dashboard catalog/order data. Authentication can use the Django backend or an
-explicit demo mode for dashboard smoke and end-to-end tests.
+PostgreSQL is the primary database for Django. The admin dashboard accesses
+catalog and order data exclusively through the Django REST API.
 
 ## Structure
 
@@ -50,7 +49,6 @@ Admin dashboard:
 ```bash
 cd apps/yalla_admin
 npm install
-npm run db:deploy
 npm run lint
 npm run build
 ```
@@ -74,8 +72,7 @@ python manage.py runserver
 
 Default local connection values are `yalla_db`, `yalla_user`, `1234`,
 `127.0.0.1:5432`. Override them with `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `POSTGRES_HOST`, and `POSTGRES_PORT`. The dashboard uses
-the matching `DATABASE_URL` in `apps/yalla_admin/.env.local`.
+`POSTGRES_PASSWORD`, `POSTGRES_HOST`, and `POSTGRES_PORT`.
 Backend tests also use PostgreSQL and create `test_yalla_db` by default; the
 configured PostgreSQL role therefore needs permission to create test databases.
 The one-time legacy fixture is local-only and ignored by Git because it contains

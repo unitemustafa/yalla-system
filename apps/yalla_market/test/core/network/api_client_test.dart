@@ -58,6 +58,56 @@ void main() {
     expect(await tokenStore.read(), isNull);
     expect(expirationEvents, 1);
   });
+
+  test('uses the rotated refresh token in logout requests', () async {
+    final tokenStore = InMemoryTokenStore();
+    await tokenStore.save(
+      StoredAuthTokens(
+        accessToken: 'old-access',
+        refreshToken: 'old-refresh',
+        expiresAt: DateTime.now().add(const Duration(minutes: 1)),
+      ),
+    );
+
+    final dio = Dio()
+      ..httpClientAdapter = _Adapter((options) {
+        expect(options.path, '/auth/logout');
+        expect(options.headers['Authorization'], 'Bearer next-access');
+        expect(options.data, {'refreshToken': 'next-refresh'});
+        return ResponseBody.fromString(
+          '{"detail":"Logout successful."}',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+    final refreshDio = Dio()
+      ..httpClientAdapter = _Adapter((options) {
+        expect(options.path, '/auth/refresh');
+        expect(options.data, {'refreshToken': 'old-refresh'});
+        return ResponseBody.fromString(
+          '{"accessToken":"next-access","refreshToken":"next-refresh",'
+          '"expiresIn":3600}',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+    final client = ApiClient(
+      dio: dio,
+      refreshDio: refreshDio,
+      tokenStore: tokenStore,
+    );
+
+    await client.post<Object?>(
+      '/auth/logout',
+      data: {'refreshToken': 'old-refresh'},
+    );
+
+    expect((await tokenStore.read())?.refreshToken, 'next-refresh');
+  });
 }
 
 class _Adapter implements HttpClientAdapter {

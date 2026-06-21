@@ -90,6 +90,7 @@ class ApiClient {
             ? await _refreshTokens(tokens)
             : tokens;
         options.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
+        _synchronizeLogoutRefreshToken(options, refreshed);
       }
     } catch (error) {
       await _expireSession();
@@ -131,6 +132,7 @@ class ApiClient {
       final request = error.requestOptions;
       request.extra['authRetried'] = true;
       request.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
+      _synchronizeLogoutRefreshToken(request, refreshed);
       final retryResponse = await _dio.fetch<Object?>(request);
       handler.resolve(retryResponse);
     } catch (_) {
@@ -161,6 +163,19 @@ class ApiClient {
   bool _isRefreshRequest(RequestOptions options) {
     return options.path.endsWith(ApiEndpoints.refreshToken) ||
         options.extra['skipAuth'] == true;
+  }
+
+  void _synchronizeLogoutRefreshToken(
+    RequestOptions options,
+    StoredAuthTokens tokens,
+  ) {
+    if (!options.path.endsWith('/auth/logout')) return;
+    final data = options.data;
+    if (data is Map<String, dynamic>) {
+      data['refreshToken'] = tokens.refreshToken;
+    } else if (data is Map) {
+      data['refreshToken'] = tokens.refreshToken;
+    }
   }
 
   Future<void> _expireSession() async {

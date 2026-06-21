@@ -49,17 +49,20 @@ class CourierSession {
     required this.user,
     required this.accessToken,
     required this.refreshToken,
+    required this.rememberMe,
   });
 
   final CourierUser user;
   final String accessToken;
   final String refreshToken;
+  final bool rememberMe;
 
   factory CourierSession.fromJson(Map<String, dynamic> json) {
     return CourierSession(
       user: CourierUser.fromJson(json['user'] as Map<String, dynamic>),
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
+      rememberMe: json['rememberMe'] as bool? ?? true,
     );
   }
 
@@ -67,13 +70,20 @@ class CourierSession {
     'user': user.toJson(),
     'accessToken': accessToken,
     'refreshToken': refreshToken,
+    'rememberMe': rememberMe,
   };
 
-  CourierSession copyWith({String? accessToken, String? refreshToken}) {
+  CourierSession copyWith({
+    CourierUser? user,
+    String? accessToken,
+    String? refreshToken,
+    bool? rememberMe,
+  }) {
     return CourierSession(
-      user: user,
+      user: user ?? this.user,
       accessToken: accessToken ?? this.accessToken,
       refreshToken: refreshToken ?? this.refreshToken,
+      rememberMe: rememberMe ?? this.rememberMe,
     );
   }
 }
@@ -87,27 +97,51 @@ class CourierAuthException implements Exception {
   String toString() => message;
 }
 
+abstract class CourierSessionStorage {
+  Future<String?> read();
+
+  Future<void> write(String value);
+
+  Future<void> clear();
+}
+
+class SecureCourierSessionStorage implements CourierSessionStorage {
+  SecureCourierSessionStorage({FlutterSecureStorage? storage})
+    : _storage = storage ?? const FlutterSecureStorage();
+
+  static const _storageKey = 'yalla_home.courier_session.v1';
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read() => _storage.read(key: _storageKey);
+
+  @override
+  Future<void> write(String value) {
+    return _storage.write(key: _storageKey, value: value);
+  }
+
+  @override
+  Future<void> clear() => _storage.delete(key: _storageKey);
+}
+
 class CourierAuthService {
   CourierAuthService({
     http.Client? client,
-    FlutterSecureStorage? storage,
+    CourierSessionStorage? sessionStorage,
     String? apiBaseUrl,
   }) : _client = client ?? http.Client(),
-       _storage = storage ?? const FlutterSecureStorage(),
-       _apiBaseUrl = (apiBaseUrl ?? _configuredApiBaseUrl).replaceAll(
-         RegExp(r'/+$'),
-         '',
-       );
+       _sessionStorage = sessionStorage ?? SecureCourierSessionStorage(),
+       _apiBaseUrl = _buildApiBaseUrl(apiBaseUrl ?? _configuredApiOrigin);
 
   static final CourierAuthService instance = CourierAuthService();
-  static const _storageKey = 'yalla_home.courier_session.v1';
-  static const _configuredApiBaseUrl = String.fromEnvironment(
+  static const _configuredApiOrigin = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://127.0.0.1:8000/api/v1',
+    defaultValue: 'http://127.0.0.1:8000',
   );
 
   final http.Client _client;
-  final FlutterSecureStorage _storage;
+  final CourierSessionStorage _sessionStorage;
   final String _apiBaseUrl;
   CourierSession? _session;
 
@@ -133,18 +167,18 @@ class CourierAuthService {
     }
 
     try {
-      final session = CourierSession.fromJson(data);
+      final session = CourierSession.fromJson({
+        ...data,
+        'rememberMe': rememberMe,
+      });
       if (session.user.role != 'representative') {
         throw const CourierAuthException('هذا الحساب ليس حساب مندوب توصيل.');
       }
       _session = session;
       if (rememberMe) {
-        await _storage.write(
-          key: _storageKey,
-          value: jsonEncode(session.toJson()),
-        );
+        await _sessionStorage.write(jsonEncode(session.toJson()));
       } else {
-        await _storage.delete(key: _storageKey);
+        await _sessionStorage.clear();
       }
       return session;
     } on CourierAuthException {
@@ -158,20 +192,14 @@ class CourierAuthService {
     if (_session case final session?) return session;
 
     try {
-      final stored = await _storage.read(key: _storageKey);
+      final stored = await _sessionStorage.read();
       if (stored == null || stored.trim().isEmpty) return null;
       var session = CourierSession.fromJson(
         jsonDecode(stored) as Map<String, dynamic>,
       );
 
-      final profileResponse = await _get(
-        '/auth/me',
-        accessToken: session.accessToken,
-      );
-      if (profileResponse.statusCode == 200) {
-        _session = session;
-        return session;
-      }
+      final currentSession = await _loadCurrentSession(session);
+      if (currentSession != null) return currentSession;
 
       final refreshResponse = await _post(
         '/auth/refresh',
@@ -187,12 +215,9 @@ class CourierAuthService {
         accessToken: refreshData['accessToken'] as String?,
         refreshToken: refreshData['refreshToken'] as String?,
       );
-      _session = session;
-      await _storage.write(
-        key: _storageKey,
-        value: jsonEncode(session.toJson()),
-      );
-      return session;
+      final refreshedSession = await _loadCurrentSession(session);
+      if (refreshedSession == null) await clearSession();
+      return refreshedSession;
     } catch (_) {
       await clearSession();
       return null;
@@ -218,10 +243,33 @@ class CourierAuthService {
   Future<void> clearSession() async {
     _session = null;
     try {
-      await _storage.delete(key: _storageKey);
+      await _sessionStorage.clear();
     } catch (_) {
       // Some test/desktop environments do not expose a secure-storage plugin.
     }
+  }
+
+  Future<CourierSession?> _loadCurrentSession(CourierSession session) async {
+    final response = await _get('/auth/me', accessToken: session.accessToken);
+    if (response.statusCode != 200) return null;
+
+    final data = _decodeObject(response);
+    final rawUser = data['user'];
+    if (rawUser is! Map) {
+      throw const CourierAuthException('استجابة بيانات المندوب غير مكتملة.');
+    }
+
+    final user = CourierUser.fromJson(Map<String, dynamic>.from(rawUser));
+    if (user.role != 'representative') {
+      throw const CourierAuthException('هذا الحساب ليس حساب مندوب توصيل.');
+    }
+
+    final updated = session.copyWith(user: user);
+    _session = updated;
+    if (updated.rememberMe) {
+      await _sessionStorage.write(jsonEncode(updated.toJson()));
+    }
+    return updated;
   }
 
   Future<http.Response> _get(String path, {required String accessToken}) {
@@ -291,5 +339,15 @@ class CourierAuthService {
       }
     }
     return null;
+  }
+
+  static String _buildApiBaseUrl(String origin) {
+    final normalized = origin.trim().replaceAll(RegExp(r'/+$'), '');
+    if (normalized.isEmpty) {
+      throw StateError(
+        'API_BASE_URL is required. Example: http://127.0.0.1:8000',
+      );
+    }
+    return '$normalized/api/v1';
   }
 }

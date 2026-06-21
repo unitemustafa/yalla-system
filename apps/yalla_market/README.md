@@ -15,6 +15,9 @@ flutter build web --dart-define-from-file=env/production.json
 flutter build appbundle --dart-define-from-file=env/production.json
 ```
 
+Debug runs default to `http://127.0.0.1:8000`, so Linux desktop can be started
+directly with `flutter run -d linux`.
+
 `env/development.json` points at the local Django backend on
 `http://127.0.0.1:8000`, which is suitable for Windows/macOS/Linux desktop and
 web. For the Android emulator, use `--dart-define=API_BASE_URL=http://10.0.2.2:8000`.

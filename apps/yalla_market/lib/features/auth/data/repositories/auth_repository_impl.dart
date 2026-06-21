@@ -75,8 +75,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) {
     return _guard(
       () => _signup(
@@ -84,8 +84,8 @@ class AuthRepositoryImpl implements AuthRepository {
         lastName: lastName,
         email: email,
         password: password,
-        username: username,
         phone: phone,
+        username: username,
       ),
       'Could not create your account.',
     );
@@ -115,6 +115,24 @@ class AuthRepositoryImpl implements AuthRepository {
     return _guard(
       () => _requestPasswordReset(email),
       'Could not send a password reset code.',
+    );
+  }
+
+  @override
+  Future<ApiResult<bool>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) {
+    return _guard(
+      () => _resetPassword(
+        email: email,
+        code: code,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+      ),
+      'Could not reset your password.',
     );
   }
 
@@ -234,7 +252,7 @@ class AuthRepositoryImpl implements AuthRepository {
         account.passwordDigest !=
             _passwordDigest(account.user.email, password)) {
       throw const _AuthRepositoryException(
-        UnauthorizedFailure('Invalid login credentials.'),
+        UnauthorizedFailure('Invalid email or password.'),
       );
     }
 
@@ -275,8 +293,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) async {
     final normalizedEmail = _normalizeEmail(email);
     final normalizedUsername = _normalizeUsername(username ?? '');
@@ -286,9 +304,10 @@ class AuthRepositoryImpl implements AuthRepository {
     if (cleanFirstName.isEmpty ||
         cleanLastName.isEmpty ||
         normalizedEmail.isEmpty ||
+        _normalizePhone(phone).isEmpty ||
         password.isEmpty) {
       throw const _AuthRepositoryException(
-        ValidationFailure('Name, email, and password are required.'),
+        ValidationFailure('Name, email, phone, and password are required.'),
       );
     }
 
@@ -299,9 +318,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     }
 
-    if (phone != null &&
-        _normalizePhone(phone).isNotEmpty &&
-        await _isPhoneRegistered(phone)) {
+    if (await _isPhoneRegistered(phone)) {
       throw const _AuthRepositoryException(
         ValidationFailure('Phone number is already registered.'),
       );
@@ -320,7 +337,7 @@ class AuthRepositoryImpl implements AuthRepository {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       username: normalizedUsername.isEmpty ? null : normalizedUsername,
-      phone: phone?.trim().isEmpty ?? true ? null : phone?.trim(),
+      phone: phone.trim(),
       role: 'CUSTOMER',
     );
 
@@ -386,6 +403,43 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     }
 
+    return true;
+  }
+
+  Future<bool> _resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final normalizedEmail = _normalizeEmail(email);
+    if (!RegExp(r'^\d{6}$').hasMatch(code.trim())) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Enter the 6-digit verification code.'),
+      );
+    }
+    if (password != passwordConfirmation) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Passwords do not match.'),
+      );
+    }
+
+    final accounts = await _loadAccounts();
+    final index = accounts.indexWhere(
+      (account) => _normalizeEmail(account.user.email) == normalizedEmail,
+    );
+    if (index < 0) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('No account found with this email.'),
+      );
+    }
+
+    final updated = [...accounts];
+    updated[index] = accounts[index].copyWith(
+      passwordDigest: _passwordDigest(normalizedEmail, password),
+    );
+    await _saveAccounts(updated);
+    await _clearSession();
     return true;
   }
 
@@ -489,7 +543,8 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await _saveAccounts(updatedAccounts);
 
-    final updatedSession = AuthSession(user: updatedUser);
+    final updatedSession =
+        _session?.copyWith(user: updatedUser) ?? AuthSession(user: updatedUser);
     _session = updatedSession;
     await _saveSession(updatedSession);
     return updatedUser;

@@ -106,6 +106,7 @@ void main() {
         firstName: 'Mustafa',
         lastName: 'Ali',
         email: ' mustafa@example.com ',
+        phone: '+201000000000',
         password: 'Password123!',
       );
 
@@ -131,6 +132,7 @@ void main() {
         firstName: 'Mustafa',
         lastName: 'Ali',
         email: 'mustafa@example.com',
+        phone: '+201000000000',
         password: 'Password123!',
       );
       final completed = await cubit.completeSignupVerification('123456');
@@ -165,6 +167,7 @@ void main() {
           firstName: 'Mustafa',
           lastName: 'Ali',
           email: 'mustafa@example.com',
+          phone: '+201000000000',
           password: 'Password123!',
         );
         final completed = await cubit.completeSignupVerification('123456');
@@ -194,7 +197,11 @@ void main() {
       final user = await cubit.updateProfile(firstName: 'Mona');
 
       expect(user?.firstName, 'Mona');
-      expect((cubit.state as AuthAuthenticated).session.user.firstName, 'Mona');
+      final updatedSession = (cubit.state as AuthAuthenticated).session;
+      expect(updatedSession.user.firstName, 'Mona');
+      expect(updatedSession.accessToken, sampleSession.accessToken);
+      expect(updatedSession.refreshToken, sampleSession.refreshToken);
+      expect(updatedSession.expiresAt, sampleSession.expiresAt);
       await expectedStates;
       await cubit.close();
     });
@@ -251,6 +258,7 @@ AuthUseCases _authUseCases(AuthRepository repository) {
     verifyEmail: VerifyEmailUseCase(repository),
     resendVerificationCode: ResendVerificationCodeUseCase(repository),
     requestPasswordReset: RequestPasswordResetUseCase(repository),
+    resetPassword: ResetPasswordUseCase(repository),
     refreshProfile: RefreshProfileUseCase(repository),
     updateProfile: UpdateProfileUseCase(repository),
     logout: LogoutUseCase(repository),
@@ -320,8 +328,8 @@ class _FakeAuthRepository implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) async {
     return ApiResult.success(loginResult ?? sampleSession);
   }
@@ -342,6 +350,16 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<ApiResult<bool>> requestPasswordReset(String email) async {
+    return const ApiResult.success(true);
+  }
+
+  @override
+  Future<ApiResult<bool>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
     return const ApiResult.success(true);
   }
 
