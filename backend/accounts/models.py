@@ -28,6 +28,41 @@ class User(AbstractUser):
         ]
 
 
+class CourierProfile(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        BUSY = "busy", "Busy"
+        OFFLINE = "offline", "Offline"
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="courier_profile",
+    )
+    photo_url = models.TextField(blank=True)
+    vehicle = models.CharField(max_length=100, blank=True)
+    plate_number = models.CharField(max_length=50, blank=True)
+    zone = models.CharField(max_length=100, blank=True)
+    max_active_orders = models.PositiveSmallIntegerField(default=3)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_courier_profiles",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name() or self.user.email} courier profile"
+
+
 class OneTimePassword(models.Model):
     class Purpose(models.TextChoices):
         REGISTRATION = "registration", "Registration"

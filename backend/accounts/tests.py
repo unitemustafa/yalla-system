@@ -7,7 +7,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
-from .models import OneTimePassword
+from .models import CourierProfile, OneTimePassword
 
 User = get_user_model()
 
@@ -278,3 +278,221 @@ class AuthenticationAPITests(APITestCase):
         )
         self.assertEqual(otp.attempts, 5)
         self.assertIsNotNone(otp.used_at)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    AUTH_OTP_INCLUDE_IN_RESPONSE=True,
+)
+class V1AuthenticationAPITests(APITestCase):
+    password = "StrongPassword123!"
+
+    def create_user(self, role, **overrides):
+        defaults = {
+            "username": f"{role}_user",
+            "email": f"{role}@example.com",
+            "phone": f"+20100000000{len(role)}",
+            "password": self.password,
+            "role": role,
+            "is_active": True,
+        }
+        defaults.update(overrides)
+        return User.objects.create_user(**defaults)
+
+    def bearer(self, user):
+        refresh = RefreshToken.for_user(user)
+        return {"HTTP_AUTHORIZATION": f"Bearer {refresh.access_token}"}
+
+    def test_market_signup_accepts_flutter_payload_and_verifies_with_code(self):
+        signup_response = self.client.post(
+            "/api/v1/auth/signup",
+            {
+                "firstName": "Mustafa",
+                "lastName": "Ali",
+                "username": "mustafa_ali",
+                "email": "mustafa@example.com",
+                "password": self.password,
+                "phone": "+201001234567",
+            },
+            format="json",
+        )
+
+        self.assertEqual(signup_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(signup_response.data["email"], "mustafa@example.com")
+        self.assertEqual(len(signup_response.data["dev_otp"]), 6)
+
+        user = User.objects.get(email="mustafa@example.com")
+        self.assertEqual(user.role, User.Role.CLIENT)
+        self.assertFalse(user.is_active)
+        self.assertTrue(user.terms_accepted)
+
+        verify_response = self.client.post(
+            "/api/v1/auth/verify-email",
+            {
+                "email": "mustafa@example.com",
+                "code": signup_response.data["dev_otp"],
+            },
+            format="json",
+        )
+
+        self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(verify_response.data["user"]["firstName"], "Mustafa")
+        self.assertEqual(verify_response.data["user"]["role"], "CUSTOMER")
+        self.assertIn("accessToken", verify_response.data)
+        self.assertIn("refreshToken", verify_response.data)
+        self.assertIn("expiresAt", verify_response.data)
+
+    def test_market_signup_requires_username(self):
+        response = self.client.post(
+            "/api/v1/auth/signup",
+            {
+                "firstName": "Mustafa",
+                "lastName": "Ali",
+                "email": "missing.username@example.com",
+                "password": self.password,
+                "phone": "+201001234568",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("username", response.data)
+
+    def test_market_availability_and_me_endpoints_use_customer_role(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="customer",
+            email="customer@example.com",
+            phone="+201001111111",
+        )
+
+        username_response = self.client.get(
+            "/api/v1/auth/check-username",
+            {"username": "new_customer"},
+        )
+        email_response = self.client.get(
+            "/api/v1/auth/check-email",
+            {"email": "customer@example.com"},
+        )
+
+        self.assertEqual(username_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(username_response.data["available"])
+        self.assertTrue(email_response.data["registered"])
+
+        me_response = self.client.get("/api/v1/auth/me", **self.bearer(user))
+        self.assertEqual(me_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(me_response.data["email"], "customer@example.com")
+
+        patch_response = self.client.patch(
+            "/api/v1/auth/me",
+            {"firstName": "Updated"},
+            format="json",
+            **self.bearer(user),
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_response.data["firstName"], "Updated")
+
+    def test_customer_login_rejects_dashboard_and_courier_accounts(self):
+        admin = self.create_user(
+            User.Role.ADMIN,
+            username="admin_user",
+            email="admin@example.com",
+            phone="+201002222222",
+            is_staff=True,
+        )
+        courier = self.create_user(
+            User.Role.REPRESENTATIVE,
+            username="courier_user",
+            email="courier@example.com",
+            phone="+201003333333",
+        )
+
+        for email in (admin.email, courier.email):
+            response = self.client.post(
+                "/api/v1/auth/login",
+                {"email": email, "password": self.password},
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_creates_courier_account_that_can_login_to_courier_app(self):
+        admin = self.create_user(
+            User.Role.ADMIN,
+            username="dashboard_admin",
+            email="dashboard@example.com",
+            phone="+201004444444",
+            is_staff=True,
+        )
+
+        dashboard_login = self.client.post(
+            "/api/v1/dashboard/auth/login",
+            {"email": admin.email, "password": self.password},
+            format="json",
+        )
+        self.assertEqual(dashboard_login.status_code, status.HTTP_200_OK)
+        self.assertEqual(dashboard_login.data["user"]["role"], "ADMIN")
+
+        create_response = self.client.post(
+            "/api/v1/dashboard/couriers",
+            {
+                "name": "Captain Ali",
+                "email": "captain.ali@example.com",
+                "phone": "+201005555555",
+                "password": "CourierPass123!",
+                "vehicle": "Motorbike",
+                "plateNumber": "ABC-123",
+                "zone": "Cairo",
+                "maxActiveOrders": 4,
+            },
+            format="json",
+            **self.bearer(admin),
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["name"], "Captain Ali")
+        self.assertEqual(create_response.data["zone"], "Cairo")
+
+        courier_user = User.objects.get(email="captain.ali@example.com")
+        self.assertEqual(courier_user.role, User.Role.REPRESENTATIVE)
+        self.assertTrue(CourierProfile.objects.filter(user=courier_user).exists())
+
+        courier_login = self.client.post(
+            "/api/v1/courier/auth/login",
+            {"identifier": "+201005555555", "password": "CourierPass123!"},
+            format="json",
+        )
+        self.assertEqual(courier_login.status_code, status.HTTP_200_OK)
+        self.assertEqual(courier_login.data["user"]["role"], "REPRESENTATIVE")
+        self.assertEqual(courier_login.data["courier"]["vehicle"], "Motorbike")
+
+    def test_role_isolation_for_dashboard_and_courier_me(self):
+        customer = self.create_user(
+            User.Role.CLIENT,
+            username="role_customer",
+            email="role.customer@example.com",
+            phone="+201006666666",
+        )
+        courier = self.create_user(
+            User.Role.REPRESENTATIVE,
+            username="role_courier",
+            email="role.courier@example.com",
+            phone="+201007777777",
+        )
+        CourierProfile.objects.create(user=courier, zone="Cairo")
+
+        dashboard_me = self.client.get(
+            "/api/v1/dashboard/auth/me",
+            **self.bearer(customer),
+        )
+        courier_me = self.client.get(
+            "/api/v1/courier/auth/me",
+            **self.bearer(courier),
+        )
+        customer_on_courier = self.client.get(
+            "/api/v1/courier/auth/me",
+            **self.bearer(customer),
+        )
+
+        self.assertEqual(dashboard_me.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(courier_me.status_code, status.HTTP_200_OK)
+        self.assertEqual(courier_me.data["courier"]["zone"], "Cairo")
+        self.assertEqual(customer_on_courier.status_code, status.HTTP_403_FORBIDDEN)
