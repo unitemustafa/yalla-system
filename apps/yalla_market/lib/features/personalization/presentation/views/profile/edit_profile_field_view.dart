@@ -17,11 +17,6 @@ part 'edit_profile_birth_date_widgets.dart';
 
 enum EditableProfileField { name, username, email, phone, gender, birthDate }
 
-bool _useArabicCopy(BuildContext context) {
-  return context.isArabicLanguage ||
-      Directionality.of(context) == TextDirection.rtl;
-}
-
 class EditProfileFieldView extends StatefulWidget {
   const EditProfileFieldView({super.key, required this.field});
 
@@ -34,12 +29,8 @@ class EditProfileFieldView extends StatefulWidget {
 class _EditProfileFieldViewState extends State<EditProfileFieldView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller;
-  late final TextEditingController _verificationCodeController;
   late final String _initialFieldValue;
   bool _isSaving = false;
-  bool _verificationCodeSent = false;
-  String? _verificationTarget;
-  String? _verificationChangeValue;
   DateTime? _selectedDate;
 
   @override
@@ -49,15 +40,11 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
     _selectedDate = profile.birthDate;
     _initialFieldValue = _initialValue(profile);
     _controller = TextEditingController(text: _initialFieldValue);
-    _verificationCodeController = TextEditingController();
-    _controller.addListener(_handleFieldChanged);
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_handleFieldChanged);
     _controller.dispose();
-    _verificationCodeController.dispose();
     super.dispose();
   }
 
@@ -70,74 +57,6 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
       EditableProfileField.gender => profile.gender,
       EditableProfileField.birthDate => _formatDate(profile.birthDate),
     };
-  }
-
-  bool get _isContactField => widget.field == EditableProfileField.phone;
-
-  bool get _shouldShowVerificationPanel =>
-      _isContactField && _controller.text.trim() != _initialFieldValue.trim();
-
-  String get _expectedVerificationCode => '123456';
-
-  String get _contactVerificationTarget => _initialFieldValue.trim();
-
-  void _handleFieldChanged() {
-    if (!_isContactField) return;
-
-    final value = _controller.text.trim();
-    if (!_verificationCodeSent || _verificationChangeValue == value) {
-      setState(() {});
-      return;
-    }
-
-    setState(() {
-      _verificationCodeSent = false;
-      _verificationTarget = null;
-      _verificationChangeValue = null;
-      _verificationCodeController.clear();
-    });
-  }
-
-  void _sendVerificationCode() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final newValue = _controller.text.trim();
-    final target = _contactVerificationTarget;
-    if (!_shouldShowVerificationPanel ||
-        newValue == _initialFieldValue.trim()) {
-      return;
-    }
-
-    if (target.isEmpty) {
-      final useArabicCopy = _useArabicCopy(context);
-      CustomSnackBar.showWarning(
-        context: context,
-        title: useArabicCopy ? 'مفيش رقم حالي' : 'No current phone number',
-        message: useArabicCopy
-            ? 'ضيف رقمك الحالي الأول من خلال الدعم.'
-            : 'Add your current phone number first through support.',
-      );
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _verificationCodeSent = true;
-      _verificationTarget = target;
-      _verificationChangeValue = newValue;
-      _verificationCodeController.clear();
-    });
-
-    final useArabicCopy = _useArabicCopy(context);
-    CustomSnackBar.showSuccess(
-      context: context,
-      title: useArabicCopy
-          ? 'تم إرسال كود واتساب للرقم الحالي'
-          : 'WhatsApp code sent to current phone',
-      message: useArabicCopy
-          ? 'اترسل إلى $target. كود التجربة: $_expectedVerificationCode'
-          : 'Sent to $target. Demo code: $_expectedVerificationCode',
-    );
   }
 
   @override
@@ -182,16 +101,6 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
                       ),
                       const SizedBox(height: 16),
                       _buildInput(isDark),
-                      if (_shouldShowVerificationPanel) ...[
-                        const SizedBox(height: 12),
-                        _ContactVerificationPanel(
-                          isDark: isDark,
-                          codeController: _verificationCodeController,
-                          codeSent: _verificationCodeSent,
-                          target: _contactVerificationTarget,
-                          onSendCode: _sendVerificationCode,
-                        ),
-                      ],
                       const SizedBox(height: 18),
                       Row(
                         children: [
@@ -357,7 +266,6 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
 
     final profile = UserProfileController.instance;
     final value = _controller.text.trim();
-    if (!_canSaveContactChange(value)) return;
 
     setState(() => _isSaving = true);
 
@@ -397,37 +305,6 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
       message: _successMessage,
     );
     Navigator.pop(context);
-  }
-
-  bool _canSaveContactChange(String value) {
-    if (!_shouldShowVerificationPanel) return true;
-
-    final useArabicCopy = _useArabicCopy(context);
-    if (!_verificationCodeSent ||
-        _verificationTarget != _contactVerificationTarget ||
-        _verificationChangeValue != value) {
-      CustomSnackBar.showWarning(
-        context: context,
-        title: useArabicCopy ? 'أكد الرقم الأول' : 'Verify first',
-        message: useArabicCopy
-            ? 'ابعت كود واتساب للرقم الحالي قبل حفظ الرقم الجديد.'
-            : 'Send a WhatsApp code to the current phone before saving the new phone.',
-      );
-      return false;
-    }
-
-    if (_verificationCodeController.text.trim() != _expectedVerificationCode) {
-      CustomSnackBar.showError(
-        context: context,
-        title: useArabicCopy ? 'كود غير صحيح' : 'Invalid code',
-        message: useArabicCopy
-            ? 'اكتب كود التأكيد الصحيح عشان نغير البيانات.'
-            : 'Enter the correct verification code to update this field.',
-      );
-      return false;
-    }
-
-    return true;
   }
 
   (String, String) _splitName(String displayName) {
@@ -534,100 +411,5 @@ class _EditProfileFieldViewState extends State<EditProfileFieldView> {
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
-  }
-}
-
-class _ContactVerificationPanel extends StatelessWidget {
-  const _ContactVerificationPanel({
-    required this.isDark,
-    required this.codeController,
-    required this.codeSent,
-    required this.target,
-    required this.onSendCode,
-  });
-
-  final bool isDark;
-  final TextEditingController codeController;
-  final bool codeSent;
-  final String target;
-  final VoidCallback onSendCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final useArabicCopy = _useArabicCopy(context);
-    final accentColor = AppColors.primary;
-    final mutedColor = isDark
-        ? AppColors.darkTextSecondary
-        : AppColors.lightTextSecondary;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: isDark ? 0.14 : 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: accentColor.withValues(alpha: 0.22)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            useArabicCopy ? 'تأكيد رقم الموبايل الجديد' : 'Confirm new phone',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            useArabicCopy
-                ? 'هنبعت كود واتساب للرقم الحالي $target. اكتبه هنا قبل حفظ الرقم الجديد.'
-                : 'We will send a WhatsApp code to your current phone $target. Enter it here before saving the new phone.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: mutedColor,
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: codeController,
-                  enabled: codeSent,
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  decoration: InputDecoration(
-                    labelText: useArabicCopy ? 'كود واتساب' : 'WhatsApp code',
-                    prefixIcon: const Icon(AppIcons.security_safe),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                height: 50,
-                child: FilledButton(
-                  onPressed: onSendCode,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accentColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    codeSent
-                        ? (useArabicCopy ? 'إعادة إرسال' : 'Resend')
-                        : (useArabicCopy ? 'إرسال واتساب' : 'Send WhatsApp'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 }

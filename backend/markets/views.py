@@ -14,30 +14,25 @@ from .serializers import (
     HomeOfferSerializer,
     HomeProductSerializer,
 )
-from .services import markets_covering_address
 
 
 class HomeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        address = (
-            request.user.addresses.filter(is_default=True)
-            .order_by("-created_at")
-            .first()
-            or request.user.addresses.order_by("-created_at").first()
-        )
-        if address is None:
+        city = request.user.current_city
+        if city is None or not city.is_active:
             return Response(
                 {
-                    "detail": (
-                        "A user address is required before loading the home page."
-                    )
+                    "code": "location_required",
+                    "detail": "Select a supported city before loading the home page.",
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=428,
             )
 
-        market_ids = markets_covering_address(address)
+        market_ids = list(
+            city.markets.filter(status="active").values_list("id", flat=True)
+        )
         now = timezone.now()
 
         products = (
@@ -66,7 +61,12 @@ class HomeView(APIView):
                         market_id__in=market_ids,
                     )
                     .select_related("category", "market")
-                    .prefetch_related("variants"),
+                    .prefetch_related(
+                        Prefetch(
+                            "variants",
+                            queryset=ProductVariant.objects.order_by("price", "id"),
+                        )
+                    ),
                 )
             )
             .order_by("-created_at", "-id")[:4]
@@ -82,14 +82,15 @@ class HomeView(APIView):
         return Response(
             {
                 "location": {
-                    "address_id": address.id,
-                    "name": address.name,
-                    "latitude": address.latitude,
-                    "longitude": address.longitude,
+                    "city_id": city.slug,
+                    "slug": city.slug,
+                    "name": city.name,
+                    "name_ar": city.name_ar,
                 },
                 "offers": HomeOfferSerializer(
                     offers,
                     many=True,
+                    context={"request": request},
                 ).data,
                 "market_classifications": HomeMarketClassificationSerializer(
                     classifications,
@@ -99,6 +100,7 @@ class HomeView(APIView):
                 "products": HomeProductSerializer(
                     products,
                     many=True,
+                    context={"request": request},
                 ).data,
             },
             status=status.HTTP_200_OK,

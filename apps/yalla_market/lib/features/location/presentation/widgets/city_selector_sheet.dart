@@ -57,6 +57,8 @@ class _CitySelectorSheetContent extends StatelessWidget {
               compact: true,
               onCitySelected: (city) => _selectCity(context, city),
               onUseCurrentLocation: () => _useCurrentLocation(context),
+              onOpenSettings: () =>
+                  context.read<LocationCubit>().openAppSettings(),
             );
           },
         ),

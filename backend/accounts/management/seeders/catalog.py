@@ -12,6 +12,7 @@ from catalog.models import (
     ProductVariant,
     VariantAttributeValue,
 )
+from locations.models import City
 from markets.models import Market, MarketClassification
 
 
@@ -26,28 +27,32 @@ def seed_markets(areas):
             "Yalla Fresh Market",
             "Algiers Centre",
             "Supermarket",
+            "cairo",
             ["Central Algiers", "Bab Ezzouar"],
         ),
         (
             "Atlas Family Kitchen",
-            "Bab Ezzouar",
+            "Naama Bay",
             "Restaurant",
+            "sharm-el-sheikh",
             ["Central Algiers", "Bab Ezzouar"],
         ),
         (
             "Oran Golden Bakery",
             "Oran Centre",
             "Bakery",
+            "alexandria",
             ["Oran Centre"],
         ),
     ]
     markets = {}
-    for name, branch, classification, area_names in definitions:
+    for name, branch, classification, city_slug, area_names in definitions:
         market, _ = Market.objects.update_or_create(
             name=name,
-            branch=branch,
             defaults={
+                "branch": branch,
                 "classification": classifications[classification],
+                "city": City.objects.get(slug=city_slug),
                 "status": Market.Status.ACTIVE,
             },
         )

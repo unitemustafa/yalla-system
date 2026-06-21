@@ -8,6 +8,8 @@ class AddressData {
     required this.city,
     required this.state,
     required this.country,
+    this.latitude,
+    this.longitude,
     this.isDefault = false,
   });
 
@@ -19,6 +21,8 @@ class AddressData {
   final String city;
   final String state;
   final String country;
+  final double? latitude;
+  final double? longitude;
   final bool isDefault;
 
   factory AddressData.fromJson(Map<String, dynamic> json) {
@@ -43,9 +47,11 @@ class AddressData {
           json['postalCode']?.toString() ??
           json['postal_code']?.toString() ??
           '',
-      city: json['city']?.toString() ?? '',
+      city: _cityName(json['city']),
       state: json['state']?.toString() ?? '',
       country: json['country']?.toString() ?? '',
+      latitude: _doubleFromJson(json['latitude']),
+      longitude: _doubleFromJson(json['longitude']),
       isDefault:
           json['isDefault'] as bool? ??
           json['is_default'] as bool? ??
@@ -76,6 +82,8 @@ class AddressData {
       'city': city,
       'state': state,
       'country': country,
+      'latitude': latitude,
+      'longitude': longitude,
       'isDefault': isDefault,
     };
   }
@@ -87,9 +95,8 @@ class AddressData {
       'phone': phoneNumber,
       'line1': street,
       'postalCode': postalCode,
-      'city': city,
-      'state': state,
-      'country': country,
+      'latitude': latitude,
+      'longitude': longitude,
       'isDefault': isDefault,
     };
   }
@@ -103,6 +110,8 @@ class AddressData {
     String? city,
     String? state,
     String? country,
+    double? latitude,
+    double? longitude,
     bool? isDefault,
   }) {
     return AddressData(
@@ -114,7 +123,19 @@ class AddressData {
       city: city ?? this.city,
       state: state ?? this.state,
       country: country ?? this.country,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       isDefault: isDefault ?? this.isDefault,
     );
   }
+}
+
+String _cityName(Object? value) {
+  if (value is Map) return '${value['name'] ?? value['slug'] ?? ''}';
+  return value?.toString() ?? '';
+}
+
+double? _doubleFromJson(Object? value) {
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '');
 }

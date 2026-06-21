@@ -18,7 +18,10 @@ class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({"user": UserSerializer(request.user).data})
+        user = User.objects.select_related("current_city").get(pk=request.user.pk)
+        return Response(
+            {"user": UserSerializer(user, context={"request": request}).data}
+        )
 
     def patch(self, request):
         serializer = UserProfileUpdateSerializer(
@@ -27,7 +30,10 @@ class CurrentUserView(APIView):
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
-        return Response({"user": UserSerializer(serializer.save()).data})
+        user = serializer.save()
+        return Response(
+            {"user": UserSerializer(user, context={"request": request}).data}
+        )
 
     def delete(self, request):
         password = request.data.get("password", "")

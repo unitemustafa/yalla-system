@@ -1,11 +1,16 @@
 export type DashboardUser = {
-  id?: string;
+  id: string;
   email: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  phone: string;
   role: string;
+  avatarUrl: string | null;
 };
 
-type BackendUser = {
+export type BackendUser = {
   id?: string | number;
   email?: string;
   first_name?: string;
@@ -13,7 +18,10 @@ type BackendUser = {
   last_name?: string;
   lastName?: string;
   username?: string;
+  phone?: string;
   role?: string;
+  avatar_url?: string | null;
+  avatarUrl?: string | null;
 };
 
 export type BackendLoginResponse = {
@@ -24,17 +32,6 @@ export type BackendLoginResponse = {
 };
 
 const fallbackBackendBaseUrl = "http://127.0.0.1:8000/api/v1";
-const fallbackAllowedRoles = "admin";
-
-export function dashboardAuthMode() {
-  const mode = process.env.DASHBOARD_AUTH_MODE?.trim().toLowerCase();
-
-  if (mode === "demo" || mode === "backend") {
-    return mode;
-  }
-
-  return process.env.BACKEND_API_BASE_URL?.trim() ? "backend" : "demo";
-}
 
 export function backendApiBaseUrl() {
   return (process.env.BACKEND_API_BASE_URL?.trim() || fallbackBackendBaseUrl)
@@ -46,25 +43,11 @@ export function backendAuthUrl(path: string) {
 }
 
 export function isAllowedDashboardRole(role: string | undefined) {
-  const normalizedRole = role?.trim().toLowerCase();
-
-  if (!normalizedRole) {
-    return false;
-  }
-
-  const roles = (process.env.DASHBOARD_ALLOWED_ROLES || fallbackAllowedRoles)
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  return roles.includes(normalizedRole);
+  return role?.trim().toLowerCase() === "admin";
 }
 
 export function normalizeDashboardUser(user: BackendUser | undefined) {
-  if (!user?.email || !user.role) {
-    return null;
-  }
-
+  if (!user?.email || !user.role) return null;
   const firstName = user.first_name ?? user.firstName ?? "";
   const lastName = user.last_name ?? user.lastName ?? "";
   const name =
@@ -73,37 +56,31 @@ export function normalizeDashboardUser(user: BackendUser | undefined) {
     user.email;
 
   return {
-    id: user.id === undefined ? undefined : String(user.id),
+    id: user.id === undefined ? "" : String(user.id),
     email: user.email,
     name,
+    firstName,
+    lastName,
+    username: user.username ?? "",
+    phone: user.phone ?? "",
     role: user.role,
+    avatarUrl: user.avatar_url ?? user.avatarUrl ?? null,
   } satisfies DashboardUser;
 }
 
 export function extractBackendErrorMessage(data: unknown, fallback: string) {
-  if (!data || typeof data !== "object") {
-    return fallback;
-  }
-
+  if (!data || typeof data !== "object") return fallback;
   const record = data as Record<string, unknown>;
   const directMessage = record.message ?? record.detail;
-
   if (typeof directMessage === "string" && directMessage.trim()) {
     return directMessage;
   }
-
   for (const value of Object.values(record)) {
-    if (typeof value === "string" && value.trim()) {
-      return value;
-    }
-
+    if (typeof value === "string" && value.trim()) return value;
     if (Array.isArray(value)) {
       const first = value.find((item) => typeof item === "string" && item.trim());
-      if (typeof first === "string") {
-        return first;
-      }
+      if (typeof first === "string") return first;
     }
   }
-
   return fallback;
 }

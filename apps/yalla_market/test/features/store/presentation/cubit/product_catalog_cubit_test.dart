@@ -147,6 +147,11 @@ class _FakeLocationRepository implements LocationRepository {
   final CityData? city;
 
   @override
+  Future<ApiResult<List<CityData>>> getCities() async {
+    return ApiResult.success(city == null ? const [] : [city!]);
+  }
+
+  @override
   Future<ApiResult<CityData?>> getSelectedCity() async {
     return ApiResult.success(city);
   }

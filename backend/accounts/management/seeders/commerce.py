@@ -29,7 +29,7 @@ def seed_offers(markets, products, now):
             ["Mineral Water", "Orange Juice"],
         ),
         (
-            "Algiers Lunch Flash",
+            "Sharm Lunch Flash",
             "Atlas Family Kitchen",
             Offer.OfferType.FLASH,
             "12.00",

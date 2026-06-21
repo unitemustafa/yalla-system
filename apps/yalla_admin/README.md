@@ -23,33 +23,16 @@ http://localhost:3000
 
 بيانات الدخول التجريبية:
 
-```text
-Email: dashboard@admin.com
-Password: 01266666610
-```
-
-For backend mode, sign in with a real active Django user whose role is included
-in `DASHBOARD_ALLOWED_ROLES`.
-
-Dashboard auth uses the Django backend by default. Configure the backend URL,
-allowed dashboard roles, and session signing secret with environment variables:
+Sign in with a real active Django user whose role is `admin`.
+Configure the backend URL and session signing secret:
 
 ```bash
 BACKEND_API_BASE_URL=http://127.0.0.1:8000/api/v1
-DASHBOARD_AUTH_MODE=backend
-DASHBOARD_ALLOWED_ROLES=admin
 SESSION_SECRET=replace-with-a-strong-random-secret
 ```
 
 `SESSION_SECRET` is required and the app will throw a clear error in production
 when it is missing.
-
-Demo auth is still available for smoke/e2e previews by setting:
-
-```bash
-DASHBOARD_AUTH_MODE=demo
-DASHBOARD_DEMO_PASSWORD=01266666610
-```
 
 ## البيانات
 

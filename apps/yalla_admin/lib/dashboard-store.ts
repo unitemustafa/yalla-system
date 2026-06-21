@@ -1,8 +1,5 @@
-import { cookies } from "next/headers";
-
 import type { ItemRow } from "@/features/dashboard/data";
-import { backendAccessCookieName } from "@/lib/auth";
-import { backendApiBaseUrl } from "@/lib/backend-auth";
+import { djangoFetch } from "@/lib/django-bff";
 
 export type DashboardOrder = {
   index: string;
@@ -66,25 +63,10 @@ async function dashboardRequest<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(backendAccessCookieName)?.value;
-
-  if (!accessToken) {
-    throw new DashboardApiError("Backend access token is missing.", 401);
-  }
-
-  const response = await fetch(
-    `${backendApiBaseUrl()}/dashboard/${path.replace(/^\/+/, "")}`,
-    {
-      ...init,
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        ...(init.body ? { "content-type": "application/json" } : {}),
-        ...init.headers,
-      },
-      cache: "no-store",
-    },
-  ).catch(() => null);
+  const response = await djangoFetch(
+    `dashboard/${path.replace(/^\/+/, "")}`,
+    init,
+  );
 
   if (!response) {
     throw new DashboardApiError("Dashboard API is unavailable.", 503);

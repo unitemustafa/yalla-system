@@ -1,10 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import {
-  getDashboardAccountEmail,
-  isDashboardAccountEmail,
-} from "@/lib/account-email";
-
 export const authCookieName = "yalla-session";
 export const backendAccessCookieName = "yalla-access-token";
 export const backendRefreshCookieName = "yalla-refresh-token";
@@ -12,17 +7,6 @@ export const authCookieMaxAge = 60 * 60 * 8;
 export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
 
 const fallbackSessionSecret = "dev-session-secret-change-me";
-const fallbackDemoPassword = "01266666610";
-
-const demoAdmin = {
-  email: "dashboard@admin.com",
-  name: "Mohamed Abdeljalel",
-  role: "manager",
-};
-
-const mutableAuthState = globalThis as typeof globalThis & {
-  __yallaDemoPassword?: string;
-};
 
 export type SessionPayload = {
   sub: string;
@@ -33,53 +17,12 @@ export type SessionPayload = {
   remembered?: boolean;
 };
 
-if (
-  process.env.NODE_ENV === "production" &&
-  !process.env.SESSION_SECRET?.trim()
-) {
-  throw new Error(
-    "SESSION_SECRET is required in production. Set SESSION_SECRET to a strong random value.",
-  );
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET?.trim()) {
+  throw new Error("SESSION_SECRET is required in production.");
 }
 
 function getSessionSecret() {
-  const secret = process.env.SESSION_SECRET?.trim();
-
-  if (secret) {
-    return secret;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "SESSION_SECRET is required in production. Set SESSION_SECRET to a strong random value.",
-    );
-  }
-
-  return fallbackSessionSecret;
-}
-
-function getDemoPassword() {
-  if (mutableAuthState.__yallaDemoPassword) {
-    return mutableAuthState.__yallaDemoPassword;
-  }
-
-  const password = process.env.DASHBOARD_DEMO_PASSWORD?.trim();
-
-  if (password) {
-    return password;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "DASHBOARD_DEMO_PASSWORD is required for demo dashboard login.",
-    );
-  }
-
-  return fallbackDemoPassword;
-}
-
-export function updateDemoPassword(password: string) {
-  mutableAuthState.__yallaDemoPassword = password;
+  return process.env.SESSION_SECRET?.trim() || fallbackSessionSecret;
 }
 
 function encodeJson(value: SessionPayload) {
@@ -87,84 +30,43 @@ function encodeJson(value: SessionPayload) {
 }
 
 function sign(value: string) {
-  return createHmac("sha256", getSessionSecret())
-    .update(value)
-    .digest("base64url");
+  return createHmac("sha256", getSessionSecret()).update(value).digest("base64url");
 }
 
 function signaturesMatch(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
-
-  return (
-    leftBuffer.length === rightBuffer.length &&
-    timingSafeEqual(leftBuffer, rightBuffer)
-  );
+  return leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function validateDemoCredentials(email: string, password: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  // Demo-only auth: this dashboard has no real backend user database yet.
-  if (
-    normalizedEmail !== demoAdmin.email &&
-    !isDashboardAccountEmail(normalizedEmail)
-  ) {
-    return null;
-  }
-
-  if (password !== getDemoPassword()) {
-    return null;
-  }
-
-  return {
-    email:
-      normalizedEmail === demoAdmin.email
-        ? demoAdmin.email
-        : getDashboardAccountEmail(),
-    name: demoAdmin.name,
-    role: demoAdmin.role,
-  };
-}
-
-export function createSessionToken(user: {
-  email: string;
-  name: string;
-  role: string;
-}, maxAge = authCookieMaxAge, remembered = false) {
+export function createSessionToken(
+  user: { id?: string; email: string; name: string; role: string },
+  maxAge = authCookieMaxAge,
+  remembered = false,
+) {
   const payload = encodeJson({
-    sub: user.email,
+    sub: user.id || user.email,
     email: user.email,
     name: user.name,
     role: user.role,
     exp: Math.floor(Date.now() / 1000) + maxAge,
     remembered,
   });
-
   return `${payload}.${sign(payload)}`;
 }
 
 export function readSessionToken(token: string | undefined) {
-  if (!token) {
-    return null;
-  }
-
+  if (!token) return null;
   const [payload, signature] = token.split(".");
-
   if (!payload || !signature || !signaturesMatch(signature, sign(payload))) {
     return null;
   }
-
   try {
     const session = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
     ) as SessionPayload;
-
-    if (!session.exp || session.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-
-    return session;
+    return session.exp >= Math.floor(Date.now() / 1000) ? session : null;
   } catch {
     return null;
   }

@@ -2,7 +2,8 @@ import 'package:yalla_market/features/cart/data/repositories/cart_repository_imp
 import 'package:yalla_market/features/cart/domain/repositories/cart_repository.dart';
 import 'package:yalla_market/features/cart/domain/usecases/cart_usecases.dart';
 import 'package:yalla_market/features/cart/presentation/cubit/cart_cubit.dart';
-import 'package:yalla_market/features/personalization/data/repositories/address_repository_impl.dart';
+import 'package:yalla_market/core/network/api_result.dart';
+import 'package:yalla_market/features/personalization/domain/entities/address.dart';
 import 'package:yalla_market/features/personalization/domain/repositories/address_repository.dart';
 import 'package:yalla_market/features/personalization/domain/usecases/address_usecases.dart';
 import 'package:yalla_market/features/personalization/presentation/cubit/address_cubit.dart';
@@ -42,7 +43,7 @@ WishlistCubit makeWishlistCubit({WishlistRepository? repository}) {
 }
 
 AddressCubit makeAddressCubit({AddressRepository? repository}) {
-  final repo = repository ?? AddressRepositoryImpl();
+  final repo = repository ?? _TestAddressRepository();
   return AddressCubit(
     AddressUseCases(
       getAddresses: GetAddressesUseCase(repo),
@@ -52,6 +53,46 @@ AddressCubit makeAddressCubit({AddressRepository? repository}) {
       selectAddress: SelectAddressUseCase(repo),
     ),
   );
+}
+
+class _TestAddressRepository implements AddressRepository {
+  final List<AddressData> _addresses = [];
+
+  @override
+  Future<ApiResult<List<AddressData>>> getAddresses() async {
+    return ApiResult.success(List.unmodifiable(_addresses));
+  }
+
+  @override
+  Future<ApiResult<AddressData?>> getSelectedAddress() async {
+    for (final address in _addresses) {
+      if (address.isDefault) return ApiResult.success(address);
+    }
+    return const ApiResult.success(null);
+  }
+
+  @override
+  Future<ApiResult<List<AddressData>>> saveAddress(AddressData address) async {
+    _addresses.removeWhere((item) => item.id == address.id);
+    _addresses.add(address);
+    return ApiResult.success(List.unmodifiable(_addresses));
+  }
+
+  @override
+  Future<ApiResult<List<AddressData>>> deleteAddress(String id) async {
+    _addresses.removeWhere((item) => item.id == id);
+    return ApiResult.success(List.unmodifiable(_addresses));
+  }
+
+  @override
+  Future<ApiResult<List<AddressData>>> selectAddress(String id) async {
+    for (var index = 0; index < _addresses.length; index++) {
+      _addresses[index] = _addresses[index].copyWith(
+        isDefault: _addresses[index].id == id,
+      );
+    }
+    return ApiResult.success(List.unmodifiable(_addresses));
+  }
 }
 
 CheckoutCubit makeCheckoutCubit({OrderRepository? repository}) {

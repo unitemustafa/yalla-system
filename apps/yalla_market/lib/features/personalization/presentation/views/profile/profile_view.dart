@@ -54,7 +54,17 @@ class _ProfileViewState extends State<ProfileView> {
       return;
     }
 
-    UserProfileController.instance.updateAvatar(bytes);
+    final user = await context.read<AuthCubit>().updateAvatar(bytes);
+    if (!context.mounted) return;
+    if (user == null) {
+      CustomSnackBar.showError(
+        context: context,
+        title: 'Profile photo was not saved',
+        message: 'Check the image and try again.',
+      );
+      return;
+    }
+    UserProfileController.instance.updateFromAuthUser(user);
 
     CustomSnackBar.showSuccess(
       context: context,

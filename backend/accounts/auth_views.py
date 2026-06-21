@@ -11,15 +11,42 @@ from .auth_serializers import (
     EmailOTPSerializer,
     ForgotPasswordSerializer,
     LoginSerializer,
+    OTPRequestSerializer,
+    OTPVerifySerializer,
     ResetPasswordSerializer,
     SignupSerializer,
 )
 from .models import OneTimePassword
-from .services import issue_otp, otp_response_data, verify_otp
+from .services import (
+    OTPRateLimitError,
+    issue_otp,
+    otp_response_data,
+    request_ip,
+    verify_otp,
+)
 from .token_serializers import EmailTokenRefreshSerializer, LogoutSerializer
 from .view_utils import blacklist_user_tokens, token_payload
 
 User = get_user_model()
+
+
+def rate_limit_response(error):
+    return Response(
+        {
+            "code": "otp_rate_limited",
+            "detail": error.message,
+            "retry_after": error.retry_after,
+        },
+        status=status.HTTP_429_TOO_MANY_REQUESTS,
+        headers={"Retry-After": str(error.retry_after)},
+    )
+
+
+def issue_otp_for_request(request, user, purpose):
+    try:
+        return issue_otp(user, purpose, request_ip(request))
+    except OTPRateLimitError as error:
+        return rate_limit_response(error)
 
 
 class SignupView(APIView):
@@ -45,7 +72,12 @@ class SignupView(APIView):
         user.set_password(data["password"])
         user.save()
 
-        _, code = issue_otp(user, OneTimePassword.Purpose.REGISTRATION)
+        issued = issue_otp_for_request(
+            request, user, OneTimePassword.Purpose.REGISTRATION
+        )
+        if isinstance(issued, Response):
+            return issued
+        _, code = issued
         return Response(
             {
                 "detail": "Registration OTP sent.",
@@ -104,7 +136,12 @@ class ResendRegistrationOTPView(APIView):
                 {"detail": "If registration is pending, a new OTP has been sent."}
             )
 
-        _, code = issue_otp(user, OneTimePassword.Purpose.REGISTRATION)
+        issued = issue_otp_for_request(
+            request, user, OneTimePassword.Purpose.REGISTRATION
+        )
+        if isinstance(issued, Response):
+            return issued
+        _, code = issued
         return Response(
             {
                 "detail": "A new registration OTP has been sent.",
@@ -160,7 +197,12 @@ class ForgotPasswordView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _, code = issue_otp(user, OneTimePassword.Purpose.PASSWORD_RESET)
+        issued = issue_otp_for_request(
+            request, user, OneTimePassword.Purpose.PASSWORD_RESET
+        )
+        if isinstance(issued, Response):
+            return issued
+        _, code = issued
         response_data = {
             "detail": "If an active account exists, a password reset OTP has been sent."
         }
@@ -185,3 +227,61 @@ class ResetPasswordView(APIView):
 class RefreshTokenView(TokenRefreshView):
     permission_classes = [AllowAny]
     serializer_class = EmailTokenRefreshSerializer
+
+
+class OTPRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = OTPRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        purpose = serializer.validated_data["purpose"]
+        user = User.objects.filter(
+            email__iexact=serializer.validated_data["email"],
+            is_active=(purpose == OneTimePassword.Purpose.PASSWORD_RESET),
+        ).first()
+        response_data = {
+            "detail": "If the account is eligible, a verification code was sent."
+        }
+        if user is None:
+            return Response(response_data)
+        issued = issue_otp_for_request(request, user, purpose)
+        if isinstance(issued, Response):
+            return issued
+        _, code = issued
+        response_data.update(otp_response_data(code))
+        return Response(response_data)
+
+
+class OTPVerifyView(APIView):
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        purpose = data["purpose"]
+        user = User.objects.filter(
+            email__iexact=data["email"],
+            is_active=(purpose == OneTimePassword.Purpose.PASSWORD_RESET),
+        ).first()
+        if user is None:
+            return Response(
+                {"otp": ["Invalid verification code."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        _, error = verify_otp(user, purpose, data["otp"])
+        if error:
+            return Response(
+                {"otp": [error]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if purpose == OneTimePassword.Purpose.REGISTRATION:
+            user.is_active = True
+            user.save(update_fields=["is_active"])
+            return Response(token_payload(user))
+        user.set_password(data["password"])
+        user.save(update_fields=["password"])
+        blacklist_user_tokens(user)
+        return Response({"detail": "Password reset successfully."})

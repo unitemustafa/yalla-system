@@ -6,6 +6,7 @@ import '../../../features/location/data/repositories/location_repository_impl.da
 import '../../../features/location/domain/repositories/location_repository.dart';
 import '../../../features/location/domain/usecases/location_usecases.dart';
 import '../../../features/location/presentation/cubit/location_cubit.dart';
+import '../../../core/network/api_client.dart';
 
 void registerLocationDependencies(GetIt sl) {
   if (!sl.isRegistered<LocationPreferences>()) {
@@ -21,8 +22,12 @@ void registerLocationDependencies(GetIt sl) {
       () => LocationRepositoryImpl(
         sl<LocationPreferences>(),
         sl<DeviceLocationDataSource>(),
+        sl<ApiClient>(),
       ),
     );
+  }
+  if (!sl.isRegistered<GetCitiesUseCase>()) {
+    sl.registerLazySingleton(() => GetCitiesUseCase(sl<LocationRepository>()));
   }
   if (!sl.isRegistered<GetSelectedCityUseCase>()) {
     sl.registerLazySingleton(
@@ -57,6 +62,7 @@ void registerLocationDependencies(GetIt sl) {
   if (!sl.isRegistered<LocationUseCases>()) {
     sl.registerLazySingleton(
       () => LocationUseCases(
+        getCities: sl<GetCitiesUseCase>(),
         getSelectedCity: sl<GetSelectedCityUseCase>(),
         saveSelectedCity: sl<SaveSelectedCityUseCase>(),
         detectCurrentLocation: sl<DetectCurrentLocationUseCase>(),

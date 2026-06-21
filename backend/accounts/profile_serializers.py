@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.utils import timezone
+from PIL import Image, UnidentifiedImageError
 from rest_framework import serializers
+from datetime import timedelta
 
 from .serializer_utils import (
     CamelCaseInputMixin,
@@ -75,6 +78,18 @@ class UserProfileUpdateSerializer(
     )
     email = serializers.EmailField(required=False)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    avatar = serializers.ImageField(required=False)
+    gender = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    birth_date = serializers.DateField(required=False, allow_null=True)
+    fcm_token = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    input_aliases = {
+        **CamelCaseInputMixin.input_aliases,
+        "birthDate": "birth_date",
+        "fcmToken": "fcm_token",
+        "profilePhoto": "avatar",
+        "profile_photo": "avatar",
+    }
 
     def validate_email(self, value):
         email = normalize_email(value)
@@ -92,6 +107,13 @@ class UserProfileUpdateSerializer(
         ).first()
         if user:
             raise serializers.ValidationError("This username is already taken.")
+        if username != self.instance.username:
+            changed_at = self.instance.username_changed_at
+            next_change_at = changed_at + timedelta(days=7) if changed_at else None
+            if next_change_at and next_change_at > timezone.now():
+                raise serializers.ValidationError(
+                    f"Username can be changed after {next_change_at.isoformat()}."
+                )
         return username
 
     def validate_phone(self, value):
@@ -105,16 +127,51 @@ class UserProfileUpdateSerializer(
             )
         return phone
 
+    def validate_avatar(self, value):
+        if value.size > 8 * 1024 * 1024:
+            raise serializers.ValidationError("Image must not exceed 8 MB.")
+        try:
+            image = Image.open(value)
+            image.verify()
+            image_format = (image.format or "").upper()
+        except (UnidentifiedImageError, OSError, ValueError):
+            raise serializers.ValidationError("Upload a valid image.")
+        finally:
+            value.seek(0)
+        if image_format not in {"JPEG", "PNG", "WEBP", "GIF"}:
+            raise serializers.ValidationError(
+                "Only JPG, PNG, WebP, and GIF images are supported."
+            )
+        return value
+
     def update(self, instance, validated_data):
-        fields = ("first_name", "last_name", "username", "email", "phone")
+        fields = (
+            "first_name",
+            "last_name",
+            "username",
+            "email",
+            "phone",
+            "avatar",
+            "gender",
+            "birth_date",
+            "fcm_token",
+        )
+        username_changed = (
+            "username" in validated_data
+            and validated_data["username"] != instance.username
+        )
         for field in fields:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
+        if username_changed:
+            instance.username_changed_at = timezone.now()
         instance.save(
             update_fields=[
                 field
-                for field in (*fields, "updated_at")
-                if field in validated_data or field == "updated_at"
+                for field in (*fields, "username_changed_at", "updated_at")
+                if field in validated_data
+                or field == "updated_at"
+                or (field == "username_changed_at" and username_changed)
             ]
         )
         return instance

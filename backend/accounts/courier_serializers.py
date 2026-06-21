@@ -66,16 +66,35 @@ class CourierSerializer(serializers.ModelSerializer):
         return labels.get(user.courier_profile.status, "غير متصل")
 
     def get_performance(self, _user):
-        return "100%"
+        total = _user.courier_orders.count()
+        delivered = _user.courier_orders.filter(status="delivered").count()
+        return f"{round((delivered / total) * 100) if total else 0}%"
 
-    def get_activeOrders(self, _user):
-        return []
+    def get_activeOrders(self, user):
+        return list(
+            user.courier_orders.filter(
+                status__in=(
+                    "pending",
+                    "confirmed",
+                    "under_preparation",
+                    "ready",
+                )
+            ).values_list("id", flat=True)
+        )
 
-    def get_deliveredOrders(self, _user):
-        return []
+    def get_deliveredOrders(self, user):
+        return list(
+            user.courier_orders.filter(status="delivered").values_list(
+                "id", flat=True
+            )
+        )
 
-    def get_notDeliveredOrders(self, _user):
-        return []
+    def get_notDeliveredOrders(self, user):
+        return list(
+            user.courier_orders.filter(status="cancelled").values_list(
+                "id", flat=True
+            )
+        )
 
 
 class CourierCreateSerializer(RequiredFieldMessagesMixin, serializers.Serializer):

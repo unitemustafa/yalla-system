@@ -16,6 +16,7 @@ from catalog.models import (
     ProductVariant,
 )
 from markets.models import Market, MarketClassification
+from locations.models import City
 from orders.models import Order
 
 User = get_user_model()
@@ -85,28 +86,112 @@ def unique_sku():
 def resolve_market(name):
     cleaned = str(name or "").strip()
     if cleaned:
-        market = Market.objects.filter(name__iexact=cleaned).first()
+        market = Market.objects.filter(
+            name__iexact=cleaned,
+            city__isnull=False,
+        ).first()
         if market:
             return market
-        classification, _ = MarketClassification.objects.get_or_create(
-            name="Dashboard"
-        )
-        return Market.objects.create(
-            classification=classification,
-            name=cleaned,
-            status=Market.Status.ACTIVE,
+        raise serializers.ValidationError(
+            {
+                "shopName": [
+                    "Choose an existing market that is assigned to a city."
+                ]
+            }
         )
 
-    market = Market.objects.filter(status=Market.Status.ACTIVE).order_by("id").first()
+    market = (
+        Market.objects.filter(
+            status=Market.Status.ACTIVE,
+            city__isnull=False,
+        )
+        .order_by("id")
+        .first()
+    )
     if market:
         return market
-
-    classification, _ = MarketClassification.objects.get_or_create(name="Dashboard")
-    return Market.objects.create(
-        classification=classification,
-        name="Yalla Market",
-        status=Market.Status.ACTIVE,
+    raise serializers.ValidationError(
+        {"shopName": ["Create a city-assigned market before creating products."]}
     )
+
+
+class DashboardCitySerializer(serializers.ModelSerializer):
+    id = serializers.CharField(source="slug", read_only=True)
+
+    class Meta:
+        model = City
+        fields = (
+            "id",
+            "slug",
+            "name",
+            "name_ar",
+            "center_latitude",
+            "center_longitude",
+            "radius_km",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("created_at", "updated_at")
+
+    def validate_radius_km(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Radius must be greater than zero.")
+        return value
+
+    def validate_center_latitude(self, value):
+        if not -90 <= value <= 90:
+            raise serializers.ValidationError("Latitude must be between -90 and 90.")
+        return value
+
+    def validate_center_longitude(self, value):
+        if not -180 <= value <= 180:
+            raise serializers.ValidationError(
+                "Longitude must be between -180 and 180."
+            )
+        return value
+
+
+class DashboardMarketSerializer(serializers.ModelSerializer):
+    city_id = serializers.SlugRelatedField(
+        source="city",
+        slug_field="slug",
+        queryset=City.objects.filter(is_active=True),
+    )
+    classification_id = serializers.PrimaryKeyRelatedField(
+        source="classification",
+        queryset=MarketClassification.objects.all(),
+    )
+    city_name = serializers.CharField(source="city.name", read_only=True)
+    classification_name = serializers.CharField(
+        source="classification.name",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Market
+        fields = (
+            "id",
+            "name",
+            "branch",
+            "status",
+            "city_id",
+            "city_name",
+            "classification_id",
+            "classification_name",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("created_at", "updated_at")
+
+    def validate(self, attrs):
+        if attrs.get("city") is None and (
+            self.instance is None or self.instance.city_id is None
+        ):
+            raise serializers.ValidationError(
+                {"city_id": "A city is required for every market change."}
+            )
+        return attrs
 
 
 def resolve_category(name, category_type):
@@ -186,6 +271,7 @@ def order_to_dashboard(order, position):
         "date": local_created_at.strftime("%Y-%m-%d"),
         "time": local_created_at.strftime("%H:%M"),
         "payment": order.payment_method,
+        "courierId": str(order.courier_id) if order.courier_id else None,
     }
 
 
@@ -308,6 +394,20 @@ class DashboardOrderWriteSerializer(serializers.Serializer):
     date = serializers.CharField(required=False, allow_blank=True)
     time = serializers.CharField(required=False, allow_blank=True)
     payment = serializers.CharField(required=False, allow_blank=True)
+    courierId = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_courierId(self, value):
+        if value is None:
+            return None
+        courier = User.objects.filter(
+            pk=value,
+            role=User.Role.REPRESENTATIVE,
+            courier_profile__isnull=False,
+            is_active=True,
+        ).first()
+        if courier is None:
+            raise serializers.ValidationError("Active courier was not found.")
+        return courier
 
     def _status(self, value, fallback=Order.Status.PENDING):
         cleaned = str(value or "").strip()
@@ -349,6 +449,7 @@ class DashboardOrderWriteSerializer(serializers.Serializer):
         return Order.objects.create(
             user=self._user(validated_data),
             market=market,
+            courier=validated_data.get("courierId"),
             payment_method=str(validated_data.get("payment", "")).strip() or "نقدي",
             description=str(validated_data.get("type", "")).strip(),
             status=self._status(validated_data.get("status")),
@@ -367,6 +468,7 @@ class DashboardOrderWriteSerializer(serializers.Serializer):
         if "total" in validated_data:
             order.subtotal_price = validated_data["total"]
             order.total_price = validated_data["total"]
+        if "courierId" in validated_data:
+            order.courier = validated_data["courierId"]
         order.save()
         return order
-

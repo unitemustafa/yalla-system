@@ -1,116 +1,28 @@
-import { cookies } from "next/headers";
+import { extractBackendErrorMessage } from "@/lib/backend-auth";
+import { djangoFetch } from "@/lib/django-bff";
 
-import { requireDashboardSession, unauthorizedResponse } from "@/lib/api-auth";
-import {
-  authCookieSettings,
-  backendAccessCookieName,
-  backendRefreshCookieName,
-  rememberedAuthCookieMaxAge,
-} from "@/lib/auth";
-import {
-  backendApiBaseUrl,
-  dashboardAuthMode,
-  extractBackendErrorMessage,
-} from "@/lib/backend-auth";
-
-async function proxyCouriers(method: "GET" | "POST", request?: Request) {
-  const session = await requireDashboardSession();
-
-  if (!session) {
-    return unauthorizedResponse();
+async function proxy(method: "GET" | "POST", request?: Request) {
+  const response = await djangoFetch("auth/couriers", {
+    method,
+    body: method === "POST" ? await request?.text() : undefined,
+  });
+  if (!response) {
+    return Response.json({ message: "Courier service is unavailable." }, { status: 503 });
   }
-
-  if (dashboardAuthMode() !== "backend") {
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
     return Response.json(
-      { message: "Courier accounts require backend authentication mode." },
-      { status: 503 },
+      { message: extractBackendErrorMessage(data, "Courier request failed.") },
+      { status: response.status },
     );
   }
-
-  const cookieStore = await cookies();
-  let accessToken = cookieStore.get(backendAccessCookieName)?.value;
-
-  if (!accessToken) {
-    return unauthorizedResponse();
-  }
-
-  const body = method === "POST" ? await request?.text() : undefined;
-  const sendRequest = () =>
-    fetch(`${backendApiBaseUrl()}/auth/couriers`, {
-      method,
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        ...(method === "POST" ? { "content-type": "application/json" } : {}),
-      },
-      body,
-      cache: "no-store",
-    }).catch(() => null);
-
-  let backendResponse = await sendRequest();
-
-  if (backendResponse?.status === 401) {
-    const refreshToken = cookieStore.get(backendRefreshCookieName)?.value;
-    const refreshResponse = refreshToken
-      ? await fetch(`${backendApiBaseUrl()}/auth/refresh`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ refreshToken }),
-          cache: "no-store",
-        }).catch(() => null)
-      : null;
-    const refreshData = (await refreshResponse?.json().catch(() => null)) as
-      | { accessToken?: string; refreshToken?: string }
-      | null;
-
-    if (refreshResponse?.ok && refreshData?.accessToken) {
-      accessToken = refreshData.accessToken;
-      cookieStore.set({
-        name: backendAccessCookieName,
-        value: accessToken,
-        ...authCookieSettings(session.remembered ? 15 * 60 : undefined),
-      });
-      if (refreshData.refreshToken) {
-        cookieStore.set({
-          name: backendRefreshCookieName,
-          value: refreshData.refreshToken,
-          ...authCookieSettings(
-            session.remembered ? rememberedAuthCookieMaxAge : undefined,
-          ),
-        });
-      }
-      backendResponse = await sendRequest();
-    }
-  }
-
-  if (!backendResponse) {
-    return Response.json(
-      { message: "Courier account service is unavailable." },
-      { status: 503 },
-    );
-  }
-
-  const data = await backendResponse.json().catch(() => null);
-
-  if (!backendResponse.ok) {
-    return Response.json(
-      {
-        ...(data && typeof data === "object" ? data : {}),
-        message: extractBackendErrorMessage(
-          data,
-          "Could not save the courier account.",
-        ),
-      },
-      { status: backendResponse.status },
-    );
-  }
-
-  return Response.json(data, { status: backendResponse.status });
+  return Response.json(data, { status: response.status });
 }
 
 export async function GET() {
-  return proxyCouriers("GET");
+  return proxy("GET");
 }
 
 export async function POST(request: Request) {
-  return proxyCouriers("POST", request);
+  return proxy("POST", request);
 }

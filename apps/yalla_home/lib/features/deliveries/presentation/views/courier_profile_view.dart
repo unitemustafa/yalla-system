@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/connectivity/internet_status_controller.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/presentation/widgets/page_top_bar.dart';
 import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/theme/app_theme_controller.dart';
+import '../../../auth/data/courier_auth_service.dart';
 
 class CourierProfileView extends StatelessWidget {
   const CourierProfileView({
@@ -16,6 +16,7 @@ class CourierProfileView extends StatelessWidget {
     required this.onActiveOrdersTap,
     required this.onDeliveredSummaryTap,
     required this.onLogout,
+    required this.user,
   });
 
   final int activeOrders;
@@ -23,6 +24,7 @@ class CourierProfileView extends StatelessWidget {
   final VoidCallback onActiveOrdersTap;
   final VoidCallback onDeliveredSummaryTap;
   final VoidCallback onLogout;
+  final CourierUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +55,7 @@ class CourierProfileView extends StatelessWidget {
                         subtitle: 'بيانات الشيفت والحالة الحالية',
                       ),
                       const SizedBox(height: 18),
-                      const _CourierHero(),
+                      _CourierHero(user: user),
                       const SizedBox(height: 14),
                       Row(
                         children: [
@@ -83,11 +85,24 @@ class CourierProfileView extends StatelessWidget {
                         title: 'إعدادات التشغيل',
                         isDark: isDark,
                         children: [
-                          const _SettingsInfoTile(
+                          _SettingsInfoTile(
                             icon: AppIcons.location,
                             title: 'منطقة الشيفت',
-                            subtitle: 'القاهرة • متاح للتوصيل',
+                            subtitle:
+                                user.courierProfile?.region.isNotEmpty == true
+                                ? user.courierProfile!.region
+                                : 'غير محددة',
                             accentColor: AppColors.success,
+                          ),
+                          _SettingsDivider(isDark: isDark),
+                          _SettingsInfoTile(
+                            icon: AppIcons.truck_fast,
+                            title: 'المركبة',
+                            subtitle: [
+                              user.courierProfile?.vehicleType ?? '',
+                              user.courierProfile?.vehiclePlate ?? '',
+                            ].where((value) => value.isNotEmpty).join(' • '),
+                            accentColor: AppColors.primary,
                           ),
                           _SettingsDivider(isDark: isDark),
                           const _ThemeModeTile(),
@@ -149,7 +164,9 @@ class CourierProfileView extends StatelessWidget {
 }
 
 class _CourierHero extends StatelessWidget {
-  const _CourierHero();
+  const _CourierHero({required this.user});
+
+  final CourierUser user;
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +188,6 @@ class _CourierHero extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
@@ -179,7 +195,7 @@ class _CourierHero extends StatelessWidget {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: Image.asset(AppAssets.blackLogo, fit: BoxFit.contain),
+              child: _CourierAvatar(user: user),
             ),
           ),
           const SizedBox(width: 14),
@@ -191,7 +207,7 @@ class _CourierHero extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        'كابتن مصطفى',
+                        user.name.isEmpty ? user.email : user.name,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontSize: 20,
@@ -211,7 +227,7 @@ class _CourierHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'شيفت القاهرة • متاح للتوصيل',
+                  _profileSummary(user),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.white.withValues(alpha: 0.78),
                     fontWeight: FontWeight.w700,
@@ -228,6 +244,47 @@ class _CourierHero extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CourierAvatar extends StatelessWidget {
+  const _CourierAvatar({required this.user});
+
+  final CourierUser user;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = user.courierProfile?.profilePhotoUrl;
+    final fallback = Center(
+      child: Text(
+        user.name.trim().isEmpty ? 'Y' : user.name.trim()[0].toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+    if (photo == null || photo.isEmpty) return fallback;
+    return Image.network(
+      photo,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+}
+
+String _profileSummary(CourierUser user) {
+  final profile = user.courierProfile;
+  if (profile == null) return user.phone;
+  final status = switch (profile.status) {
+    'available' => 'متاح للتوصيل',
+    'busy' => 'مشغول',
+    _ => 'غير متصل',
+  };
+  return [
+    profile.region,
+    status,
+  ].where((value) => value.trim().isNotEmpty).join(' • ');
 }
 
 class _StatusBadge extends StatelessWidget {

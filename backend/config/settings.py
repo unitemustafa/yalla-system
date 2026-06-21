@@ -22,10 +22,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m*gme97(k%lgq+lq2tjwh48jkygaz-w8gpx67!wa0j)miv52yy'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-development-only")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 ALLOWED_HOSTS = [
     host.strip()
@@ -143,6 +148,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+MEDIA_URL = os.getenv("DJANGO_MEDIA_URL", "/media/")
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", BASE_DIR / "media"))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv("DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024))
+)
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -163,10 +173,36 @@ SIMPLE_JWT = {
 # use a shorter refresh token even if that token is copied elsewhere.
 AUTH_SESSION_REFRESH_TOKEN_LIFETIME = timedelta(hours=8)
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
-DEFAULT_FROM_EMAIL = "brahmia.lokmeneabdelmoname@univ-guelma.dz"
+EMAIL_BACKEND = os.getenv(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("SMTP_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("SMTP_USERNAME", "laura.jackson620@gmail.com")
+EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "mktswnsukuboress")
+EMAIL_USE_TLS = os.getenv("SMTP_USE_TLS", "true").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+EMAIL_USE_SSL = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@yalla.local")
 
-AUTH_OTP_EXPIRY_SECONDS = 10 * 60
+AUTH_OTP_EXPIRY_SECONDS = int(os.getenv("AUTH_OTP_EXPIRY_SECONDS", "300"))
+AUTH_OTP_COOLDOWN_SECONDS = int(os.getenv("AUTH_OTP_COOLDOWN_SECONDS", "60"))
+AUTH_OTP_TARGET_LIMIT = int(os.getenv("AUTH_OTP_TARGET_LIMIT", "3"))
+AUTH_OTP_TARGET_WINDOW_SECONDS = int(
+    os.getenv("AUTH_OTP_TARGET_WINDOW_SECONDS", "600")
+)
+AUTH_OTP_IP_LIMIT = int(os.getenv("AUTH_OTP_IP_LIMIT", "10"))
+AUTH_OTP_IP_WINDOW_SECONDS = int(os.getenv("AUTH_OTP_IP_WINDOW_SECONDS", "3600"))
 AUTH_OTP_INCLUDE_IN_RESPONSE = DEBUG
 
 _default_cors_allowed_origins = (

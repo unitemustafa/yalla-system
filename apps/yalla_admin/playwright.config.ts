@@ -23,10 +23,6 @@ export default defineConfig({
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
-        env: {
-          ...process.env,
-          DASHBOARD_AUTH_MODE: "demo",
-        },
       },
   projects: [
     {

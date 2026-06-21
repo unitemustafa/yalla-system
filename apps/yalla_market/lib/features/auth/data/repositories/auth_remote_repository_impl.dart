@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -172,15 +174,26 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<ApiResult<AuthUser>> updateAvatar(Uint8List bytes) {
+    return _guard(() async {
+      final payload = await _apiClient.patch<Map<String, dynamic>>(
+        '/auth/me',
+        data: FormData.fromMap({
+          'avatar': MultipartFile.fromBytes(bytes, filename: 'avatar.png'),
+        }),
+      );
+      return _userFromPayload(payload);
+    });
+  }
+
+  @override
   Future<ApiResult<bool>> logout() {
     return _guard(() async {
       final tokens = await _tokenStore.read();
       try {
         await _apiClient.post<Object?>(
           '/auth/logout',
-          data: {
-            if (tokens != null) 'refreshToken': tokens.refreshToken,
-          },
+          data: {if (tokens != null) 'refreshToken': tokens.refreshToken},
         );
       } finally {
         await _tokenStore.clear();

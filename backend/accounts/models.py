@@ -12,6 +12,18 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=30, unique=True)
     role = models.CharField(max_length=30, choices=Role.choices, default=Role.CLIENT)
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
+    gender = models.CharField(max_length=30, blank=True)
+    birth_date = models.DateField(null=True, blank=True)
+    username_changed_at = models.DateTimeField(null=True, blank=True)
+    current_city = models.ForeignKey(
+        "locations.City",
+        on_delete=models.SET_NULL,
+        related_name="current_users",
+        null=True,
+        blank=True,
+    )
+    fcm_token = models.TextField(blank=True, null=True)
 
     terms_accepted = models.BooleanField(default=False)
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
@@ -48,6 +60,19 @@ class OneTimePassword(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["user", "purpose", "created_at"]),
+        ]
+
+
+class OTPRequestLog(models.Model):
+    purpose = models.CharField(max_length=30, choices=OneTimePassword.Purpose.choices)
+    target_hash = models.CharField(max_length=64)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["target_hash", "purpose", "created_at"]),
+            models.Index(fields=["ip_address", "created_at"]),
         ]
 
 

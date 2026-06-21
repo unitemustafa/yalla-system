@@ -110,6 +110,43 @@ class EmailOTPSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
         return normalize_email(value)
 
 
+class OTPRequestSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
+    email = serializers.EmailField()
+    purpose = serializers.ChoiceField(choices=OneTimePassword.Purpose.choices)
+
+    def validate_email(self, value):
+        return normalize_email(value)
+
+
+class OTPVerifySerializer(EmailOTPSerializer):
+    purpose = serializers.ChoiceField(choices=OneTimePassword.Purpose.choices)
+    password = serializers.CharField(
+        required=False,
+        write_only=True,
+        trim_whitespace=False,
+    )
+    password_confirm = serializers.CharField(
+        required=False,
+        write_only=True,
+        trim_whitespace=False,
+    )
+
+    def validate(self, attrs):
+        if attrs["purpose"] == OneTimePassword.Purpose.PASSWORD_RESET:
+            password = attrs.get("password")
+            password_confirm = attrs.get("password_confirm")
+            if not password:
+                raise serializers.ValidationError(
+                    {"password": "Password is required for password reset."}
+                )
+            if password != password_confirm:
+                raise serializers.ValidationError(
+                    {"password_confirm": "Passwords do not match."}
+                )
+            validate_password_strength(password)
+        return attrs
+
+
 class LoginSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
     email = serializers.CharField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)

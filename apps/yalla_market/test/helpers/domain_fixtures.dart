@@ -49,6 +49,8 @@ const sampleAddress = AddressData(
   state: 'Cairo',
   country: 'Egypt',
   postalCode: '11511',
+  latitude: 30.0444,
+  longitude: 31.2357,
   isDefault: true,
 );
 

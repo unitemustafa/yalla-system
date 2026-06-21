@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:yalla_home/core/theme/app_theme_controller.dart';
+import 'package:yalla_home/features/auth/data/courier_auth_service.dart';
 import 'package:yalla_home/features/deliveries/domain/courier_order.dart';
 import 'package:yalla_home/features/deliveries/presentation/views/courier_profile_view.dart';
 import 'package:yalla_home/features/deliveries/presentation/widgets/order_card.dart';
@@ -80,6 +81,22 @@ void main() {
     await tester.pumpWidget(
       _TestApp(
         child: CourierProfileView(
+          user: const CourierUser(
+            id: 'courier-1',
+            firstName: 'Mustafa',
+            lastName: 'Ali',
+            email: 'courier@example.com',
+            phone: '+201001234567',
+            role: 'representative',
+            courierProfile: CourierProfileData(
+              region: 'Tripoli',
+              vehicleType: 'Motorcycle',
+              vehiclePlate: 'ABC-123',
+              status: 'available',
+              activeOrders: 3,
+              deliveredOrders: 1,
+            ),
+          ),
           activeOrders: 3,
           deliveredOrders: 1,
           onActiveOrdersTap: () => activeTapped = true,

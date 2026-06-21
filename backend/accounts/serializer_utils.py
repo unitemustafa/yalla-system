@@ -162,6 +162,10 @@ class PasswordValidationMixin:
 
 class UserSerializer(RequiredFieldMessagesMixin, serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
+    avatar_url = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+    current_city = serializers.SerializerMethodField()
+    courier_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -173,4 +177,59 @@ class UserSerializer(RequiredFieldMessagesMixin, serializers.ModelSerializer):
             "email",
             "phone",
             "role",
+            "avatar_url",
+            "has_password",
+            "gender",
+            "birth_date",
+            "username_changed_at",
+            "current_city",
+            "fcm_token",
+            "courier_profile",
         )
+
+    def get_avatar_url(self, user):
+        if not user.avatar:
+            return None
+        try:
+            url = user.avatar.url
+        except ValueError:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
+
+    def get_has_password(self, user):
+        return user.has_usable_password()
+
+    def get_current_city(self, user):
+        city = getattr(user, "current_city", None)
+        if city is None:
+            return None
+        return {
+            "id": city.slug,
+            "slug": city.slug,
+            "name": city.name,
+            "name_ar": city.name_ar,
+        }
+
+    def get_courier_profile(self, user):
+        profile = getattr(user, "courier_profile", None)
+        if profile is None:
+            return None
+        active_statuses = (
+            "pending",
+            "confirmed",
+            "under_preparation",
+            "ready",
+        )
+        orders = user.courier_orders.all()
+        photo_url = profile.photo_url or self.get_avatar_url(user)
+        return {
+            "region": profile.zone,
+            "vehicle_type": profile.vehicle,
+            "vehicle_plate": profile.plate_number,
+            "profile_photo_url": photo_url or None,
+            "status": profile.status,
+            "max_active_orders": profile.max_active_orders,
+            "active_orders": orders.filter(status__in=active_statuses).count(),
+            "delivered_orders": orders.filter(status="delivered").count(),
+        }

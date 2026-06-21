@@ -154,7 +154,11 @@ class SignupAvailabilityChecker {
     }
 
     isCheckingEmail = true;
-    emailAvailabilityMessage = _copy(context, 'بنفحص الإيميل...', 'Checking email...');
+    emailAvailabilityMessage = _copy(
+      context,
+      'بنفحص الإيميل...',
+      'Checking email...',
+    );
     onStateChanged();
 
     try {

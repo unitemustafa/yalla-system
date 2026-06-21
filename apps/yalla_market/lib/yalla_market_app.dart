@@ -27,6 +27,7 @@ import 'features/store/presentation/cubit/order_history_cubit.dart';
 import 'features/store/presentation/cubit/product_catalog_cubit.dart';
 import 'features/store/presentation/cubit/product_discovery_cubit.dart';
 import 'features/wishlist/presentation/cubit/wishlist_cubit.dart';
+import 'features/home/presentation/cubit/home_cubit.dart';
 
 import 'features/splash/presentation/cubit/splash_cubit.dart';
 
@@ -53,6 +54,7 @@ class _YallaMarketAppState extends State<YallaMarketApp> {
         BlocProvider(create: (_) => sl<AuthCubit>()),
         BlocProvider(create: (_) => sl<OnboardingCubit>()),
         BlocProvider(create: (_) => sl<LocationCubit>()),
+        BlocProvider(create: (_) => sl<HomeCubit>()),
         BlocProvider(create: (_) => sl<SplashCubit>()),
         BlocProvider(create: (_) => sl<ProductCatalogCubit>()),
         BlocProvider(create: (_) => sl<ProductDiscoveryCubit>()),

@@ -15,6 +15,7 @@ class CitySelectionPanel extends StatefulWidget {
     required this.state,
     required this.onCitySelected,
     required this.onUseCurrentLocation,
+    this.onOpenSettings,
     this.compact = false,
     this.initialMode = LocationChoiceMode.automatic,
     this.mode,
@@ -24,6 +25,7 @@ class CitySelectionPanel extends StatefulWidget {
   final LocationState state;
   final ValueChanged<CityData> onCitySelected;
   final VoidCallback onUseCurrentLocation;
+  final VoidCallback? onOpenSettings;
   final bool compact;
   final LocationChoiceMode initialMode;
   final LocationChoiceMode? mode;
@@ -62,9 +64,7 @@ class _CitySelectionPanelState extends State<CitySelectionPanel> {
         ? (widget.state as LocationFailure).message
         : null;
     final selectedCity = widget.state.selectedCity;
-    final manualCities = CityData.supported
-        .where((city) => !city.isGeneral)
-        .toList(growable: false);
+    final manualCities = CityData.supported.toList(growable: false);
 
     return Column(
       mainAxisSize: widget.compact ? MainAxisSize.min : MainAxisSize.max,
@@ -76,6 +76,26 @@ class _CitySelectionPanelState extends State<CitySelectionPanel> {
         if (error != null && _mode == LocationChoiceMode.automatic) ...[
           const SizedBox(height: 12),
           _LocationError(message: error),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isBusy ? null : widget.onUseCurrentLocation,
+                  child: const Text('Retry'),
+                ),
+              ),
+              if (widget.onOpenSettings != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.onOpenSettings,
+                    child: const Text('Open settings'),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
         const SizedBox(height: 18),
         AnimatedSwitcher(
@@ -109,11 +129,13 @@ class _CitySelectionPanelState extends State<CitySelectionPanel> {
                         ),
                       ),
                     ),
-                    _OtherRegionTile(
-                      selected: selectedCity?.isGeneral ?? false,
-                      disabled: manualDisabled,
-                      onTap: () => _selectSupportedCity(CityData.general),
-                    ),
+                    if (manualCities.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No supported cities are available. Retry after checking your connection.',
+                        ),
+                      ),
                   ],
                 ),
         ),
@@ -448,79 +470,6 @@ class _CityTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 _RegionBadge(label: context.tr('General')),
               ],
-              const Icon(AppIcons.arrow_right_3, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OtherRegionTile extends StatelessWidget {
-  const _OtherRegionTile({
-    required this.selected,
-    required this.disabled,
-    required this.onTap,
-  });
-
-  final bool selected;
-  final bool disabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = selected
-        ? AppColors.primary.withValues(alpha: isDark ? 0.20 : 0.10)
-        : isDark
-        ? AppColors.darkCardColor
-        : Colors.white;
-    final borderColor = selected
-        ? AppColors.primary.withValues(alpha: 0.42)
-        : isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.06);
-    final textColor = selected
-        ? AppColors.primary
-        : isDark
-        ? Colors.white
-        : AppColors.lightTextPrimary;
-
-    return Material(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: disabled ? null : onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                selected ? AppIcons.tick_circle5 : AppIcons.global,
-                color: selected ? AppColors.primary : textColor,
-                size: 21,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  context.tr('Other'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: textColor,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _RegionBadge(label: context.tr('General')),
               const Icon(AppIcons.arrow_right_3, size: 18),
             ],
           ),

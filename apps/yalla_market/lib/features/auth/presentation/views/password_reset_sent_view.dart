@@ -126,10 +126,7 @@ class _PasswordResetSentViewState extends State<PasswordResetSentView> {
         if (state is AuthPasswordResetSucceeded) {
           CustomSnackBar.showSuccess(
             context: context,
-            title: _copy(
-              ar: 'تم تغيير كلمة المرور',
-              en: 'Password changed',
-            ),
+            title: _copy(ar: 'تم تغيير كلمة المرور', en: 'Password changed'),
             message: _copy(
               ar: 'تقدر الآن تسجل الدخول بكلمة المرور الجديدة.',
               en: 'You can now sign in with your new password.',
@@ -211,8 +208,7 @@ class _PasswordResetSentViewState extends State<PasswordResetSentView> {
                           Text(
                             _copy(
                               ar: 'اكتب الكود المرسل إلى ${widget.email} ثم اختر كلمة مرور جديدة.',
-                              en:
-                                  'Enter the code sent to ${widget.email}, then choose a new password.',
+                              en: 'Enter the code sent to ${widget.email}, then choose a new password.',
                             ),
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodyMedium?.copyWith(
@@ -304,10 +300,8 @@ class _PasswordResetSentViewState extends State<PasswordResetSentView> {
                             child: Text(
                               _isCoolingDown
                                   ? _copy(
-                                      ar:
-                                          'إعادة الإرسال خلال $_remainingSeconds ثانية',
-                                      en:
-                                          'Resend in $_remainingSeconds seconds',
+                                      ar: 'إعادة الإرسال خلال $_remainingSeconds ثانية',
+                                      en: 'Resend in $_remainingSeconds seconds',
                                     )
                                   : _copy(
                                       ar: 'إعادة إرسال الكود',

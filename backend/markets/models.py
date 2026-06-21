@@ -18,6 +18,13 @@ class Market(models.Model):
         on_delete=models.PROTECT,
         related_name="markets",
     )
+    city = models.ForeignKey(
+        "locations.City",
+        on_delete=models.PROTECT,
+        related_name="markets",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=255)
     branch = models.CharField(max_length=255, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)

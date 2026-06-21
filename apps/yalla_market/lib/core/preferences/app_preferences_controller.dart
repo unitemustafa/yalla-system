@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AppPreferences {
   const AppPreferences({
@@ -55,11 +56,19 @@ class AppPreferencesController extends ValueNotifier<AppPreferences> {
     );
   }
 
-  Future<void> setPushNotifications(bool enabled) {
+  Future<void> setPushNotifications(bool enabled) async {
+    var effectiveValue = enabled;
+    if (enabled) {
+      final current = await Permission.notification.status;
+      final result = current.isGranted || current.isProvisional
+          ? current
+          : await Permission.notification.request();
+      effectiveValue = result.isGranted || result.isProvisional;
+    }
     return _setPreference(
       key: _pushNotificationsKey,
-      value: enabled,
-      nextPreferences: value.copyWith(pushNotifications: enabled),
+      value: effectiveValue,
+      nextPreferences: value.copyWith(pushNotifications: effectiveValue),
     );
   }
 

@@ -11,6 +11,7 @@ class CourierUser {
     required this.email,
     required this.phone,
     required this.role,
+    this.courierProfile,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class CourierUser {
   final String email;
   final String phone;
   final String role;
+  final CourierProfileData? courierProfile;
 
   String get name =>
       [firstName, lastName].where((part) => part.trim().isNotEmpty).join(' ');
@@ -31,6 +33,11 @@ class CourierUser {
       email: '${json['email'] ?? ''}',
       phone: '${json['phone'] ?? ''}',
       role: '${json['role'] ?? ''}',
+      courierProfile: json['courier_profile'] is Map
+          ? CourierProfileData.fromJson(
+              Map<String, dynamic>.from(json['courier_profile'] as Map),
+            )
+          : null,
     );
   }
 
@@ -41,7 +48,56 @@ class CourierUser {
     'email': email,
     'phone': phone,
     'role': role,
+    'courier_profile': courierProfile?.toJson(),
   };
+}
+
+class CourierProfileData {
+  const CourierProfileData({
+    required this.region,
+    required this.vehicleType,
+    required this.vehiclePlate,
+    required this.status,
+    required this.activeOrders,
+    required this.deliveredOrders,
+    this.profilePhotoUrl,
+  });
+
+  final String region;
+  final String vehicleType;
+  final String vehiclePlate;
+  final String status;
+  final int activeOrders;
+  final int deliveredOrders;
+  final String? profilePhotoUrl;
+
+  factory CourierProfileData.fromJson(Map<String, dynamic> json) {
+    return CourierProfileData(
+      region: '${json['region'] ?? ''}',
+      vehicleType: '${json['vehicle_type'] ?? ''}',
+      vehiclePlate: '${json['vehicle_plate'] ?? ''}',
+      status: '${json['status'] ?? ''}',
+      activeOrders: _intValue(json['active_orders']),
+      deliveredOrders: _intValue(json['delivered_orders']),
+      profilePhotoUrl: json['profile_photo_url']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'region': region,
+    'vehicle_type': vehicleType,
+    'vehicle_plate': vehiclePlate,
+    'status': status,
+    'active_orders': activeOrders,
+    'delivered_orders': deliveredOrders,
+    'profile_photo_url': profilePhotoUrl,
+  };
+}
+
+int _intValue(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value') ?? 0;
 }
 
 class CourierSession {
@@ -144,6 +200,7 @@ class CourierAuthService {
   final CourierSessionStorage _sessionStorage;
   final String _apiBaseUrl;
   CourierSession? _session;
+  Future<CourierSession?>? _refreshingSession;
 
   CourierSession? get currentSession => _session;
 
@@ -197,27 +254,10 @@ class CourierAuthService {
       var session = CourierSession.fromJson(
         jsonDecode(stored) as Map<String, dynamic>,
       );
-
-      final currentSession = await _loadCurrentSession(session);
-      if (currentSession != null) return currentSession;
-
-      final refreshResponse = await _post(
-        '/auth/refresh',
-        body: {'refreshToken': session.refreshToken},
-      );
-      final refreshData = _decodeObject(refreshResponse);
-      if (refreshResponse.statusCode != 200) {
-        await clearSession();
-        return null;
-      }
-
-      session = session.copyWith(
-        accessToken: refreshData['accessToken'] as String?,
-        refreshToken: refreshData['refreshToken'] as String?,
-      );
-      final refreshedSession = await _loadCurrentSession(session);
-      if (refreshedSession == null) await clearSession();
-      return refreshedSession;
+      _session = session;
+      final currentSession = await _loadCurrentSession();
+      if (currentSession == null) await clearSession();
+      return currentSession;
     } catch (_) {
       await clearSession();
       return null;
@@ -249,8 +289,10 @@ class CourierAuthService {
     }
   }
 
-  Future<CourierSession?> _loadCurrentSession(CourierSession session) async {
-    final response = await _get('/auth/me', accessToken: session.accessToken);
+  Future<CourierSession?> _loadCurrentSession() async {
+    final response = await _authorizedRequest(
+      (token) => _get('/auth/me', accessToken: token),
+    );
     if (response.statusCode != 200) return null;
 
     final data = _decodeObject(response);
@@ -264,7 +306,54 @@ class CourierAuthService {
       throw const CourierAuthException('هذا الحساب ليس حساب مندوب توصيل.');
     }
 
+    final session = _session;
+    if (session == null) return null;
     final updated = session.copyWith(user: user);
+    _session = updated;
+    if (updated.rememberMe) {
+      await _sessionStorage.write(jsonEncode(updated.toJson()));
+    }
+    return updated;
+  }
+
+  Future<http.Response> _authorizedRequest(
+    Future<http.Response> Function(String accessToken) request,
+  ) async {
+    final session = _session;
+    if (session == null) {
+      throw const CourierAuthException('جلسة المندوب غير متاحة.');
+    }
+    var response = await request(session.accessToken);
+    if (response.statusCode != 401) return response;
+
+    final refreshed = await _refreshSessionOnce();
+    if (refreshed == null) return response;
+    return request(refreshed.accessToken);
+  }
+
+  Future<CourierSession?> _refreshSessionOnce() {
+    final activeRefresh = _refreshingSession;
+    if (activeRefresh != null) return activeRefresh;
+    final refresh = _performRefresh();
+    _refreshingSession = refresh;
+    return refresh.whenComplete(() => _refreshingSession = null);
+  }
+
+  Future<CourierSession?> _performRefresh() async {
+    final session = _session;
+    if (session == null) return null;
+    final response = await _post(
+      '/auth/refresh',
+      body: {'refreshToken': session.refreshToken},
+    );
+    if (response.statusCode != 200) return null;
+    final data = _decodeObject(response);
+    final accessToken = data['accessToken']?.toString();
+    if (accessToken == null || accessToken.isEmpty) return null;
+    final updated = session.copyWith(
+      accessToken: accessToken,
+      refreshToken: data['refreshToken']?.toString() ?? session.refreshToken,
+    );
     _session = updated;
     if (updated.rememberMe) {
       await _sessionStorage.write(jsonEncode(updated.toJson()));

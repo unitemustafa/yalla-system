@@ -15,6 +15,14 @@ class Order(models.Model):
         on_delete=models.PROTECT,
         related_name="orders",
     )
+    courier = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.PROTECT,
+        related_name="courier_orders",
+        null=True,
+        blank=True,
+        limit_choices_to={"role": "representative"},
+    )
     market = models.ForeignKey(
         "markets.Market",
         on_delete=models.PROTECT,

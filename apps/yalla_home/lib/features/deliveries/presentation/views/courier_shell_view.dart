@@ -70,6 +70,8 @@ class _CourierShellViewState extends State<CourierShellView> {
 
   @override
   Widget build(BuildContext context) {
+    final user = CourierAuthService.instance.currentSession?.user;
+    final profile = user?.courierProfile;
     final screens = [
       CourierOrdersView(orders: _activeOrders, onDelivered: _markDelivered),
       DeliveredHistoryView(orders: _deliveredOrders),
@@ -78,13 +80,17 @@ class _CourierShellViewState extends State<CourierShellView> {
         onOrderTap: _openOrderDetails,
         onUnreadCountChanged: _updateUnreadNotificationCount,
       ),
-      CourierProfileView(
-        activeOrders: _activeOrders.length,
-        deliveredOrders: _deliveredOrders.length,
-        onActiveOrdersTap: () => setState(() => _selectedIndex = 0),
-        onDeliveredSummaryTap: _openDeliveredSummary,
-        onLogout: _logout,
-      ),
+      if (user != null)
+        CourierProfileView(
+          user: user,
+          activeOrders: profile?.activeOrders ?? 0,
+          deliveredOrders: profile?.deliveredOrders ?? 0,
+          onActiveOrdersTap: () => setState(() => _selectedIndex = 0),
+          onDeliveredSummaryTap: _openDeliveredSummary,
+          onLogout: _logout,
+        )
+      else
+        const Center(child: CircularProgressIndicator()),
     ];
 
     return Scaffold(

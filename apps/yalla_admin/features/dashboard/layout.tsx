@@ -13,14 +13,17 @@ import { DashboardOfflineBanner } from "./offline-banner";
 import { SessionExpiryGuard } from "./session-expiry-guard";
 import { SnackbarProvider } from "./snackbar";
 import { cn } from "@/lib/utils";
+import { AuthUserProvider } from "@/features/auth/auth-user-provider";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <DashboardI18nProvider>
-      <SnackbarProvider>
-        <DashboardLayoutContent>{children}</DashboardLayoutContent>
-      </SnackbarProvider>
-    </DashboardI18nProvider>
+    <AuthUserProvider>
+      <DashboardI18nProvider>
+        <SnackbarProvider>
+          <DashboardLayoutContent>{children}</DashboardLayoutContent>
+        </SnackbarProvider>
+      </DashboardI18nProvider>
+    </AuthUserProvider>
   );
 }
 

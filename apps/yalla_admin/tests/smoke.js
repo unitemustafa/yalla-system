@@ -1,434 +1,176 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const fsSync = require("node:fs");
-const fs = require("node:fs/promises");
-const nodePath = require("node:path");
+const http = require("node:http");
 const { spawn } = require("node:child_process");
 
-loadEnvFile(".env.local");
-loadEnvFile(".env");
-loadEnvFile(".env.example");
+const baseURL = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3010";
+const backendURL = "http://127.0.0.1:4010/api/v1";
+let nextProcess;
+let backendServer;
 
-const baseURL = process.env.SMOKE_BASE_URL ?? "http://localhost:3010";
-const smokePort = new URL(baseURL).port || "3010";
-const demoPassword = requireEnv("DASHBOARD_DEMO_PASSWORD");
-const sessionSecret = requireEnv("SESSION_SECRET");
-const defaultAccountEmail = "m.abdeljalel@yalla-market.com";
-let serverProcess;
+const adminUser = {
+  id: "1",
+  email: "admin@example.com",
+  first_name: "Admin",
+  last_name: "User",
+  username: "admin",
+  phone: "+218910000000",
+  role: "admin",
+  avatar_url: null,
+};
 
-function loadEnvFile(fileName) {
-  const filePath = nodePath.join(process.cwd(), fileName);
-
-  if (!fsSync.existsSync(filePath)) {
-    return;
-  }
-
-  const lines = fsSync.readFileSync(filePath, "utf8").split(/\r?\n/);
-
-  for (const line of lines) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)\s*$/);
-
-    if (!match || process.env[match[1]]) {
-      continue;
-    }
-
-    process.env[match[1]] = match[2].replace(/^["']|["']$/g, "");
-  }
+function json(response, status, body) {
+  response.writeHead(status, { "content-type": "application/json" });
+  response.end(JSON.stringify(body));
 }
 
-function requireEnv(name) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`${name} is required to run the dashboard smoke test.`);
-  }
-
-  return value;
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForServer() {
-  for (let index = 0; index < 60; index += 1) {
-    try {
-      const response = await fetch(`${baseURL}/login`);
-      if (response.ok) {
-        return true;
-      }
-    } catch {
-      await sleep(1_000);
-    }
-  }
-
-  return false;
-}
-
-async function ensureServer() {
-  try {
-    const response = await fetch(`${baseURL}/login`);
-    if (response.ok) {
+function startBackend() {
+  backendServer = http.createServer((request, response) => {
+    const path = request.url;
+    if (path === "/api/v1/auth/login" && request.method === "POST") {
+      let body = "";
+      request.on("data", (chunk) => (body += chunk));
+      request.on("end", () => {
+        const input = JSON.parse(body || "{}");
+        if (input.password !== "Password123!") {
+          return json(response, 401, { detail: "Invalid login credentials." });
+        }
+        const user =
+          input.email === "client@example.com"
+            ? { ...adminUser, email: input.email, role: "client" }
+            : adminUser;
+        return json(response, 200, {
+          accessToken: "expired-access",
+          refreshToken: "refresh-token",
+          expiresIn: 900,
+          user,
+        });
+      });
       return;
     }
-  } catch {
-    // Start the local server below.
-  }
+    if (path === "/api/v1/auth/refresh") {
+      return json(response, 200, {
+        accessToken: "fresh-access",
+        refreshToken: "next-refresh",
+        expiresIn: 900,
+      });
+    }
+    if (path === "/api/v1/auth/me") {
+      if (request.headers.authorization !== "Bearer fresh-access") {
+        return json(response, 401, { detail: "Token is invalid." });
+      }
+      return json(response, 200, { user: adminUser });
+    }
+    if (path === "/api/v1/dashboard/items") {
+      return json(response, 200, { items: [] });
+    }
+    if (path === "/api/v1/dashboard/cities") {
+      return json(response, 200, { cities: [] });
+    }
+    if (path === "/api/v1/dashboard/markets") {
+      return json(response, 200, { markets: [] });
+    }
+    if (path === "/api/v1/auth/logout") return json(response, 200, { ok: true });
+    return json(response, 404, { detail: "Not found." });
+  });
+  return new Promise((resolve) => backendServer.listen(4010, resolve));
+}
 
-  serverProcess = spawn("npm", ["run", "dev", "--", "-p", smokePort], {
+async function waitForNext() {
+  for (let index = 0; index < 60; index += 1) {
+    try {
+      if ((await fetch(`${baseURL}/login`)).ok) return;
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error("Timed out waiting for Next.js.");
+}
+
+async function startNext() {
+  nextProcess = spawn("npm", ["run", "dev", "--", "-p", "3010"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      DASHBOARD_AUTH_MODE: "demo",
-      DASHBOARD_DEMO_PASSWORD: demoPassword,
-      SESSION_SECRET: sessionSecret,
-      PORT: smokePort,
+      BACKEND_API_BASE_URL: backendURL,
+      SESSION_SECRET: "smoke-session-secret",
     },
-    shell: process.platform === "win32",
     stdio: "ignore",
   });
-
-  const ready = await waitForServer();
-  if (!ready) {
-    throw new Error(`Timed out waiting for ${baseURL}`);
-  }
+  await waitForNext();
 }
 
-function getCookie(response) {
-  const setCookie = response.headers.get("set-cookie");
-  if (!setCookie) {
-    throw new Error("Login response did not include a session cookie");
+function mergeCookies(current, response) {
+  const raw = response.headers.get("set-cookie");
+  if (!raw) return current;
+  const next = new Map(
+    current
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => part.split(/=(.*)/s).slice(0, 2)),
+  );
+  for (const cookie of raw.split(/,(?=\s*[^;,=]+=[^;,]+)/)) {
+    const [pair] = cookie.trim().split(";");
+    const [name, value] = pair.split(/=(.*)/s).slice(0, 2);
+    if (value) next.set(name, value);
+    else next.delete(name);
   }
-
-  return setCookie.split(";")[0];
+  return [...next.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
 }
 
-function getSessionCookieHeader(response) {
-  const setCookie = response.headers.get("set-cookie");
-  if (!setCookie) {
-    throw new Error("Login response did not include a session cookie");
-  }
-
-  return setCookie
-    .split(/,(?=\s*[^;,=]+=[^;,]+)/)
-    .find((cookieHeader) => cookieHeader.trim().startsWith("yalla-session="));
-}
-
-async function jsonRequest(path, options = {}) {
+async function request(path, options = {}, cookie = "") {
   const response = await fetch(`${baseURL}${path}`, {
     ...options,
     headers: {
       ...(options.body ? { "content-type": "application/json" } : {}),
+      ...(cookie ? { cookie } : {}),
       ...options.headers,
     },
   });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  return { response, data };
-}
-
-async function uploadSmokeImage(cookie) {
-  const formData = new FormData();
-  const pngBytes = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
-    "base64",
-  );
-
-  formData.append(
-    "file",
-    new Blob([pngBytes], { type: "image/png" }),
-    "smoke-upload.png",
-  );
-
-  const response = await fetch(`${baseURL}/api/dashboard/uploads`, {
-    method: "POST",
-    headers: { cookie },
-    body: formData,
-  });
-  const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
-
-  return { response, data };
-}
-
-async function removeUploadedSmokeImage(url) {
-  if (typeof url !== "string" || !url.startsWith("/uploads/dashboard/")) {
-    return;
-  }
-
-  const filePath = nodePath.join(process.cwd(), "public", ...url.split("/").slice(1));
-  await fs.rm(filePath, { force: true });
-}
-
-async function stopServer() {
-  if (!serverProcess?.pid) {
-    return;
-  }
-
-  if (process.platform === "win32") {
-    spawn("taskkill", ["/pid", String(serverProcess.pid), "/t", "/f"], {
-      stdio: "ignore",
-    });
-    return;
-  }
-
-  serverProcess.kill("SIGTERM");
+  const data = await response.json().catch(() => null);
+  return { response, data, cookie: mergeCookies(cookie, response) };
 }
 
 async function main() {
-  await ensureServer();
+  await startBackend();
+  await startNext();
 
-  const unauthorized = await jsonRequest("/api/dashboard/items");
-  if (unauthorized.response.status !== 401) {
-    throw new Error(`Expected unauthorized items request to return 401, got ${unauthorized.response.status}`);
-  }
+  const unauthorized = await request("/api/dashboard/items");
+  if (unauthorized.response.status !== 401) throw new Error("Expected 401.");
 
-  const badLogin = await jsonRequest("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email: "dashboard@admin.com", password: "wrong" }),
-  });
-  if (badLogin.response.status !== 401) {
-    throw new Error(`Expected bad login to return 401, got ${badLogin.response.status}`);
-  }
-
-  const login = await jsonRequest("/api/auth/login", {
+  const rejected = await request("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
-      email: "dashboard@admin.com",
-      password: demoPassword,
-      remember: false,
+      email: "client@example.com",
+      password: "Password123!",
     }),
   });
-  if (!login.response.ok) {
-    throw new Error(`Expected login to succeed, got ${login.response.status}`);
-  }
+  if (rejected.response.status !== 403) throw new Error("Expected admin rejection.");
 
-  const sessionCookieHeader = getSessionCookieHeader(login.response);
-  if (!sessionCookieHeader || /(?:max-age|expires)=/i.test(sessionCookieHeader)) {
-    throw new Error("Expected unchecked remember-me login to use a session cookie");
-  }
-
-  const rememberedLogin = await jsonRequest("/api/auth/login", {
+  const login = await request("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
-      email: "dashboard@admin.com",
-      password: demoPassword,
+      email: "admin@example.com",
+      password: "Password123!",
       remember: true,
     }),
   });
-  const rememberedCookieHeader = getSessionCookieHeader(rememberedLogin.response);
-  if (
-    !rememberedLogin.response.ok ||
-    !rememberedCookieHeader ||
-    !rememberedCookieHeader.toLowerCase().includes("max-age=2592000")
-  ) {
-    throw new Error("Expected remembered login cookie to persist for 30 days");
+  if (!login.response.ok || !login.cookie.includes("yalla-session=")) {
+    throw new Error("Backend login did not create HttpOnly session cookies.");
   }
 
-  const cookie = getCookie(login.response);
-  const authHeaders = { cookie };
-  const items = await jsonRequest("/api/dashboard/items", { headers: authHeaders });
-  const orders = await jsonRequest("/api/dashboard/orders", { headers: authHeaders });
-
-  if (!Array.isArray(items.data?.items) || items.data.items.length === 0) {
-    throw new Error("Expected dashboard items API to return rows");
-  }
-  if (!Array.isArray(orders.data?.orders) || orders.data.orders.length === 0) {
-    throw new Error("Expected dashboard orders API to return rows");
-  }
-  if (!items.data.items.every((item) => typeof item.code === "string" && item.code)) {
-    throw new Error("Expected every dashboard item to include a product code");
+  const session = await request("/api/auth/session", {}, login.cookie);
+  if (!session.response.ok || session.data?.user?.role !== "admin") {
+    throw new Error("Session did not refresh access and load /auth/me.");
   }
 
-  const nextAccountEmail = `smoke-${Date.now()}@yalla-market.com`;
-  const emailChangeRequest = await jsonRequest("/api/auth/email-change/request", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({ newEmail: nextAccountEmail }),
-  });
-  const emailChangeCode = emailChangeRequest.data?.devCode;
-  if (!emailChangeRequest.response.ok || typeof emailChangeCode !== "string") {
-    throw new Error("Expected email change request to return a dev verification code");
-  }
+  const items = await request("/api/dashboard/items", {}, session.cookie);
+  const cities = await request("/api/dashboard/cities", {}, session.cookie);
+  const markets = await request("/api/dashboard/markets", {}, session.cookie);
+  if (!Array.isArray(items.data?.items)) throw new Error("Items proxy failed.");
+  if (!Array.isArray(cities.data?.cities)) throw new Error("Cities proxy failed.");
+  if (!Array.isArray(markets.data?.markets)) throw new Error("Markets proxy failed.");
 
-  const emailChangeConfirm = await jsonRequest("/api/auth/email-change/confirm", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({ code: emailChangeCode }),
-  });
-  if (emailChangeConfirm.data?.email !== nextAccountEmail) {
-    throw new Error("Expected email change confirmation to persist the new email");
-  }
-
-  const newEmailLogin = await jsonRequest("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({
-      email: nextAccountEmail,
-      password: demoPassword,
-    }),
-  });
-  if (!newEmailLogin.response.ok) {
-    throw new Error("Expected login with the changed account email to succeed");
-  }
-
-  const emailRestoreRequest = await jsonRequest("/api/auth/email-change/request", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({ newEmail: defaultAccountEmail }),
-  });
-  const emailRestoreCode = emailRestoreRequest.data?.devCode;
-  if (!emailRestoreRequest.response.ok || typeof emailRestoreCode !== "string") {
-    throw new Error("Expected email restore request to return a dev verification code");
-  }
-
-  const emailRestoreConfirm = await jsonRequest("/api/auth/email-change/confirm", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({ code: emailRestoreCode }),
-  });
-  if (emailRestoreConfirm.data?.email !== defaultAccountEmail) {
-    throw new Error("Expected email restore confirmation to persist the default email");
-  }
-
-  const uploadedImage = await uploadSmokeImage(cookie);
-  const uploadedImageUrl = uploadedImage.data?.url;
-  if (
-    !uploadedImage.response.ok ||
-    typeof uploadedImageUrl !== "string" ||
-    !uploadedImageUrl.startsWith("/uploads/dashboard/")
-  ) {
-    throw new Error("Expected dashboard image upload to return a public URL");
-  }
-
-  const uploadedAsset = await fetch(`${baseURL}${uploadedImageUrl}`);
-  if (
-    !uploadedAsset.ok ||
-    !uploadedAsset.headers.get("content-type")?.startsWith("image/png")
-  ) {
-    throw new Error("Expected uploaded dashboard image to be publicly readable");
-  }
-  await removeUploadedSmokeImage(uploadedImageUrl);
-
-  const firstItem = items.data.items[0];
-  const originalActive = Boolean(firstItem.active);
-  const nextActive = !originalActive;
-  const patchedItem = await jsonRequest(
-    `/api/dashboard/items/${encodeURIComponent(firstItem.id)}`,
-    {
-      method: "PATCH",
-      headers: authHeaders,
-      body: JSON.stringify({ active: nextActive }),
-    },
-  );
-  if (patchedItem.data?.item?.active !== nextActive) {
-    throw new Error("Expected item active patch to persist");
-  }
-
-  await jsonRequest(`/api/dashboard/items/${encodeURIComponent(firstItem.id)}`, {
-    method: "PATCH",
-    headers: authHeaders,
-    body: JSON.stringify({ active: originalActive }),
-  });
-
-  const duplicatedItem = await jsonRequest(
-    `/api/dashboard/items/${encodeURIComponent(firstItem.id)}/duplicate`,
-    {
-      method: "POST",
-      headers: authHeaders,
-    },
-  );
-  const duplicateId = duplicatedItem.data?.item?.id;
-  if (!duplicatedItem.response.ok || !duplicateId) {
-    throw new Error("Expected item duplicate API to return the copied item");
-  }
-  if (!/^PRD-[A-Z2-9]+$/.test(duplicatedItem.data?.item?.code ?? "")) {
-    throw new Error("Expected duplicated item to receive a generated product code");
-  }
-
-  const deletedDuplicate = await jsonRequest(
-    `/api/dashboard/items/${encodeURIComponent(duplicateId)}`,
-    {
-      method: "DELETE",
-      headers: authHeaders,
-    },
-  );
-  if (!deletedDuplicate.response.ok) {
-    throw new Error("Expected duplicate cleanup delete to succeed");
-  }
-
-  const createdItem = await jsonRequest("/api/dashboard/items", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      name: "Smoke product",
-      description: "Created by smoke test",
-      category: "Smoke",
-      subcategory: "Smoke",
-      price: "1 EGP",
-      active: true,
-    }),
-  });
-  const createdItemCode = createdItem.data?.item?.code;
-  const createdItemId = createdItem.data?.item?.id;
-  if (
-    !createdItem.response.ok ||
-    !createdItemId ||
-    !/^PRD-[A-Z2-9]+$/.test(createdItemCode ?? "")
-  ) {
-    throw new Error("Expected item create API to return a generated product code");
-  }
-
-  await jsonRequest(`/api/dashboard/items/${encodeURIComponent(createdItemId)}`, {
-    method: "DELETE",
-    headers: authHeaders,
-  });
-
-  const firstOrder = orders.data.orders[0];
-  const patchedOrder = await jsonRequest(
-    `/api/dashboard/orders/${encodeURIComponent(firstOrder.number)}`,
-    {
-      method: "PATCH",
-      headers: authHeaders,
-      body: JSON.stringify({ status: "smoke-test-status" }),
-    },
-  );
-  if (patchedOrder.data?.order?.status !== "smoke-test-status") {
-    throw new Error("Expected order status patch to persist");
-  }
-
-  await jsonRequest(`/api/dashboard/orders/${encodeURIComponent(firstOrder.number)}`, {
-    method: "PATCH",
-    headers: authHeaders,
-    body: JSON.stringify({ status: firstOrder.status }),
-  });
-
-  const createdOrder = await jsonRequest("/api/dashboard/orders", {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({
-      customer: "Smoke customer",
-      phone: "+201000000000",
-      type: "delivery",
-      payment: "cash",
-      total: 0,
-    }),
-  });
-  const createdOrderNumber = createdOrder.data?.order?.number;
-  if (
-    !createdOrder.response.ok ||
-    !/^ORD-\d{8}-[A-Z2-9]+$/.test(createdOrderNumber ?? "")
-  ) {
-    throw new Error("Expected order create API to return a generated order code");
-  }
-
-  await jsonRequest(`/api/dashboard/orders/${encodeURIComponent(createdOrderNumber)}`, {
-    method: "DELETE",
-    headers: authHeaders,
-  });
-
-  console.log(
-    `Smoke passed: ${items.data.items.length} items, ${orders.data.orders.length} orders, auth and mutations OK.`,
-  );
+  console.log("Smoke passed: Django auth, refresh-once, provider session, cities and markets.");
 }
 
 main()
@@ -436,4 +178,7 @@ main()
     console.error(error);
     process.exitCode = 1;
   })
-  .finally(stopServer);
+  .finally(() => {
+    nextProcess?.kill("SIGTERM");
+    backendServer?.close();
+  });

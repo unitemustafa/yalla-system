@@ -1,19 +1,27 @@
+from datetime import timedelta
+from io import BytesIO
+import tempfile
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.utils import timezone
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
-from .models import OneTimePassword
+from .models import CourierProfile, OneTimePassword, OTPRequestLog
 
 User = get_user_model()
 
 
 @override_settings(
+    DEBUG=True,
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     AUTH_OTP_INCLUDE_IN_RESPONSE=True,
 )
@@ -595,3 +603,129 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(username_check.status_code, status.HTTP_200_OK)
         self.assertFalse(username_check.data["available"])
         self.assertTrue(username_check.data["registered"])
+
+
+class ProfileAndOTPIntegrationTests(APITestCase):
+    password = "StrongPassword123!"
+
+    def setUp(self):
+        self.media_directory = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(
+            DEBUG=True,
+            AUTH_OTP_INCLUDE_IN_RESPONSE=True,
+            AUTH_OTP_COOLDOWN_SECONDS=60,
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            MEDIA_ROOT=self.media_directory.name,
+        )
+        self.settings_override.enable()
+        self.user = User.objects.create_user(
+            username="profile-user",
+            email="profile@example.com",
+            phone="+218930000001",
+            password=self.password,
+        )
+        token = RefreshToken.for_user(self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_directory.cleanup()
+
+    def valid_image(self, image_format="PNG"):
+        buffer = BytesIO()
+        Image.new("RGB", (8, 8), "red").save(buffer, format=image_format)
+        extension = "jpg" if image_format == "JPEG" else image_format.lower()
+        return SimpleUploadedFile(
+            f"avatar.{extension}",
+            buffer.getvalue(),
+            content_type=f"image/{extension}",
+        )
+
+    def test_me_accepts_real_image_and_returns_absolute_url(self):
+        response = self.client.patch(
+            "/api/v1/auth/me",
+            {"avatar": self.valid_image(), "gender": "female"},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["user"]["avatar_url"].startswith("http://"))
+        self.assertEqual(response.data["user"]["gender"], "female")
+
+    def test_me_rejects_non_image_even_with_image_extension(self):
+        upload = SimpleUploadedFile(
+            "avatar.png",
+            b"not-an-image",
+            content_type="image/png",
+        )
+        response = self.client.patch(
+            "/api/v1/auth/me",
+            {"avatar": upload},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("avatar", response.data)
+
+    def test_username_lock_applies_only_after_actual_change(self):
+        response = self.client.patch(
+            "/api/v1/auth/me",
+            {"username": "profile-user"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.username_changed_at)
+
+        response = self.client.patch(
+            "/api/v1/auth/me",
+            {"username": "new-profile-user"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.username_changed_at)
+
+        response = self.client.patch(
+            "/api/v1/auth/me",
+            {"username": "another-profile-user"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("username", response.data)
+
+    def test_generic_otp_request_is_hashed_and_rate_limited(self):
+        self.client.credentials()
+        response = self.client.post(
+            "/api/v1/auth/otp/request",
+            {"email": self.user.email, "purpose": "password_reset"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["dev_otp"]), 6)
+        log = OTPRequestLog.objects.get()
+        self.assertNotEqual(log.target_hash, self.user.email)
+        otp = OneTimePassword.objects.get()
+        self.assertNotIn(response.data["dev_otp"], otp.code_hash)
+
+        response = self.client.post(
+            "/api/v1/auth/otp/request",
+            {"email": self.user.email, "purpose": "password_reset"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(response.data["code"], "otp_rate_limited")
+
+    def test_courier_profile_contract_uses_real_order_counts(self):
+        CourierProfile.objects.create(
+            user=self.user,
+            zone="Tripoli",
+            vehicle="Motorcycle",
+            plate_number="ABC-123",
+        )
+        self.user.role = User.Role.REPRESENTATIVE
+        self.user.save(update_fields=["role"])
+        response = self.client.get("/api/v1/auth/me")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        profile = response.data["user"]["courier_profile"]
+        self.assertEqual(profile["region"], "Tripoli")
+        self.assertEqual(profile["vehicle_type"], "Motorcycle")
+        self.assertEqual(profile["vehicle_plate"], "ABC-123")

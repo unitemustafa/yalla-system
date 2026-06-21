@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yalla_market/core/errors/failure.dart';
 import 'package:yalla_market/core/network/api_result.dart';
@@ -116,7 +118,7 @@ void main() {
       await cubit.close();
     });
 
-    test('returns to login after verification completes', () async {
+    test('keeps signup session after verification completes', () async {
       final repository = _FakeAuthRepository(loginResult: sampleSession);
       final cubit = AuthCubit(_authUseCases(repository));
       final expectedStates = expectLater(
@@ -124,7 +126,7 @@ void main() {
         emitsInOrder([
           isA<AuthLoading>(),
           isA<AuthSignupSucceeded>(),
-          isA<AuthEmailVerified>(),
+          isA<AuthAuthenticated>(),
         ]),
       );
 
@@ -138,14 +140,14 @@ void main() {
       final completed = await cubit.completeSignupVerification('123456');
 
       expect(completed, isTrue);
-      expect(cubit.state, isA<AuthEmailVerified>());
-      expect(AuthGuard.isAuthenticated, isFalse);
+      expect(cubit.state, isA<AuthAuthenticated>());
+      expect(AuthGuard.isAuthenticated, isTrue);
       await expectedStates;
       await cubit.close();
     });
 
     test(
-      'verifies a pending signup without tokens before returning to login',
+      'verifies a pending signup and keeps the authenticated session',
       () async {
         const pendingSession = AuthSession(user: sampleUser);
         final repository = _FakeAuthRepository(
@@ -159,7 +161,7 @@ void main() {
             isA<AuthLoading>(),
             isA<AuthSignupSucceeded>(),
             isA<AuthLoading>(),
-            isA<AuthEmailVerified>(),
+            isA<AuthAuthenticated>(),
           ]),
         );
 
@@ -174,8 +176,8 @@ void main() {
 
         expect(completed, isTrue);
         expect(repository.lastVerificationCode, '123456');
-        expect(cubit.state, isA<AuthEmailVerified>());
-        expect(AuthGuard.isAuthenticated, isFalse);
+        expect(cubit.state, isA<AuthAuthenticated>());
+        expect(AuthGuard.isAuthenticated, isTrue);
         await expectedStates;
         await cubit.close();
       },
@@ -261,6 +263,7 @@ AuthUseCases _authUseCases(AuthRepository repository) {
     resetPassword: ResetPasswordUseCase(repository),
     refreshProfile: RefreshProfileUseCase(repository),
     updateProfile: UpdateProfileUseCase(repository),
+    updateAvatar: UpdateAvatarUseCase(repository),
     logout: LogoutUseCase(repository),
     deleteAccountWithPassword: DeleteAccountWithPasswordUseCase(repository),
   );
@@ -285,6 +288,11 @@ class _FakeAuthRepository implements AuthRepository {
   String? lastLoginEmail;
   bool? lastRememberMe;
   String? lastVerificationCode;
+
+  @override
+  Future<ApiResult<AuthUser>> updateAvatar(Uint8List bytes) async {
+    return ApiResult.success(updateProfileResult ?? sampleUser);
+  }
 
   @override
   Future<ApiResult<AuthSession?>> restoreSavedSession() async {

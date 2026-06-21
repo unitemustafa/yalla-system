@@ -9,11 +9,26 @@ class LocationCubit extends Cubit<LocationState> {
 
   final LocationUseCases _useCases;
 
+  Future<List<CityData>> loadCities() async {
+    final result = await _useCases.getCities();
+    return result.when(
+      success: (cities) {
+        emit(LocationReady(state.selectedCity));
+        return cities;
+      },
+      failure: (failure) {
+        emit(LocationFailure(failure.message, state.selectedCity));
+        return const [];
+      },
+    );
+  }
+
   /// Hydrates city state from an already-resolved city (e.g. from SplashCubit).
   void syncCity(CityData? city) => emit(LocationReady(city));
 
   Future<CityData?> loadSelectedCity() async {
     emit(LocationLoading(state.selectedCity));
+    await _useCases.getCities();
 
     final result = await _useCases.getSelectedCity();
     return result.when(

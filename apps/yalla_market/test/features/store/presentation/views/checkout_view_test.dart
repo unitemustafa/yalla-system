@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yalla_market/core/routing/app_routes.dart';
 import 'package:yalla_market/features/cart/presentation/cubit/cart_cubit.dart';
+import 'package:yalla_market/features/location/domain/entities/city_data.dart';
 import 'package:yalla_market/features/personalization/presentation/cubit/address_cubit.dart';
 import 'package:yalla_market/features/store/data/repositories/order_repository_impl.dart';
 import 'package:yalla_market/features/store/presentation/cubit/checkout_cubit.dart';
@@ -16,6 +17,7 @@ void main() {
   testWidgets('renders checkout summary and completes cash order flow', (
     tester,
   ) async {
+    CityData.replaceSupported(const [CityData(name: 'Cairo', slug: 'cairo')]);
     final orderRepository = OrderRepositoryImpl();
     final cartCubit = makeCartCubit();
     final addressCubit = makeAddressCubit();

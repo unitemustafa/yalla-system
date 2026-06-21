@@ -1,9 +1,7 @@
 import 'package:get_it/get_it.dart';
 
-import '../../../core/config/app_environment.dart';
 import '../../../core/network/api_client.dart';
 import '../../../features/personalization/data/repositories/address_remote_repository_impl.dart';
-import '../../../features/personalization/data/repositories/address_repository_impl.dart';
 import '../../../features/personalization/data/repositories/profile_image_repository_impl.dart';
 import '../../../features/personalization/domain/repositories/address_repository.dart';
 import '../../../features/personalization/domain/repositories/profile_image_repository.dart';
@@ -15,9 +13,7 @@ import '../../../features/personalization/presentation/cubit/profile_image_cubit
 void registerPersonalizationDependencies(GetIt sl) {
   if (!sl.isRegistered<AddressRepository>()) {
     sl.registerLazySingleton<AddressRepository>(
-      () => AppEnvironment.useDemoRepositories
-          ? AddressRepositoryImpl()
-          : AddressRemoteRepositoryImpl(sl<ApiClient>()),
+      () => AddressRemoteRepositoryImpl(sl<ApiClient>()),
     );
   }
   if (!sl.isRegistered<GetAddressesUseCase>()) {

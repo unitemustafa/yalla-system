@@ -6,6 +6,9 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../../core/presentation/widgets/appbar/page_top_bar.dart';
 import '../../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../../../../core/utils/validators.dart';
+import '../../../../../core/di/service_locator.dart';
+import '../../../../location/data/datasources/device_location_data_source.dart';
+import '../../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import 'address_entry.dart';
 
 class AddNewAddressView extends StatefulWidget {
@@ -22,9 +25,6 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _streetController;
-  late final TextEditingController _cityController;
-  late final TextEditingController _stateController;
-  late final TextEditingController _countryController;
 
   bool get _isEditing => widget.address != null;
 
@@ -36,9 +36,6 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
     _nameController = TextEditingController(text: address?.name ?? '');
     _phoneController = TextEditingController(text: address?.phoneNumber ?? '');
     _streetController = TextEditingController(text: address?.street ?? '');
-    _cityController = TextEditingController(text: address?.city ?? '');
-    _stateController = TextEditingController(text: address?.state ?? '');
-    _countryController = TextEditingController(text: address?.country ?? '');
   }
 
   @override
@@ -46,15 +43,25 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
     _nameController.dispose();
     _phoneController.dispose();
     _streetController.dispose();
-    _cityController.dispose();
-    _stateController.dispose();
-    _countryController.dispose();
     super.dispose();
   }
 
-  void _saveAddress() {
+  Future<void> _saveAddress() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    DeviceCoordinates coordinates;
+    try {
+      coordinates = await sl<DeviceLocationDataSource>().currentCoordinates();
+    } on LocationSelectionException catch (error) {
+      if (!mounted) return;
+      CustomSnackBar.showError(
+        context: context,
+        title: 'Location required',
+        message: error.message,
+      );
+      return;
+    }
+    if (!mounted) return;
     final existingAddress = widget.address;
     final address = AddressEntry(
       id: existingAddress?.id ?? '',
@@ -62,9 +69,11 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
       phoneNumber: _phoneController.text.trim(),
       street: _streetController.text.trim(),
       postalCode: existingAddress?.postalCode ?? '',
-      city: _cityController.text.trim(),
-      state: _stateController.text.trim(),
-      country: _countryController.text.trim(),
+      city: existingAddress?.city ?? '',
+      state: '',
+      country: '',
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
     );
 
     Navigator.pop(context, address);
@@ -140,29 +149,16 @@ class _AddNewAddressViewState extends State<AddNewAddressView> {
                               validator: _requiredField,
                               textInputAction: TextInputAction.next,
                             ),
-                            _ResponsiveFieldPair(
-                              first: _AddressTextField(
-                                controller: _cityController,
-                                icon: AppIcons.building,
-                                label: 'City',
-                                validator: _requiredField,
-                                textInputAction: TextInputAction.next,
+                            const ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(
+                                AppIcons.location,
+                                color: AppColors.primary,
                               ),
-                              second: _AddressTextField(
-                                controller: _stateController,
-                                icon: AppIcons.activity,
-                                label: 'State',
-                                validator: _requiredField,
-                                textInputAction: TextInputAction.next,
+                              title: Text('GPS location required'),
+                              subtitle: Text(
+                                'Your coordinates are checked by the server when you save.',
                               ),
-                            ),
-                            _AddressTextField(
-                              controller: _countryController,
-                              icon: AppIcons.global,
-                              label: 'Country',
-                              validator: _requiredField,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _saveAddress(),
                             ),
                           ],
                         ),
@@ -293,7 +289,6 @@ class _AddressTextField extends StatelessWidget {
     this.validator,
     this.keyboardType,
     this.textInputAction,
-    this.onSubmitted,
   });
 
   final TextEditingController controller;
@@ -302,7 +297,6 @@ class _AddressTextField extends StatelessWidget {
   final FormFieldValidator<String>? validator;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
-  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +307,6 @@ class _AddressTextField extends StatelessWidget {
       validator: validator,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
-      onFieldSubmitted: onSubmitted,
       style: Theme.of(
         context,
       ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -334,35 +327,6 @@ class _AddressTextField extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ResponsiveFieldPair extends StatelessWidget {
-  const _ResponsiveFieldPair({required this.first, required this.second});
-
-  final Widget first;
-  final Widget second;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stackFields = constraints.maxWidth < 520;
-
-        if (stackFields) {
-          return Column(children: [first, const SizedBox(height: 14), second]);
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: first),
-            const SizedBox(width: 14),
-            Expanded(child: second),
-          ],
-        );
-      },
     );
   }
 }

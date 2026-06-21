@@ -10,8 +10,7 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/routing/app_routes.dart';
-import '../../../store/presentation/cubit/product_catalog_cubit.dart';
-import '../../../store/presentation/cubit/product_discovery_cubit.dart';
+import '../../../home/presentation/cubit/home_cubit.dart';
 import '../../domain/entities/city_data.dart';
 import '../cubit/location_cubit.dart';
 import '../cubit/location_state.dart';
@@ -41,6 +40,9 @@ class _SelectCityViewState extends State<SelectCityView>
       vsync: this,
       duration: const Duration(milliseconds: 2600),
     )..repeat();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(context.read<LocationCubit>().loadCities());
+    });
   }
 
   @override
@@ -132,6 +134,8 @@ class _SelectCityViewState extends State<SelectCityView>
                                 _selectCityAndContinue(context, city),
                             onUseCurrentLocation: () =>
                                 _detectCurrentLocation(context),
+                            onOpenSettings: () =>
+                                context.read<LocationCubit>().openAppSettings(),
                           ),
                         ],
                       ),
@@ -198,16 +202,6 @@ class _SelectCityViewState extends State<SelectCityView>
         message: 'Choose your area manually and you can try GPS again later.',
         actionLabel: 'Close',
       );
-      return;
-    }
-
-    final hasNamedGeneral = detectedCity.isNamedGeneral;
-    if (detectedCity.isGeneral && !hasNamedGeneral) {
-      setState(() {
-        _unsupportedDetected = true;
-        _showRadar = false;
-        _choiceMode = LocationChoiceMode.manual;
-      });
       return;
     }
 
@@ -316,9 +310,7 @@ class _SelectCityViewState extends State<SelectCityView>
     );
     if (!context.mounted || selectedCity == null) return;
 
-    await context.read<ProductCatalogCubit>().loadProducts(force: true);
-    if (!context.mounted) return;
-    await context.read<ProductDiscoveryCubit>().loadDiscovery(force: true);
+    await context.read<HomeCubit>().load(force: true);
     if (!context.mounted) return;
 
     CustomSnackBar.showSuccess(

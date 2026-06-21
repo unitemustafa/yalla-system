@@ -7,6 +7,11 @@ from .views import (
     DashboardOrderDetailView,
     DashboardOrderListCreateView,
     DashboardStatsView,
+    DashboardCityDetailView,
+    DashboardCityListCreateView,
+    DashboardMarketDetailView,
+    DashboardMarketListCreateView,
+    DashboardMarketClassificationListView,
 )
 
 urlpatterns = [
@@ -28,5 +33,25 @@ urlpatterns = [
         name="dashboard-order-detail",
     ),
     path("stats", DashboardStatsView.as_view(), name="dashboard-stats"),
+    path("cities", DashboardCityListCreateView.as_view(), name="dashboard-cities"),
+    path(
+        "cities/<slug:city_id>",
+        DashboardCityDetailView.as_view(),
+        name="dashboard-city-detail",
+    ),
+    path(
+        "markets",
+        DashboardMarketListCreateView.as_view(),
+        name="dashboard-markets",
+    ),
+    path(
+        "markets/<int:market_id>",
+        DashboardMarketDetailView.as_view(),
+        name="dashboard-market-detail",
+    ),
+    path(
+        "market-classifications",
+        DashboardMarketClassificationListView.as_view(),
+        name="dashboard-market-classifications",
+    ),
 ]
-

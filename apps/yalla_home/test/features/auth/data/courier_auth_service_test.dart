@@ -26,10 +26,13 @@ void main() {
       );
 
       expect(session.user.role, 'representative');
+      expect(session.user.courierProfile?.region, 'Tripoli');
       expect(session.rememberMe, isTrue);
       expect(storage.value, isNotNull);
-      expect(requests.single.url.toString(),
-          'http://api.test/api/v1/auth/courier-login');
+      expect(
+        requests.single.url.toString(),
+        'http://api.test/api/v1/auth/courier-login',
+      );
     });
 
     test('rejects a non-courier account', () async {
@@ -56,10 +59,7 @@ void main() {
 
     test('refreshes an expired access token and reloads the courier', () async {
       final storage = _MemorySessionStorage()
-        ..value = jsonEncode({
-          ..._sessionPayload,
-          'rememberMe': true,
-        });
+        ..value = jsonEncode({..._sessionPayload, 'rememberMe': true});
       var meCalls = 0;
       final service = CourierAuthService(
         apiBaseUrl: 'http://api.test',
@@ -95,10 +95,7 @@ void main() {
 
     test('clears the local session when refresh fails', () async {
       final storage = _MemorySessionStorage()
-        ..value = jsonEncode({
-          ..._sessionPayload,
-          'rememberMe': true,
-        });
+        ..value = jsonEncode({..._sessionPayload, 'rememberMe': true});
       final service = CourierAuthService(
         apiBaseUrl: 'http://api.test',
         sessionStorage: storage,
@@ -171,6 +168,15 @@ const _userPayload = <String, dynamic>{
   'email': 'courier@example.com',
   'phone': '+201001234567',
   'role': 'representative',
+  'courier_profile': {
+    'region': 'Tripoli',
+    'vehicle_type': 'Motorcycle',
+    'vehicle_plate': 'ABC-123',
+    'profile_photo_url': null,
+    'status': 'available',
+    'active_orders': 3,
+    'delivered_orders': 8,
+  },
 };
 
 const _sessionPayload = <String, dynamic>{

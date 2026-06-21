@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -186,8 +187,7 @@ class AuthCubit extends Cubit<AuthState> {
 
     if (session.accessToken != null && session.refreshToken != null) {
       _pendingSignupSession = null;
-      unawaited(_authUseCases.logout());
-      emit(const AuthEmailVerified());
+      emit(AuthAuthenticated(session));
       return true;
     }
 
@@ -197,10 +197,9 @@ class AuthCubit extends Cubit<AuthState> {
       code: code.trim(),
     );
     return result.when(
-      success: (_) {
+      success: (verifiedSession) {
         _pendingSignupSession = null;
-        unawaited(_authUseCases.logout());
-        emit(const AuthEmailVerified());
+        emit(AuthAuthenticated(verifiedSession));
         return true;
       },
       failure: (failure) {
@@ -336,6 +335,27 @@ class AuthCubit extends Cubit<AuthState> {
       gender: gender,
       birthDate: birthDate,
     );
+    return result.when(
+      success: (user) {
+        emit(
+          AuthAuthenticated(
+            currentSession?.copyWith(user: user) ?? AuthSession(user: user),
+          ),
+        );
+        return user;
+      },
+      failure: (failure) {
+        emit(AuthFailure(failure.message));
+        return null;
+      },
+    );
+  }
+
+  Future<AuthUser?> updateAvatar(Uint8List bytes) async {
+    final currentSession = state is AuthAuthenticated
+        ? (state as AuthAuthenticated).session
+        : null;
+    final result = await _authUseCases.updateAvatar(bytes);
     return result.when(
       success: (user) {
         emit(

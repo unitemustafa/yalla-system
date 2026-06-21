@@ -5,10 +5,12 @@ import 'package:yalla_market/features/location/presentation/cubit/location_state
 import 'package:yalla_market/features/location/presentation/widgets/city_selection_panel.dart';
 
 void main() {
-  testWidgets('manual mode shows cities and other general region', (
-    tester,
-  ) async {
+  testWidgets('manual mode shows backend cities only', (tester) async {
     CityData? selectedCity;
+    CityData.replaceSupported(const [
+      CityData(name: 'Cairo', slug: 'cairo'),
+      CityData(name: 'Sharm El Sheikh', slug: 'sharm-el-sheikh'),
+    ]);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -34,12 +36,11 @@ void main() {
 
     expect(find.text('Cairo'), findsOneWidget);
     expect(find.text('Sharm El Sheikh'), findsOneWidget);
-    expect(find.text('General'), findsOneWidget);
-    await tester.tap(find.text('Other'));
+    await tester.tap(find.text('Cairo'));
     await tester.pumpAndSettle();
 
-    expect(selectedCity?.name, 'General');
-    expect(selectedCity?.slug, CityData.generalSlug);
+    expect(selectedCity?.name, 'Cairo');
+    expect(selectedCity?.slug, 'cairo');
   });
 
   testWidgets('automatic mode exposes GPS action', (tester) async {

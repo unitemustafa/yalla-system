@@ -3,6 +3,12 @@ import 'package:yalla_market/features/location/domain/entities/city_data.dart';
 
 void main() {
   group('CityData', () {
+    setUp(() {
+      CityData.replaceSupported(const [
+        CityData(name: 'Cairo', slug: 'cairo'),
+        CityData(name: 'Sharm El Sheikh', slug: 'sharm-el-sheikh'),
+      ]);
+    });
     test('normalizes supported city names to stable slugs', () {
       expect(CityData.fromName('cairo')?.slug, 'cairo');
       expect(CityData.fromName('Sharm El Sheikh')?.slug, 'sharm-el-sheikh');

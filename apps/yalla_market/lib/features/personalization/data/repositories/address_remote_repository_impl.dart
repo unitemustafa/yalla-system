@@ -32,6 +32,11 @@ class AddressRemoteRepositoryImpl implements AddressRepository {
   @override
   Future<ApiResult<List<AddressData>>> saveAddress(AddressData address) {
     return _guard(() async {
+      if (address.latitude == null || address.longitude == null) {
+        throw const ValidationFailure(
+          'GPS coordinates are required to save an address.',
+        );
+      }
       final hasServerId = address.id.trim().isNotEmpty;
       final payload = hasServerId
           ? await _apiClient.patch<Object?>(
@@ -78,6 +83,8 @@ class AddressRemoteRepositoryImpl implements AddressRepository {
       return ApiResult.success(await action());
     } on DioException catch (error) {
       return ApiResult.failure(ApiErrorHandler.handle(error));
+    } on Failure catch (failure) {
+      return ApiResult.failure(failure);
     } catch (_) {
       return const ApiResult.failure(
         UnknownFailure('Could not update addresses.'),

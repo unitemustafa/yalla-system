@@ -8,10 +8,18 @@ from .models import Market, MarketClassification
 
 class HomeMarketSerializer(serializers.ModelSerializer):
     classification_id = serializers.IntegerField(read_only=True)
+    city_id = serializers.CharField(source="city.slug", read_only=True)
 
     class Meta:
         model = Market
-        fields = ("id", "name", "branch", "status", "classification_id")
+        fields = (
+            "id",
+            "name",
+            "branch",
+            "status",
+            "classification_id",
+            "city_id",
+        )
 
 
 class HomeMarketClassificationSerializer(serializers.ModelSerializer):
@@ -32,6 +40,7 @@ class HomeMarketClassificationSerializer(serializers.ModelSerializer):
 
 class HomeCategorySerializer(serializers.ModelSerializer):
     classification_id = serializers.IntegerField(read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductCategory
@@ -44,6 +53,9 @@ class HomeCategorySerializer(serializers.ModelSerializer):
             "classification_id",
         )
 
+    def get_image(self, category):
+        return _absolute_image(self.context.get("request"), category.image)
+
 
 class HomeVariantSerializer(serializers.ModelSerializer):
     class Meta:
@@ -52,9 +64,11 @@ class HomeVariantSerializer(serializers.ModelSerializer):
 
 
 class HomeProductSerializer(serializers.ModelSerializer):
-    category = HomeCategorySerializer(read_only=True)
+    category = serializers.SerializerMethodField()
     market = HomeMarketSerializer(read_only=True)
     variants = HomeVariantSerializer(many=True, read_only=True)
+    image = serializers.SerializerMethodField()
+    min_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -67,12 +81,31 @@ class HomeProductSerializer(serializers.ModelSerializer):
             "category",
             "market",
             "variants",
+            "min_price",
         )
+
+    def get_category(self, product):
+        return HomeCategorySerializer(
+            product.category,
+            context={"request": self.context.get("request")},
+        ).data
+
+    def get_image(self, product):
+        return _absolute_image(self.context.get("request"), product.image)
+
+    def get_min_price(self, product):
+        variant = min(
+            product.variants.all(),
+            key=lambda item: (item.price, item.pk),
+            default=None,
+        )
+        return variant.price if variant else None
 
 
 class HomeOfferSerializer(serializers.ModelSerializer):
     market = HomeMarketSerializer(read_only=True)
-    products = HomeProductSerializer(many=True, read_only=True)
+    products = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
@@ -92,3 +125,23 @@ class HomeOfferSerializer(serializers.ModelSerializer):
             "market",
             "products",
         )
+
+    def get_products(self, offer):
+        return HomeProductSerializer(
+            offer.products.all(),
+            many=True,
+            context={"request": self.context.get("request")},
+        ).data
+
+    def get_image(self, offer):
+        return _absolute_image(self.context.get("request"), offer.image)
+
+
+def _absolute_image(request, image):
+    if not image:
+        return None
+    try:
+        url = image.url
+    except ValueError:
+        return None
+    return request.build_absolute_uri(url) if request else url

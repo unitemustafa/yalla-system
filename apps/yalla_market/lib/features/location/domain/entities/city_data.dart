@@ -24,11 +24,13 @@ class CityData {
     required this.name,
     required this.slug,
     this.source = RegionSource.manual,
+    this.cityChanged = false,
   });
 
   final String name;
   final String slug;
   final RegionSource source;
+  final bool cityChanged;
 
   static const generalSlug = 'general';
 
@@ -38,11 +40,7 @@ class CityData {
     source: RegionSource.general,
   );
 
-  static const supported = [
-    general,
-    CityData(name: 'Cairo', slug: 'cairo'),
-    CityData(name: 'Sharm El Sheikh', slug: 'sharm-el-sheikh'),
-  ];
+  static List<CityData> supported = const [general];
 
   static List<CityData> get dashboardRegions =>
       supported.where((city) => !city.isGeneral).toList(growable: false);
@@ -61,7 +59,12 @@ class CityData {
   }
 
   CityData withSource(RegionSource source) {
-    return CityData(name: name, slug: slug, source: source);
+    return CityData(
+      name: name,
+      slug: slug,
+      source: source,
+      cityChanged: cityChanged,
+    );
   }
 
   CityData asGeneralRegion() {
@@ -69,7 +72,29 @@ class CityData {
       name: name,
       slug: generalSlug,
       source: RegionSource.general,
+      cityChanged: cityChanged,
     );
+  }
+
+  factory CityData.fromJson(
+    Map<String, dynamic> json, {
+    RegionSource source = RegionSource.manual,
+    bool cityChanged = false,
+  }) {
+    return CityData(
+      name: '${json['name'] ?? ''}',
+      slug: '${json['slug'] ?? json['id'] ?? ''}',
+      source: source,
+      cityChanged: cityChanged,
+    );
+  }
+
+  static void replaceSupported(Iterable<CityData> cities) {
+    final unique = <String, CityData>{};
+    for (final city in cities) {
+      if (city.slug.trim().isNotEmpty) unique[city.slug] = city;
+    }
+    supported = unique.values.toList(growable: false);
   }
 
   static CityData? fromSlug(String? value) {
@@ -117,21 +142,21 @@ class CityData {
 
     if (_matchesAnyAlias(normalized, _cairoAliases) ||
         _containsAnyArabic(normalizedArabic, _cairoArabicAliases)) {
-      return supported[1];
+      return fromSlug('cairo');
     }
     if (_matchesAnyAlias(normalized, _sharmElSheikhAliases) ||
         _containsAnyArabic(normalizedArabic, _sharmElSheikhArabicAliases)) {
-      return supported[2];
+      return fromSlug('sharm-el-sheikh');
     }
 
     final rawValue = value?.trim() ?? '';
     if (rawValue.contains('القاهرة') || rawValue.contains('قاهره')) {
-      return supported[1];
+      return fromSlug('cairo');
     }
     if (rawValue.contains('شرم') ||
         rawValue.contains('جنوب سيناء') ||
         rawValue.contains('جنوب سينا')) {
-      return supported[2];
+      return fromSlug('sharm-el-sheikh');
     }
     if (normalizedArabic.isNotEmpty) return null;
 
