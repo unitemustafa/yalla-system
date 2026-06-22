@@ -42,6 +42,7 @@ import {
 import { deliveryZones } from "@/features/dashboard/reference-data";
 import { removeInputWhitespace } from "@/lib/input-sanitizers";
 import { cn } from "@/lib/utils";
+import { dashboardFetch } from "@/lib/client-api";
 
 const deliveryListPageSize = 10;
 import { useSnackbar } from "../snackbar";
@@ -1470,7 +1471,7 @@ export function CouriersPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetch("/api/dashboard/couriers", { cache: "no-store" })
+    void dashboardFetch("couriers", { cache: "no-store" })
       .then(async (response) => {
         const data = (await response.json().catch(() => null)) as
           | { couriers?: Courier[]; message?: string }
@@ -1500,7 +1501,7 @@ export function CouriersPage() {
   }, [showSnackbar]);
 
   async function addCourier(draft: CourierDraft) {
-    const response = await fetch("/api/dashboard/couriers", {
+    const response = await dashboardFetch("couriers", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

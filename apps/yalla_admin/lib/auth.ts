@@ -1,83 +1,49 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import type { DashboardUser } from "@/lib/backend-auth";
 
-export const authCookieName = "yalla-session";
-export const backendAccessCookieName = "yalla-access-token";
-export const backendRefreshCookieName = "yalla-refresh-token";
-export const authCookieMaxAge = 60 * 60 * 8;
-export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
+export const authCookieName = "yalla_dashboard_session";
+export const backendAccessCookieName = "yalla_backend_access";
+export const backendRefreshCookieName = "yalla_backend_refresh";
+export const authCookieMaxAge = 8 * 60 * 60;
+export const rememberedAuthCookieMaxAge = 30 * 24 * 60 * 60;
 
-const fallbackSessionSecret = "dev-session-secret-change-me";
-
-export type SessionPayload = {
-  sub: string;
-  email: string;
-  name: string;
-  role: string;
-  exp: number;
-  remembered?: boolean;
+export type DashboardSession = {
+  user: DashboardUser;
+  expiresAt: number;
+  remembered: boolean;
 };
 
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET?.trim()) {
-  throw new Error("SESSION_SECRET is required in production.");
+type CookieLike = { value?: string };
+
+function encodeSession(session: DashboardSession) {
+  return encodeURIComponent(JSON.stringify(session));
 }
 
-function getSessionSecret() {
-  return process.env.SESSION_SECRET?.trim() || fallbackSessionSecret;
-}
-
-function encodeJson(value: SessionPayload) {
-  return Buffer.from(JSON.stringify(value)).toString("base64url");
-}
-
-function sign(value: string) {
-  return createHmac("sha256", getSessionSecret()).update(value).digest("base64url");
-}
-
-function signaturesMatch(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length &&
-    timingSafeEqual(leftBuffer, rightBuffer);
+function decodeSession(value: string) {
+  return JSON.parse(decodeURIComponent(value)) as
+    | DashboardSession
+    | undefined;
 }
 
 export function createSessionToken(
-  user: { id?: string; email: string; name: string; role: string },
-  maxAge = authCookieMaxAge,
-  remembered = false,
+  user: DashboardUser,
+  maxAge: number,
+  remembered: boolean,
 ) {
-  const payload = encodeJson({
-    sub: user.id || user.email,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    exp: Math.floor(Date.now() / 1000) + maxAge,
+  return encodeSession({
+    user,
     remembered,
+    expiresAt: Date.now() + maxAge * 1000,
   });
-  return `${payload}.${sign(payload)}`;
 }
 
-export function readSessionToken(token: string | undefined) {
-  if (!token) return null;
-  const [payload, signature] = token.split(".");
-  if (!payload || !signature || !signaturesMatch(signature, sign(payload))) {
-    return null;
-  }
+export function readSessionToken(cookie: CookieLike | string | undefined) {
+  const value = typeof cookie === "string" ? cookie : cookie?.value;
+  if (!value) return null;
   try {
-    const session = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8"),
-    ) as SessionPayload;
-    return session.exp >= Math.floor(Date.now() / 1000) ? session : null;
+    const session = decodeSession(value);
+    if (!session?.user?.email || Date.now() >= session.expiresAt) return null;
+    return session;
   } catch {
     return null;
   }
-}
-
-export function authCookieSettings(maxAge?: number) {
-  return {
-    httpOnly: true,
-    ...(maxAge === undefined ? {} : { maxAge }),
-    path: "/",
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-  };
 }

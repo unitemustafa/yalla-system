@@ -5,6 +5,7 @@ import { Plus, Store, Trash2 } from "lucide-react";
 
 import { Button, Card, Input, PageTitle } from "../primitives";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 
 type Market = {
   id: string;
@@ -35,9 +36,9 @@ export function ShopsPage() {
   async function load() {
     const [marketsResponse, citiesResponse, classificationsResponse] =
       await Promise.all([
-        fetch("/api/dashboard/markets", { cache: "no-store" }),
-        fetch("/api/dashboard/cities", { cache: "no-store" }),
-        fetch("/api/dashboard/market-classifications", { cache: "no-store" }),
+        dashboardFetch("markets", { cache: "no-store" }),
+        dashboardFetch("cities", { cache: "no-store" }),
+        dashboardFetch("market-classifications", { cache: "no-store" }),
       ]);
     const [marketsData, citiesData, classificationsData] = await Promise.all([
       marketsResponse.json().catch(() => null),
@@ -54,9 +55,9 @@ export function ShopsPage() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      fetch("/api/dashboard/markets", { cache: "no-store" }),
-      fetch("/api/dashboard/cities", { cache: "no-store" }),
-      fetch("/api/dashboard/market-classifications", { cache: "no-store" }),
+      dashboardFetch("markets", { cache: "no-store" }),
+      dashboardFetch("cities", { cache: "no-store" }),
+      dashboardFetch("market-classifications", { cache: "no-store" }),
     ]).then(async ([marketsResponse, citiesResponse, classificationsResponse]) => {
       const [marketsData, citiesData, classificationsData] = await Promise.all([
         marketsResponse.json().catch(() => null),
@@ -77,10 +78,8 @@ export function ShopsPage() {
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    const response = await fetch(
-      editingId
-        ? `/api/dashboard/markets/${editingId}`
-        : "/api/dashboard/markets",
+    const response = await dashboardFetch(
+      editingId ? `markets/${editingId}` : "markets",
       {
       method: editingId ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
@@ -121,7 +120,7 @@ export function ShopsPage() {
   }
 
   async function remove(id: string) {
-    const response = await fetch(`/api/dashboard/markets/${id}`, {
+    const response = await dashboardFetch(`markets/${id}`, {
       method: "DELETE",
     });
     const data = await response.json().catch(() => null);

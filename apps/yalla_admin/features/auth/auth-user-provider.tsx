@@ -4,12 +4,12 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import type { DashboardUser } from "@/lib/backend-auth";
+import { clearClientAuth, getClientSession } from "@/lib/client-api";
 
 type AuthUserContextValue = {
   user: DashboardUser | null;
@@ -21,37 +21,21 @@ type AuthUserContextValue = {
 const AuthUserContext = createContext<AuthUserContextValue | null>(null);
 
 export function AuthUserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<DashboardUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<DashboardUser | null>(
+    () => getClientSession()?.user ?? null,
+  );
+  const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/auth/session", { cache: "no-store" });
-    const data = await response.json().catch(() => null);
-    const nextUser = response.ok ? (data?.user as DashboardUser | undefined) : null;
+    const session = getClientSession();
+    const nextUser = session?.user ?? null;
     setUser(nextUser ?? null);
     setLoading(false);
-    if (!response.ok && typeof window !== "undefined") {
+    if (!nextUser && typeof window !== "undefined") {
+      clearClientAuth();
       window.location.href = "/login";
     }
     return nextUser ?? null;
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/auth/session", { cache: "no-store" })
-      .then(async (response) => ({
-        response,
-        data: await response.json().catch(() => null),
-      }))
-      .then(({ response, data }) => {
-        if (!active) return;
-        setUser(response.ok ? (data?.user as DashboardUser) : null);
-        setLoading(false);
-        if (!response.ok) window.location.href = "/login";
-      });
-    return () => {
-      active = false;
-    };
   }, []);
 
   const value = useMemo(

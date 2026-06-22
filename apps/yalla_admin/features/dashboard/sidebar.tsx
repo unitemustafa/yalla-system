@@ -1,5 +1,7 @@
 "use client";
 
+import { clearClientAuth } from "@/lib/client-api";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -172,7 +174,7 @@ export function Sidebar({
     setProfileMenuOpen(false);
     onCloseMobile();
 
-    await fetch("/api/auth/logout", { method: "POST" });
+    clearClientAuth();
     window.location.href = "/login";
   }
 

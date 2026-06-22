@@ -72,3 +72,5 @@ apps/yalla_home/android/app/release/
 apps/yalla_home/android/release/
 
 
+.headroom-venv/
+To

@@ -22,6 +22,7 @@ import {
 
 import { Badge, Card } from "../primitives";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 import { dashboardUsers } from "../users/default-dashboard-users";
 import { cn } from "@/lib/utils";
 import type { DashboardOrder } from "@/lib/dashboard-store";
@@ -501,8 +502,8 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
     setSavingStatus(true);
 
     try {
-      const response = await fetch(
-        `/api/dashboard/orders/${encodeURIComponent(order.number)}`,
+      const response = await dashboardFetch(
+        `orders/${encodeURIComponent(order.number)}`,
         {
           method: "PATCH",
           headers: { "content-type": "application/json" },

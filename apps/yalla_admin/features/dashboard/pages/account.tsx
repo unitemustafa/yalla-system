@@ -7,6 +7,7 @@ import { useAuthUser } from "@/features/auth/auth-user-provider";
 import { DashboardImage } from "@/features/dashboard/dashboard-image";
 import { Button, Card, Input, PageTitle } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
+import { authFetch } from "@/lib/client-api";
 
 export function AccountPage() {
   const { user, setUser } = useAuthUser();
@@ -18,7 +19,7 @@ export function AccountPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
 
   async function updateAccount(body: BodyInit, multipart = false) {
-    const response = await fetch("/api/auth/account", {
+    const response = await authFetch("me", {
       method: "PATCH",
       headers: multipart ? undefined : { "content-type": "application/json" },
       body,
@@ -73,7 +74,7 @@ export function AccountPage() {
 
   async function changePassword(event: React.FormEvent) {
     event.preventDefault();
-    const response = await fetch("/api/auth/change-password", {
+    const response = await authFetch("change-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({

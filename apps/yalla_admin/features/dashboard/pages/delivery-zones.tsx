@@ -5,6 +5,7 @@ import { MapPin, Plus, Save, Trash2 } from "lucide-react";
 
 import { Button, Card, Input, PageTitle } from "../primitives";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 
 type City = {
   id: string;
@@ -34,14 +35,14 @@ export function DeliveryZonesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   async function loadCities() {
-    const response = await fetch("/api/dashboard/cities", { cache: "no-store" });
+    const response = await dashboardFetch("cities", { cache: "no-store" });
     const data = await response.json().catch(() => null);
     if (response.ok) setCities(data?.cities ?? []);
   }
 
   useEffect(() => {
     let active = true;
-    fetch("/api/dashboard/cities", { cache: "no-store" })
+    dashboardFetch("cities", { cache: "no-store" })
       .then(async (response) => ({
         response,
         data: await response.json().catch(() => null),
@@ -56,10 +57,8 @@ export function DeliveryZonesPage() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    const response = await fetch(
-      editingId
-        ? `/api/dashboard/cities/${encodeURIComponent(editingId)}`
-        : "/api/dashboard/cities",
+    const response = await dashboardFetch(
+      editingId ? `cities/${encodeURIComponent(editingId)}` : "cities",
       {
         method: editingId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
@@ -79,7 +78,7 @@ export function DeliveryZonesPage() {
 
   async function remove(city: City) {
     const response = await fetch(
-      `/api/dashboard/cities/${encodeURIComponent(city.id)}`,
+      `cities/${encodeURIComponent(city.id)}`,
       { method: "DELETE" },
     );
     const data = await response.json().catch(() => null);
