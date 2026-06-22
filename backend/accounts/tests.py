@@ -370,6 +370,44 @@ class V1AuthenticationAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("username", response.data)
 
+    def test_market_signup_allows_digits_in_username(self):
+        response = self.client.post(
+            "/api/v1/auth/signup",
+            {
+                "firstName": "Mustafa",
+                "lastName": "Ali",
+                "username": "mustafa123",
+                "email": "digits.username@example.com",
+                "password": self.password,
+                "phone": "+201001234570",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            User.objects.filter(username="mustafa123").exists()
+        )
+
+    def test_market_signup_rejects_spaces_and_invalid_egyptian_phone(self):
+        response = self.client.post(
+            "/api/v1/auth/signup",
+            {
+                "firstName": "Mu stafa",
+                "lastName": "Ali",
+                "username": "mustafa 123",
+                "email": "spaces@example.com",
+                "password": self.password,
+                "phone": "+202455161661",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("firstName", response.data)
+        self.assertIn("username", response.data)
+        self.assertIn("phone", response.data)
+
     def test_resend_verification_endpoint_regenerates_registration_otp(self):
         signup_response = self.client.post(
             "/api/v1/auth/signup",
@@ -417,10 +455,15 @@ class V1AuthenticationAPITests(APITestCase):
             "/api/v1/auth/check-email",
             {"email": "customer@example.com"},
         )
+        phone_response = self.client.get(
+            "/api/v1/auth/check-phone",
+            {"phone": "01001111111"},
+        )
 
         self.assertEqual(username_response.status_code, status.HTTP_200_OK)
         self.assertTrue(username_response.data["available"])
         self.assertTrue(email_response.data["registered"])
+        self.assertTrue(phone_response.data["registered"])
 
         me_response = self.client.get("/api/v1/auth/me", **self.bearer(user))
         self.assertEqual(me_response.status_code, status.HTTP_200_OK)
@@ -513,6 +556,31 @@ class V1AuthenticationAPITests(APITestCase):
                 token__jti=refresh_jti
             ).exists()
         )
+
+    def test_customer_login_accepts_username_and_phone_identifier(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="identifier_customer",
+            email="identifier.customer@example.com",
+            phone="+201001111116",
+        )
+
+        for identifier in (
+            user.username,
+            user.phone,
+            "201001111116",
+            "01001111116",
+            "1001111116",
+            "00201001111116",
+        ):
+            response = self.client.post(
+                "/api/v1/auth/login",
+                {"identifier": identifier, "password": self.password},
+                format="json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["user"]["email"], user.email)
 
     def test_v1_logout_accepts_missing_refresh_token(self):
         user = self.create_user(

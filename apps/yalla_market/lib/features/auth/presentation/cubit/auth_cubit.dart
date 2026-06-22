@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_result.dart';
 import '../../../../core/routing/auth_guard.dart';
 import '../../../../core/session/session_expired_notifier.dart';
+import '../../../../core/storage/token_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/usecases/auth_usecases.dart';
@@ -21,6 +24,7 @@ class AuthCubit extends Cubit<AuthState> {
   final AuthUseCases _authUseCases;
   final SessionExpiredNotifier _sessionExpiredNotifier;
   AuthSession? _pendingSignupSession;
+  Timer? _sessionExpiryTimer;
 
   @override
   void onChange(Change<AuthState> change) {
@@ -28,7 +32,9 @@ class AuthCubit extends Cubit<AuthState> {
     if (change.nextState is AuthAuthenticated) {
       AuthGuard.setAuthenticated();
     } else if (change.nextState is AuthInitial ||
-        change.nextState is AuthSignupSucceeded) {
+        change.nextState is AuthSessionExpired ||
+        change.nextState is AuthSignupSucceeded ||
+        change.nextState is AuthEmailVerified) {
       AuthGuard.clearAuthentication();
     }
   }
@@ -37,21 +43,32 @@ class AuthCubit extends Cubit<AuthState> {
 
   @override
   Future<void> close() {
+    _sessionExpiryTimer?.cancel();
     _sessionExpiredNotifier.removeListener(_handleSessionExpired);
     return super.close();
   }
 
   void _handleSessionExpired() {
+    _sessionExpiryTimer?.cancel();
     _pendingSignupSession = null;
     AuthGuard.clearAuthentication();
-    if (!isClosed && state is! AuthInitial) {
-      emit(const AuthInitial());
+    if (!isClosed && state is! AuthSessionExpired) {
+      emit(const AuthSessionExpired());
     }
+  }
+
+  void _scheduleSessionExpiry(Duration duration) {
+    _sessionExpiryTimer?.cancel();
+    _sessionExpiryTimer = Timer(duration, () async {
+      await _authUseCases.logout();
+      if (!isClosed) _handleSessionExpired();
+    });
   }
 
   /// Hydrates auth state from an already-resolved session (e.g. from SplashCubit).
   void hydrate(AuthSession session) {
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(AuthAuthenticated(session));
   }
 
@@ -59,6 +76,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (state is AuthLoading) return false;
 
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(const AuthLoading());
 
     final result = await _authUseCases.restoreSavedSession();
@@ -97,6 +115,11 @@ class AuthCubit extends Cubit<AuthState> {
     result.when(
       success: (session) {
         emit(AuthAuthenticated(session));
+        _scheduleSessionExpiry(
+          rememberMe
+              ? StoredAuthTokens.rememberedLifetime
+              : StoredAuthTokens.sessionOnlyLifetime,
+        );
       },
       failure: (failure) {
         emit(AuthFailure(failure.message));
@@ -149,6 +172,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (state is AuthLoading) return;
 
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(const AuthLoading());
 
     final result = await _authUseCases.signup(
@@ -181,7 +205,7 @@ class AuthCubit extends Cubit<AuthState> {
 
     if (session.accessToken != null && session.refreshToken != null) {
       _pendingSignupSession = null;
-      emit(AuthAuthenticated(session));
+      emit(AuthEmailVerified(session.user.email));
       return true;
     }
 
@@ -193,7 +217,7 @@ class AuthCubit extends Cubit<AuthState> {
     return result.when(
       success: (verifiedSession) {
         _pendingSignupSession = null;
-        emit(AuthAuthenticated(verifiedSession));
+        emit(AuthEmailVerified(verifiedSession.user.email));
         return true;
       },
       failure: (failure) {
@@ -221,6 +245,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> logout() async {
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     final result = await _authUseCases.logout();
     result.when(
       success: (_) => emit(const AuthInitial()),

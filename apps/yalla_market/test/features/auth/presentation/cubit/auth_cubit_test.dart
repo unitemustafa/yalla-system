@@ -116,7 +116,7 @@ void main() {
     });
 
     test(
-      'authenticates the pending signup after verification completes',
+      'marks the pending signup as verified without authenticating',
       () async {
         final repository = _FakeAuthRepository(loginResult: sampleSession);
         final cubit = AuthCubit(_authUseCases(repository));
@@ -125,7 +125,7 @@ void main() {
           emitsInOrder([
             isA<AuthLoading>(),
             isA<AuthSignupSucceeded>(),
-            isA<AuthAuthenticated>(),
+            isA<AuthEmailVerified>(),
           ]),
         );
 
@@ -138,15 +138,15 @@ void main() {
         final completed = await cubit.completeSignupVerification('123456');
 
         expect(completed, isTrue);
-        expect((cubit.state as AuthAuthenticated).session, sampleSession);
-        expect(AuthGuard.isAuthenticated, isTrue);
+        expect((cubit.state as AuthEmailVerified).email, sampleUser.email);
+        expect(AuthGuard.isAuthenticated, isFalse);
         await expectedStates;
         await cubit.close();
       },
     );
 
     test(
-      'verifies a pending signup without tokens before authenticating',
+      'verifies a pending signup without tokens before returning to login',
       () async {
         const pendingSession = AuthSession(user: sampleUser);
         final repository = _FakeAuthRepository(
@@ -160,7 +160,7 @@ void main() {
             isA<AuthLoading>(),
             isA<AuthSignupSucceeded>(),
             isA<AuthLoading>(),
-            isA<AuthAuthenticated>(),
+            isA<AuthEmailVerified>(),
           ]),
         );
 
@@ -174,7 +174,8 @@ void main() {
 
         expect(completed, isTrue);
         expect(repository.lastVerificationCode, '123456');
-        expect((cubit.state as AuthAuthenticated).session, sampleSession);
+        expect((cubit.state as AuthEmailVerified).email, sampleUser.email);
+        expect(AuthGuard.isAuthenticated, isFalse);
         await expectedStates;
         await cubit.close();
       },
@@ -217,7 +218,7 @@ void main() {
       await cubit.close();
     });
 
-    test('returns to initial when the global session expires', () async {
+    test('emits session expired when the global session expires', () async {
       final notifier = SessionExpiredNotifier();
       final repository = _FakeAuthRepository(loginResult: sampleSession);
       final cubit = AuthCubit(
@@ -230,11 +231,11 @@ void main() {
 
       final expectedStates = expectLater(
         cubit.stream,
-        emits(isA<AuthInitial>()),
+        emits(isA<AuthSessionExpired>()),
       );
       notifier.notifyExpired();
 
-      expect(cubit.state, isA<AuthInitial>());
+      expect(cubit.state, isA<AuthSessionExpired>());
       expect(AuthGuard.isAuthenticated, isFalse);
       await expectedStates;
       await cubit.close();

@@ -57,6 +57,9 @@ class YallaMarketApp extends StatelessWidget {
           } else if (state is AuthInitial) {
             UserProfileController.instance.reset();
             AppNavigator.goToLogin();
+          } else if (state is AuthSessionExpired) {
+            UserProfileController.instance.reset();
+            AppNavigator.goToLogin(showSessionExpiredNotice: true);
           }
         },
         child: ValueListenableBuilder<AppLanguage>(

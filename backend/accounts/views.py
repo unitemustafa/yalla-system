@@ -20,6 +20,7 @@ from .models import CourierProfile, OneTimePassword
 from .serializers import (
     ApiUserSerializer,
     CourierCreateSerializer,
+    CustomerLoginSerializer,
     CourierLoginSerializer,
     CourierPasswordSerializer,
     CourierProfileSerializer,
@@ -34,6 +35,7 @@ from .serializers import (
     LoginSerializer,
     LogoutSerializer,
     MeUpdateSerializer,
+    phone_matches_identifier,
     RegisterSerializer,
     ResetPasswordSerializer,
     UserSerializer,
@@ -358,14 +360,9 @@ class CustomerLoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
+        serializer = CustomerLoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        if user.role != User.Role.CLIENT:
-            return Response(
-                {"detail": "This account cannot access this app."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
         return Response(token_payload_v1(user))
 
 
@@ -500,7 +497,10 @@ class PhoneAvailabilityView(APIView):
 
     def get(self, request):
         phone = request.query_params.get("phone", "").strip()
-        registered = bool(phone) and User.objects.filter(phone=phone).exists()
+        registered = bool(phone) and any(
+            phone_matches_identifier(user.phone, phone)
+            for user in User.objects.all()
+        )
         return Response({"registered": registered, "exists": registered})
 
 

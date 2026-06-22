@@ -8,6 +8,10 @@ final class AuthInitial extends AuthState {
   const AuthInitial();
 }
 
+final class AuthSessionExpired extends AuthState {
+  const AuthSessionExpired();
+}
+
 final class AuthLoading extends AuthState {
   const AuthLoading();
 }
@@ -20,6 +24,12 @@ final class AuthAuthenticated extends AuthState {
 
 final class AuthSignupSucceeded extends AuthState {
   const AuthSignupSucceeded(this.email);
+
+  final String email;
+}
+
+final class AuthEmailVerified extends AuthState {
+  const AuthEmailVerified(this.email);
 
   final String email;
 }

@@ -72,6 +72,8 @@ class ApiUserSerializer(serializers.ModelSerializer):
         )
 
     def get_avatarUrl(self, obj):
+        if obj.role != User.Role.REPRESENTATIVE:
+            return None
         profile = getattr(obj, "courier_profile", None)
         if profile and profile.photo_url:
             return profile.photo_url
@@ -169,6 +171,83 @@ def split_full_name(name):
     return parts[0], " ".join(parts[1:])
 
 
+def reject_whitespace(value, message="Spaces are not allowed."):
+    if re.search(r"\s", value):
+        raise serializers.ValidationError(message)
+    return value
+
+
+def validate_international_phone(value):
+    phone = reject_whitespace(value.strip())
+    if phone.startswith("+20"):
+        if not re.fullmatch(r"\+201[0125]\d{8}", phone):
+            raise serializers.ValidationError("Enter a valid Egyptian mobile number.")
+        return phone
+    if not re.fullmatch(r"\+[1-9]\d{7,14}", phone):
+        raise serializers.ValidationError("Enter a valid phone number.")
+    return phone
+
+
+PHONE_LOGIN_DIAL_CODES = (
+    "971",
+    "966",
+    "964",
+    "962",
+    "961",
+    "970",
+    "965",
+    "974",
+    "973",
+    "968",
+    "963",
+    "212",
+    "213",
+    "216",
+    "218",
+    "249",
+    "90",
+    "44",
+    "20",
+    "1",
+)
+
+
+def phone_lookup_keys(value):
+    digits = re.sub(r"\D", "", value or "")
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if not digits:
+        return set()
+
+    keys = {digits}
+
+    if digits.startswith("0") and len(digits) > 1:
+        national = digits[1:]
+        keys.add(national)
+        if re.fullmatch(r"1[0125]\d{8}", national):
+            keys.add(f"20{national}")
+
+    if re.fullmatch(r"1[0125]\d{8}", digits):
+        keys.add(f"20{digits}")
+        keys.add(f"0{digits}")
+
+    for dial_code in PHONE_LOGIN_DIAL_CODES:
+        if not digits.startswith(dial_code) or len(digits) <= len(dial_code):
+            continue
+        national = digits[len(dial_code) :]
+        keys.add(national)
+        if national.startswith("0") and len(national) > 1:
+            keys.add(national[1:])
+        else:
+            keys.add(f"0{national}")
+
+    return keys
+
+
+def phone_matches_identifier(phone, identifier):
+    return bool(phone_lookup_keys(phone) & phone_lookup_keys(identifier))
+
+
 class RegisterSerializer(
     RequiredFieldMessagesMixin,
     PasswordValidationMixin,
@@ -241,15 +320,25 @@ class CustomerSignupSerializer(
     phone = serializers.CharField(max_length=30)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
+    def validate_firstName(self, value):
+        return reject_whitespace(value.strip())
+
+    def validate_lastName(self, value):
+        return reject_whitespace(value.strip())
+
     def validate_email(self, value):
         email = normalize_email(value)
+        reject_whitespace(value)
         user = User.objects.filter(email__iexact=email).first()
         if user and user.is_active:
             raise serializers.ValidationError("Email is already registered.")
         return email
 
+    def validate_username(self, value):
+        return reject_whitespace(value.strip())
+
     def validate_phone(self, value):
-        phone = value.strip()
+        phone = validate_international_phone(value)
         email = normalize_email(self.initial_data.get("email", ""))
         user = User.objects.filter(phone=phone).first()
         if user and user.email.lower() != email:
@@ -258,7 +347,8 @@ class CustomerSignupSerializer(
 
     def validate(self, attrs):
         email = attrs["email"]
-        username = attrs["username"].strip()
+        username = attrs["username"]
+        reject_whitespace(attrs["password"])
         user = User.objects.filter(username__iexact=username).first()
         if user and user.email.lower() != email:
             raise serializers.ValidationError(
@@ -332,8 +422,22 @@ class RoleLoginSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
 
         if "@" in identifier:
             user = User.objects.filter(email__iexact=normalize_email(identifier)).first()
+        elif re.fullmatch(r"(?=.*\d)\+?[\d\s().-]+", identifier):
+            matching_users = [
+                candidate
+                for candidate in User.objects.all()
+                if phone_matches_identifier(candidate.phone, identifier)
+            ]
+            user = next(
+                (
+                    candidate
+                    for candidate in matching_users
+                    if candidate.check_password(attrs["password"])
+                ),
+                None,
+            )
         else:
-            user = User.objects.filter(phone=identifier).first()
+            user = User.objects.filter(username__iexact=identifier).first()
 
         if user is None or not user.check_password(attrs["password"]):
             raise AuthenticationFailed("Invalid email or password.")
@@ -348,6 +452,10 @@ class RoleLoginSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
 
 class DashboardLoginSerializer(RoleLoginSerializer):
     allowed_roles = (User.Role.ADMIN,)
+
+
+class CustomerLoginSerializer(RoleLoginSerializer):
+    allowed_roles = (User.Role.CLIENT,)
 
 
 class CourierLoginSerializer(RoleLoginSerializer):

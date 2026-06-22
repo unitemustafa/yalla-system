@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
+import '../../../../core/storage/token_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -23,6 +24,7 @@ class AuthRepositoryImpl implements AuthRepository {
   };
 
   AuthSession? _session;
+  DateTime? _sessionExpiresAt;
 
   @override
   Future<ApiResult<AuthSession?>> restoreSavedSession() {
@@ -173,13 +175,24 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<AuthSession?> _restoreSavedSession() async {
-    if (_session != null) return _session;
+    if (_session != null) {
+      if (_isCurrentSessionExpired) {
+        await _clearSession();
+        return null;
+      }
+      return _session;
+    }
 
     final preferences = await SharedPreferences.getInstance();
     final rawSession = preferences.getString(_sessionKey);
     if (rawSession == null || rawSession.trim().isEmpty) return null;
 
     final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
+    final sessionExpiresAt = _dateFromString(decoded['sessionExpiresAt']);
+    if (sessionExpiresAt != null && !sessionExpiresAt.isAfter(DateTime.now())) {
+      await _clearSession();
+      return null;
+    }
     final savedUser = _userFromJson(decoded);
     final account = (await _loadAccounts())._byUserId(savedUser.id);
     if (account == null) {
@@ -188,6 +201,7 @@ class AuthRepositoryImpl implements AuthRepository {
     }
 
     _session = AuthSession(user: account.user);
+    _sessionExpiresAt = sessionExpiresAt;
     return _session;
   }
 
@@ -196,16 +210,17 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
     bool rememberMe = false,
   }) async {
-    final normalizedEmail = _normalizeEmail(email);
-    if (normalizedEmail.isEmpty || password.isEmpty) {
+    final identifier = email.trim();
+    if (identifier.isEmpty || password.isEmpty) {
       throw const _AuthRepositoryException(
         ValidationFailure('Email and password are required.'),
       );
     }
 
-    final account = (await _loadAccounts())._byEmail(normalizedEmail);
+    final account = (await _loadAccounts())._byIdentifier(identifier);
     if (account == null ||
-        account.passwordDigest != _passwordDigest(normalizedEmail, password)) {
+        account.passwordDigest !=
+            _passwordDigest(account.user.email, password)) {
       throw const _AuthRepositoryException(
         UnauthorizedFailure('Invalid email or password.'),
       );
@@ -235,11 +250,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<bool> _isPhoneRegistered(String phone) async {
-    final normalized = _normalizePhone(phone);
-    if (normalized.isEmpty) return false;
+    final lookupKeys = _phoneLookupKeys(phone);
+    if (lookupKeys.isEmpty) return false;
 
     return (await _loadAccounts()).any(
-      (account) => _normalizePhone(account.user.phone ?? '') == normalized,
+      (account) => _phoneLookupKeys(
+        account.user.phone ?? '',
+      ).intersection(lookupKeys).isNotEmpty,
     );
   }
 
@@ -304,7 +321,7 @@ class AuthRepositoryImpl implements AuthRepository {
         passwordDigest: _passwordDigest(normalizedEmail, password),
       ),
     ]);
-    return _startSession(user, rememberSession: false);
+    return AuthSession(user: user);
   }
 
   Future<AuthSession> _verifyEmail({
@@ -323,7 +340,7 @@ class AuthRepositoryImpl implements AuthRepository {
     final currentSession = _session;
     if (currentSession != null &&
         _normalizeEmail(currentSession.user.email) == normalizedEmail) {
-      return currentSession;
+      return AuthSession(user: currentSession.user);
     }
 
     final account = (await _loadAccounts())._byEmail(normalizedEmail);
@@ -333,7 +350,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     }
 
-    return _startSession(account.user, rememberSession: false);
+    return AuthSession(user: account.user);
   }
 
   Future<bool> _resendVerificationCode(String email) async {
@@ -346,6 +363,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<AuthUser> _me() async {
+    if (_session != null && _isCurrentSessionExpired) {
+      await _clearSession();
+    }
     final session = _session ?? await _restoreSavedSession();
     if (session == null) {
       throw const _AuthRepositoryException(
@@ -481,12 +501,19 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     final session = AuthSession(user: user);
     _session = session;
+    _sessionExpiresAt = DateTime.now().add(
+      rememberSession
+          ? StoredAuthTokens.rememberedLifetime
+          : StoredAuthTokens.sessionOnlyLifetime,
+    );
 
     if (rememberSession) {
       await _saveSession(session);
+      await SessionLifecycleStore.clearSessionOnlyNotice();
     } else {
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove(_sessionKey);
+      await SessionLifecycleStore.markSessionOnlyActive();
     }
 
     return session;
@@ -518,16 +545,22 @@ class AuthRepositoryImpl implements AuthRepository {
 
   Future<void> _saveSession(AuthSession session) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
-      _sessionKey,
-      jsonEncode(_userToJson(session.user)),
-    );
+    final payload = _userToJson(session.user);
+    payload['sessionExpiresAt'] = _sessionExpiresAt?.toIso8601String();
+    await preferences.setString(_sessionKey, jsonEncode(payload));
   }
 
   Future<void> _clearSession() async {
     _session = null;
+    _sessionExpiresAt = null;
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_sessionKey);
+    await SessionLifecycleStore.clearSessionOnlyNotice();
+  }
+
+  bool get _isCurrentSessionExpired {
+    final expiry = _sessionExpiresAt;
+    return expiry != null && !expiry.isAfter(DateTime.now());
   }
 
   List<_LocalAuthAccount> _seedAccounts() {
@@ -596,7 +629,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   String _normalizeUsername(String value) => value.trim().toLowerCase();
 
-  String _normalizePhone(String value) => value.replaceAll(RegExp(r'\D'), '');
+  String _normalizePhone(String value) => _phoneDigits(value);
 
   String _localId(String seed) {
     final normalized = seed
@@ -684,7 +717,91 @@ DateTime? _dateFromString(Object? value) {
   return DateTime.tryParse(value);
 }
 
+const _phoneLoginDialCodes = [
+  '971',
+  '966',
+  '964',
+  '962',
+  '961',
+  '970',
+  '965',
+  '974',
+  '973',
+  '968',
+  '963',
+  '212',
+  '213',
+  '216',
+  '218',
+  '249',
+  '90',
+  '44',
+  '20',
+  '1',
+];
+
+String _phoneDigits(String value) {
+  var digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('00')) digits = digits.substring(2);
+  return digits;
+}
+
+Set<String> _phoneLookupKeys(String value) {
+  final digits = _phoneDigits(value);
+  if (digits.isEmpty) return const {};
+
+  final keys = <String>{digits};
+
+  if (digits.startsWith('0') && digits.length > 1) {
+    final national = digits.substring(1);
+    keys.add(national);
+    if (RegExp(r'^1[0125]\d{8}$').hasMatch(national)) {
+      keys.add('20$national');
+    }
+  }
+
+  if (RegExp(r'^1[0125]\d{8}$').hasMatch(digits)) {
+    keys
+      ..add('20$digits')
+      ..add('0$digits');
+  }
+
+  for (final dialCode in _phoneLoginDialCodes) {
+    if (!digits.startsWith(dialCode) || digits.length <= dialCode.length) {
+      continue;
+    }
+    final national = digits.substring(dialCode.length);
+    keys.add(national);
+    if (national.startsWith('0') && national.length > 1) {
+      keys.add(national.substring(1));
+    } else {
+      keys.add('0$national');
+    }
+  }
+
+  return keys;
+}
+
 extension _LocalAuthAccountsLookup on List<_LocalAuthAccount> {
+  _LocalAuthAccount? _byIdentifier(String identifier) {
+    final normalized = identifier.trim().toLowerCase();
+    final phoneKeys = _phoneLookupKeys(identifier);
+    for (final account in this) {
+      final user = account.user;
+      if (user.email.trim().toLowerCase() == normalized) return account;
+      if ((user.username ?? '').trim().toLowerCase() == normalized) {
+        return account;
+      }
+      if (phoneKeys.isNotEmpty &&
+          _phoneLookupKeys(
+            user.phone ?? '',
+          ).intersection(phoneKeys).isNotEmpty) {
+        return account;
+      }
+    }
+    return null;
+  }
+
   _LocalAuthAccount? _byEmail(String email) {
     final normalized = email.trim().toLowerCase();
     for (final account in this) {

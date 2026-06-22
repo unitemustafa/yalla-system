@@ -48,7 +48,11 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
     return _guard(() async {
       final payload = await _apiClient.post<Map<String, dynamic>>(
         '/auth/login',
-        data: {'email': email, 'password': password, 'rememberMe': rememberMe},
+        data: {
+          'identifier': email,
+          'password': password,
+          'rememberMe': rememberMe,
+        },
       );
       return _sessionFromPayload(payload, persistTokens: rememberMe);
     });
@@ -195,8 +199,16 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
   }) async {
     final user = _userFromPayload(payload);
     final tokensPayload = _asJsonMap(payload['tokens']) ?? payload;
-    final tokens = tokensFromApiPayload(tokensPayload);
-    await _tokenStore.save(tokens.copyWith(isSessionOnly: !persistTokens));
+    final now = DateTime.now();
+    final tokens = tokensFromApiPayload(tokensPayload).copyWith(
+      isSessionOnly: !persistTokens,
+      sessionExpiresAt: now.add(
+        persistTokens
+            ? StoredAuthTokens.rememberedLifetime
+            : StoredAuthTokens.sessionOnlyLifetime,
+      ),
+    );
+    await _tokenStore.save(tokens);
     return AuthSession(
       user: user,
       accessToken: tokens.accessToken,
@@ -244,7 +256,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         '/auth/verify-email',
         data: {'email': email, 'code': code},
       );
-      return _sessionFromPayload(payload, persistTokens: false);
+      return AuthSession(user: _userFromPayload(payload));
     });
   }
 

@@ -12,6 +12,11 @@ void main() {
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
         expect(request.path, '/auth/login');
+        expect(request.data, {
+          'identifier': 'm@example.com',
+          'password': 'Password123!',
+          'rememberMe': true,
+        });
         return _sessionPayload;
       });
       final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -31,6 +36,7 @@ void main() {
       );
       expect((await tokenStore.read())?.refreshToken, 'refresh-token');
       expect((await tokenStore.read())?.isSessionOnly, isFalse);
+      expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
     });
 
     test(
@@ -40,6 +46,11 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/login');
+          expect(request.data, {
+            'identifier': 'm@example.com',
+            'password': 'Password123!',
+            'rememberMe': false,
+          });
           return _sessionPayload;
         });
         final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -58,6 +69,7 @@ void main() {
         );
         expect((await tokenStore.read())?.refreshToken, 'refresh-token');
         expect((await tokenStore.read())?.isSessionOnly, isTrue);
+        expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
       },
     );
 
@@ -135,7 +147,7 @@ void main() {
       },
     );
 
-    test('verifyEmail posts the code and stores session-only tokens', () async {
+    test('verifyEmail posts the code without storing tokens', () async {
       final tokenStore = InMemoryTokenStore();
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
@@ -153,11 +165,11 @@ void main() {
       result.when(
         success: (session) {
           expect(session.user.email, 'm@example.com');
-          expect(session.accessToken, 'access-token');
+          expect(session.accessToken, isNull);
         },
         failure: (failure) => fail(failure.message),
       );
-      expect((await tokenStore.read())?.isSessionOnly, isTrue);
+      expect(await tokenStore.read(), isNull);
     });
 
     test('logout posts stored refresh token and clears token store', () async {

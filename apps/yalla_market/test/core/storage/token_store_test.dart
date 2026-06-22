@@ -39,5 +39,19 @@ void main() {
 
       expect(tokens.copyWith(accessToken: 'next').isSessionOnly, isTrue);
     });
+
+    test('drops tokens when their session lifetime expires', () async {
+      final store = InMemoryTokenStore();
+      await store.save(
+        StoredAuthTokens(
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          sessionExpiresAt: DateTime.now().subtract(const Duration(seconds: 1)),
+        ),
+      );
+
+      expect(await store.read(), isNull);
+    });
   });
 }
