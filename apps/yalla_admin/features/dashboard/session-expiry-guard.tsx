@@ -2,104 +2,73 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const tabSessionStorageKey = "yalla-dashboard-tab-session";
+import { clearClientAuth, getClientSession } from "@/lib/client-api";
 
-type SessionResponse = {
-  authenticated?: boolean;
-  remembered?: boolean;
-  expiresAt?: number;
-};
+const tabSessionStorageKey = "yalla-dashboard-tab-session";
 
 export function SessionExpiryGuard() {
   const [expired, setExpired] = useState(false);
   const timeoutRef = useRef<number | null>(null);
-  const didClearServerSession = useRef(false);
+  const didClearSession = useRef(false);
 
   useEffect(() => {
     let alive = true;
 
-    async function clearServerSession() {
-      if (didClearServerSession.current) {
-        return;
-      }
-
-      didClearServerSession.current = true;
+    function clearSession() {
+      if (didClearSession.current) return;
+      didClearSession.current = true;
       sessionStorage.removeItem(tabSessionStorageKey);
-      await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+      clearClientAuth();
     }
 
-    async function expireSession() {
-      if (!alive) {
-        return;
-      }
-
+    function expireSession() {
+      if (!alive) return;
       setExpired(true);
-      await clearServerSession();
+      clearSession();
     }
 
-    async function checkSession() {
-      const response = await fetch("/api/auth/session", {
-        cache: "no-store",
-      }).catch(() => null);
+    function checkSession() {
+      const session = getClientSession();
 
-      if (!alive) {
+      if (!alive) return;
+      if (!session) {
+        expireSession();
         return;
       }
 
-      if (!response?.ok) {
-        await expireSession();
-        return;
-      }
-
-      const data = (await response.json().catch(() => null)) as
-        | SessionResponse
-        | null;
-
-      if (!data?.authenticated) {
-        await expireSession();
-        return;
-      }
-
-      if (data.remembered) {
+      if (session.remembered) {
         sessionStorage.removeItem(tabSessionStorageKey);
         return;
       }
 
       const tabSession = sessionStorage.getItem(tabSessionStorageKey);
-
       if (!tabSession) {
-        await expireSession();
+        expireSession();
         return;
       }
 
-      const expiresAt =
-        typeof data.expiresAt === "number" ? data.expiresAt : Date.now();
-      const millisecondsUntilExpiry = expiresAt - Date.now();
-
+      const millisecondsUntilExpiry = session.expiresAt - Date.now();
       if (millisecondsUntilExpiry <= 0) {
-        await expireSession();
+        expireSession();
         return;
       }
 
       timeoutRef.current = window.setTimeout(() => {
-        void expireSession();
+        expireSession();
       }, millisecondsUntilExpiry);
     }
 
-    void checkSession();
+    checkSession();
 
     return () => {
       alive = false;
-
       if (timeoutRef.current !== null) {
         window.clearTimeout(timeoutRef.current);
       }
     };
   }, []);
 
-  if (!expired) {
-    return null;
-  }
+  if (!expired) return null;
 
   return (
     <div

@@ -27,6 +27,7 @@ import {
 } from "@/features/auth/login-splash";
 import type { LoginDashboardSnapshot } from "@/lib/login-dashboard-snapshot";
 import { removeInputWhitespace } from "@/lib/input-sanitizers";
+import { loginToBackend } from "@/lib/client-api";
 
 const productImages = [
   "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090694513-5coutf286d4.webp",
@@ -120,43 +121,37 @@ function LoginPageContent({
     setPending(true);
     const remember =
       new FormData(event.currentTarget).get("remember") === "on";
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: emailValue,
-        password: passwordValue,
-        remember,
-      }),
+    const result = await loginToBackend({
+      email: emailValue,
+      password: passwordValue,
+      remember,
+    }).catch((error: unknown) => {
+      console.error("[login] backend request failed", error);
+      return null;
     });
 
     setPending(false);
 
-    if (!response.ok) {
-      if (response.status === 403) {
+    if (!result?.ok) {
+      if (result?.forbidden) {
         setError("الحساب ده ملوش صلاحية دخول للداشبورد.");
-      } else if (response.status === 503) {
+      } else if (!result) {
         setError("خدمة تسجيل الدخول مش متاحة دلوقتي.");
+      } else if (result.incomplete) {
+        setError("رد تسجيل الدخول من الباك إند ناقص.");
       } else {
         setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
       }
       return;
     }
 
-    const data = (await response.json().catch(() => null)) as
-      | { remembered?: boolean; expiresAt?: number }
-      | null;
-
-    if (remember || data?.remembered) {
+    if (remember || result.remembered) {
       sessionStorage.removeItem(tabSessionStorageKey);
     } else {
       sessionStorage.setItem(
         tabSessionStorageKey,
         JSON.stringify({
-          expiresAt:
-            typeof data?.expiresAt === "number"
-              ? data.expiresAt
-              : Date.now() + 8 * 60 * 60 * 1000,
+          expiresAt: Date.now() + 8 * 60 * 60 * 1000,
         }),
       );
     }

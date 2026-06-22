@@ -1,8 +1,10 @@
+import { dashboardFetch } from "@/lib/client-api";
+
 export async function uploadDashboardImage(file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch("/api/dashboard/uploads", {
+  const response = await dashboardFetch("uploads", {
     method: "POST",
     body: formData,
   });

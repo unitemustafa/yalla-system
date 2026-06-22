@@ -46,6 +46,7 @@ import {
   SelectBox,
 } from "../primitives";
 import { cn } from "@/lib/utils";
+import { dashboardFetch } from "@/lib/client-api";
 import { useSnackbar } from "../snackbar";
 import { dashboardUsers, type DashboardUser } from "../users/default-dashboard-users";
 import { deliveryZones } from "../reference-data";
@@ -907,7 +908,7 @@ export function OrdersPage() {
       setError("");
 
       try {
-        const response = await fetch("/api/dashboard/orders");
+        const response = await dashboardFetch("orders");
 
         if (!response.ok) {
           throw new Error("Failed to load orders");
@@ -1311,7 +1312,7 @@ export function CreateOrderPage() {
     setSavingOrder(true);
 
     try {
-      const response = await fetch("/api/dashboard/orders", {
+      const response = await dashboardFetch("orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -1872,7 +1873,7 @@ export function CreateOrderPageLegacy() {
     setSavingOrder(true);
 
     try {
-      const response = await fetch("/api/dashboard/orders", {
+      const response = await dashboardFetch("orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

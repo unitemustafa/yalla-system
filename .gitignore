@@ -36,6 +36,8 @@ apps/yalla_admin/next-env.d.ts
 # Django backend
 backend/.env*
 backend/.venv/
+backend/venv/
+
 backend/db.sqlite3
 backend/dev.sqlite3
 backend/legacy-postgres-import.json
@@ -71,3 +73,6 @@ apps/yalla_home/android/app/debug/
 apps/yalla_home/android/app/profile/
 apps/yalla_home/android/app/release/
 apps/yalla_home/android/release/
+
+.headroom-venv/
+venv/

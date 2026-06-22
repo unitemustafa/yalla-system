@@ -34,6 +34,7 @@ import {
 import { deliveryZones } from "../reference-data";
 import { useItemTableState } from "../hooks";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 
 type ItemFilters = {
@@ -684,7 +685,7 @@ export function ItemsPage() {
       setError("");
 
       try {
-        const response = await fetch("/api/dashboard/items");
+        const response = await dashboardFetch("items");
 
         if (!response.ok) {
           throw new Error("Failed to load items");
@@ -748,8 +749,8 @@ export function ItemsPage() {
     setError("");
 
     try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(row.id)}`,
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(row.id)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -786,8 +787,8 @@ export function ItemsPage() {
     setError("");
 
     try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(row.id)}/duplicate`,
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(row.id)}/duplicate`,
         { method: "POST" },
       );
 
@@ -825,8 +826,8 @@ export function ItemsPage() {
     setError("");
 
     try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(deleteRow.id)}`,
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(deleteRow.id)}`,
         { method: "DELETE" },
       );
 

@@ -1,15 +1,17 @@
+<<<<<<< HEAD
 import { branchOptions, deliveryZones } from "@/features/dashboard/reference-data";
 import { prisma } from "@/lib/prisma";
 import { listOrders } from "@/lib/dashboard-store";
 
+=======
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 export type LoginDashboardSnapshot = {
   todayOrders: number;
   activeBranches: number;
   deliveryZones: number;
-  completedPercent: number;
-  averagePreparationMinutes: number;
 };
 
+<<<<<<< HEAD
 const completedStatuses = new Set(["مكتمل"]);
 
 function getLocalDayRange(referenceDate = new Date()) {
@@ -50,4 +52,14 @@ export async function getLoginDashboardSnapshot(): Promise<LoginDashboardSnapsho
       totalOrders === 0 ? 0 : Math.round((completedOrders / totalOrders) * 100),
     averagePreparationMinutes: averageDeliveryMinutes(),
   };
+=======
+export const loginDashboardSnapshot: LoginDashboardSnapshot = {
+  todayOrders: 128,
+  activeBranches: 6,
+  deliveryZones: 14,
+};
+
+export function getLoginDashboardSnapshot() {
+  return loginDashboardSnapshot;
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 }

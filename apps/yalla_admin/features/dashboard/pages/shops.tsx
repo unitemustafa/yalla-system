@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MapPin, Plus, Store, X } from "lucide-react";
 
+<<<<<<< HEAD
 import {
   AppSelect,
   Badge,
@@ -16,6 +17,11 @@ import {
 } from "../primitives";
 import { categoryRows } from "../data";
 import { deliveryZones } from "../reference-data";
+=======
+import { Button, Card, Input, PageTitle } from "../primitives";
+import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 
 type ShopRow = {
   id: string;
@@ -61,6 +67,7 @@ const initialShopRows: ShopRow[] = [
   },
 ];
 
+<<<<<<< HEAD
 const shopsPageSize = 10;
 
 function AddShopDrawer({
@@ -82,6 +89,46 @@ function AddShopDrawer({
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
 
+=======
+  async function load() {
+    const [marketsResponse, citiesResponse, classificationsResponse] =
+      await Promise.all([
+        dashboardFetch("markets", { cache: "no-store" }),
+        dashboardFetch("cities", { cache: "no-store" }),
+        dashboardFetch("market-classifications", { cache: "no-store" }),
+      ]);
+    const [marketsData, citiesData, classificationsData] = await Promise.all([
+      marketsResponse.json().catch(() => null),
+      citiesResponse.json().catch(() => null),
+      classificationsResponse.json().catch(() => null),
+    ]);
+    if (marketsResponse.ok) setMarkets(marketsData?.markets ?? []);
+    if (citiesResponse.ok) setCities(citiesData?.cities ?? []);
+    if (classificationsResponse.ok) {
+      setClassifications(classificationsData?.classifications ?? []);
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      dashboardFetch("markets", { cache: "no-store" }),
+      dashboardFetch("cities", { cache: "no-store" }),
+      dashboardFetch("market-classifications", { cache: "no-store" }),
+    ]).then(async ([marketsResponse, citiesResponse, classificationsResponse]) => {
+      const [marketsData, citiesData, classificationsData] = await Promise.all([
+        marketsResponse.json().catch(() => null),
+        citiesResponse.json().catch(() => null),
+        classificationsResponse.json().catch(() => null),
+      ]);
+      if (!active) return;
+      if (marketsResponse.ok) setMarkets(marketsData?.markets ?? []);
+      if (citiesResponse.ok) setCities(citiesData?.cities ?? []);
+      if (classificationsResponse.ok) {
+        setClassifications(classificationsData?.classifications ?? []);
+      }
+    });
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     return () => {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
@@ -90,8 +137,28 @@ function AddShopDrawer({
 
   function submitShop(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+<<<<<<< HEAD
 
     if (!canSave) {
+=======
+    const response = await dashboardFetch(
+      editingId ? `markets/${editingId}` : "markets",
+      {
+      method: editingId ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...draft,
+        classification_id: Number(draft.classification_id),
+      }),
+      },
+    );
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      showSnackbar({
+        message: data?.message || "يجب اختيار مدينة وتصنيف صالحين.",
+        tone: "danger",
+      });
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
       return;
     }
 
@@ -105,6 +172,7 @@ function AddShopDrawer({
     });
   }
 
+<<<<<<< HEAD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-foreground/60 px-4 py-6 backdrop-blur-sm sm:px-6">
       <section
@@ -201,6 +269,19 @@ export function ShopsPage() {
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStartIndex = (safeCurrentPage - 1) * shopsPageSize;
   const pagedShops = shops.slice(pageStartIndex, pageStartIndex + shopsPageSize);
+=======
+  async function remove(id: string) {
+    const response = await dashboardFetch(`markets/${id}`, {
+      method: "DELETE",
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      showSnackbar({ message: data?.message || "تعذر حذف السوق.", tone: "danger" });
+      return;
+    }
+    await load();
+  }
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 
   return (
     <div className="px-6 py-6">

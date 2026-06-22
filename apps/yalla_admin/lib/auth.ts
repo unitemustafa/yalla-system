@@ -1,5 +1,6 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import type { DashboardUser } from "@/lib/backend-auth";
 
+<<<<<<< HEAD
 import {
   getDashboardAccountEmail,
   isDashboardAccountEmail,
@@ -138,8 +139,43 @@ export function createSessionToken(user: {
     name: user.name,
     role: user.role,
     exp: Math.floor(Date.now() / 1000) + maxAge,
+=======
+export const authCookieName = "yalla_dashboard_session";
+export const backendAccessCookieName = "yalla_backend_access";
+export const backendRefreshCookieName = "yalla_backend_refresh";
+export const authCookieMaxAge = 8 * 60 * 60;
+export const rememberedAuthCookieMaxAge = 30 * 24 * 60 * 60;
+
+export type DashboardSession = {
+  user: DashboardUser;
+  expiresAt: number;
+  remembered: boolean;
+};
+
+type CookieLike = { value?: string };
+
+function encodeSession(session: DashboardSession) {
+  return encodeURIComponent(JSON.stringify(session));
+}
+
+function decodeSession(value: string) {
+  return JSON.parse(decodeURIComponent(value)) as
+    | DashboardSession
+    | undefined;
+}
+
+export function createSessionToken(
+  user: DashboardUser,
+  maxAge: number,
+  remembered: boolean,
+) {
+  return encodeSession({
+    user,
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     remembered,
+    expiresAt: Date.now() + maxAge * 1000,
   });
+<<<<<<< HEAD
 
   return `${payload}.${sign(payload)}`;
 }
@@ -164,18 +200,18 @@ export function readSessionToken(token: string | undefined) {
       return null;
     }
 
+=======
+}
+
+export function readSessionToken(cookie: CookieLike | string | undefined) {
+  const value = typeof cookie === "string" ? cookie : cookie?.value;
+  if (!value) return null;
+  try {
+    const session = decodeSession(value);
+    if (!session?.user?.email || Date.now() >= session.expiresAt) return null;
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     return session;
   } catch {
     return null;
   }
-}
-
-export function authCookieSettings(maxAge?: number) {
-  return {
-    httpOnly: true,
-    ...(maxAge === undefined ? {} : { maxAge }),
-    path: "/",
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-  };
 }

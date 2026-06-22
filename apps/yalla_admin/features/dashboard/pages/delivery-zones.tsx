@@ -33,6 +33,7 @@ import {
   Switch,
 } from "../primitives";
 import { useSnackbar } from "../snackbar";
+<<<<<<< HEAD
 import {
   calculateDeliveryFee,
   initialDeliverySettings,
@@ -44,6 +45,9 @@ import {
   type DeliveryZoneStatus,
 } from "../delivery-pricing";
 import { cn } from "@/lib/utils";
+=======
+import { dashboardFetch } from "@/lib/client-api";
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 
 const deliveryListPageSize = 10;
 
@@ -1018,6 +1022,7 @@ function DeliveryFeeTester({
 
 export function DeliveryZonesPage() {
   const { showSnackbar } = useSnackbar();
+<<<<<<< HEAD
   const [activeTab, setActiveTab] = useState<DeliveryTab>("zones");
   const [loading, setLoading] = useState(true);
   const [zones, setZones] = useState<DeliveryZone[]>(initialManagedDeliveryZones);
@@ -1048,6 +1053,42 @@ export function DeliveryZonesPage() {
         .join(" ")
         .toLocaleLowerCase("ar-EG")
         .includes(normalizedSearch),
+=======
+  const [cities, setCities] = useState<City[]>([]);
+  const [draft, setDraft] = useState(emptyDraft);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  async function loadCities() {
+    const response = await dashboardFetch("cities", { cache: "no-store" });
+    const data = await response.json().catch(() => null);
+    if (response.ok) setCities(data?.cities ?? []);
+  }
+
+  useEffect(() => {
+    let active = true;
+    dashboardFetch("cities", { cache: "no-store" })
+      .then(async (response) => ({
+        response,
+        data: await response.json().catch(() => null),
+      }))
+      .then(({ response, data }) => {
+        if (active && response.ok) setCities(data?.cities ?? []);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    const response = await dashboardFetch(
+      editingId ? `cities/${encodeURIComponent(editingId)}` : "cities",
+      {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(draft),
+      },
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     );
   }, [searchQuery, zones]);
 
@@ -1088,8 +1129,19 @@ export function DeliveryZonesPage() {
     showSnackbar({ message: "تمت إضافة منطقة التوصيل بنجاح." });
   }
 
+<<<<<<< HEAD
   function confirmDeleteZone() {
     if (!deleteZone) {
+=======
+  async function remove(city: City) {
+    const response = await fetch(
+      `cities/${encodeURIComponent(city.id)}`,
+      { method: "DELETE" },
+    );
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      showSnackbar({ message: data?.message || "تعذر حذف المدينة.", tone: "danger" });
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
       return;
     }
 
