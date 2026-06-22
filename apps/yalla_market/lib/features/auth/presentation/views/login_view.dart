@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/localization/app_language_controller.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
@@ -12,16 +14,17 @@ import '../../../../core/presentation/widgets/images/app_image.dart';
 import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/utils/validators.dart';
+import '../../../location/data/datasources/location_preferences.dart';
 import '../../../location/presentation/cubit/location_cubit.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
-import '../auth_error_localizer.dart';
 import '../widgets/custom_text_field.dart';
-import '../widgets/signup_phone_country_picker.dart';
 import '../widgets/warning_checkbox.dart';
 
 class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+  const LoginView({super.key, this.showSessionExpiredNotice = false});
+
+  final bool showSessionExpiredNotice;
 
   @override
   State<LoginView> createState() => _LoginViewState();
@@ -29,7 +32,7 @@ class LoginView extends StatefulWidget {
 
 class _LoginViewState extends State<LoginView> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _loginIdentifierController;
+  late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _obscurePassword = true;
   bool _rememberMe = true;
@@ -37,13 +40,18 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    _loginIdentifierController = TextEditingController();
+    _emailController = TextEditingController();
     _passwordController = TextEditingController();
+    if (widget.showSessionExpiredNotice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showSessionExpiredDialog();
+      });
+    }
   }
 
   @override
   void dispose() {
-    _loginIdentifierController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -52,22 +60,39 @@ class _LoginViewState extends State<LoginView> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final authCubit = context.read<AuthCubit>();
-    final loginIdentifier = _normalizedLoginIdentifier();
+    final identifier = _emailController.text.trim();
 
     authCubit.login(
-      email: loginIdentifier,
+      email: identifier,
       password: _passwordController.text,
       rememberMe: _rememberMe,
     );
   }
 
-  Future<void> _navigateAfterSignIn(BuildContext context) async {
+  Future<void> _navigateAfterSignIn(
+    BuildContext context,
+    AuthAuthenticated state,
+  ) async {
     final selectedCity = await context.read<LocationCubit>().loadSelectedCity();
     if (!context.mounted) return;
 
+    final selectedCityUserId = await LocationPreferences()
+        .getSelectedCityUserId();
+    if (!context.mounted) return;
+
+    final hasLegacyCity = selectedCity != null && selectedCityUserId == null;
+    if (hasLegacyCity) {
+      await LocationPreferences().setSelectedCityUserId(state.session.user.id);
+    }
+    if (!context.mounted) return;
+
+    final hasCityForCurrentUser =
+        selectedCity != null &&
+        (selectedCityUserId == state.session.user.id || hasLegacyCity);
+
     Navigator.pushNamedAndRemoveUntil(
       context,
-      selectedCity == null ? AppRoutes.selectCity : AppRoutes.navigationMenu,
+      hasCityForCurrentUser ? AppRoutes.navigationMenu : AppRoutes.selectCity,
       (route) => false,
     );
   }
@@ -89,14 +114,14 @@ class _LoginViewState extends State<LoginView> {
             title: strings.signInSuccessTitle,
             message: strings.signInSuccessMessage,
           );
-          unawaited(_navigateAfterSignIn(context));
+          unawaited(_navigateAfterSignIn(context, state));
         }
 
         if (state is AuthFailure) {
           CustomSnackBar.showError(
             context: context,
             title: _signInErrorTitle(state.message, strings),
-            message: localizeAuthError(context, state.message),
+            message: context.tr(state.message),
           );
         }
       },
@@ -146,10 +171,17 @@ class _LoginViewState extends State<LoginView> {
                                       strings,
                                     ),
                                     const SizedBox(height: 30),
-                                    _buildLoginIdentifierField(
-                                      theme,
-                                      isDarkMode,
-                                      strings,
+                                    CustomTextField(
+                                      controller: _emailController,
+                                      labelText: 'Email, username, or phone',
+                                      prefixIcon: AppIcons.direct_right,
+                                      keyboardType: TextInputType.text,
+                                      validator: _validateIdentifier,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.deny(
+                                          RegExp(r'\s'),
+                                        ),
+                                      ],
                                     ),
                                     CustomTextField(
                                       controller: _passwordController,
@@ -165,7 +197,11 @@ class _LoginViewState extends State<LoginView> {
                                         });
                                       },
                                       validator: Validators.passwordRequired,
-                                      labelFontSize: 12,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.deny(
+                                          RegExp(r'\s'),
+                                        ),
+                                      ],
                                     ),
                                     _buildRememberAndForgotRow(
                                       theme,
@@ -379,96 +415,6 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  Widget _buildLoginIdentifierField(
-    ThemeData theme,
-    bool isDarkMode,
-    AppTranslations strings,
-  ) {
-    return CustomTextField(
-      controller: _loginIdentifierController,
-      labelText: strings.loginIdentifier,
-      prefixIcon: AppIcons.direct_right,
-      keyboardType: TextInputType.emailAddress,
-      validator: Validators.loginIdentifier,
-      labelFontSize: 12,
-    );
-  }
-
-  String _normalizedLoginIdentifier() {
-    final rawValue = _loginIdentifierController.text.trim();
-    return _normalizePhoneIdentifier(rawValue) ?? rawValue;
-  }
-
-  String? _normalizePhoneIdentifier(String value) {
-    if (!_isPhoneCandidate(value)) return null;
-
-    final digits = value.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return null;
-
-    if (value.trim().startsWith('+')) {
-      return _normalizeInternationalPhone(digits) ?? '+$digits';
-    }
-    if (digits.startsWith('00') && digits.length > 4) {
-      final internationalDigits = digits.substring(2);
-      return _normalizeInternationalPhone(internationalDigits) ??
-          '+$internationalDigits';
-    }
-
-    for (final country in kPhoneCountries) {
-      final dialDigits = country.dialCode.replaceAll(RegExp(r'\D'), '');
-      if (digits.startsWith(dialDigits)) {
-        return normalizePhoneForCountry(country, digits);
-      }
-    }
-
-    final localCountry = _countryForLocalPhone(digits);
-    if (localCountry == null) return digits;
-    return normalizePhoneForCountry(localCountry, digits);
-  }
-
-  String? _normalizeInternationalPhone(String digits) {
-    for (final country in kPhoneCountries) {
-      final dialDigits = country.dialCode.replaceAll(RegExp(r'\D'), '');
-      if (digits.startsWith(dialDigits) && digits.length > dialDigits.length) {
-        return normalizePhoneForCountry(country, digits);
-      }
-    }
-    return null;
-  }
-
-  PhoneCountry? _countryForLocalPhone(String digits) {
-    if (RegExp(r'^01[0125]\d{8}$').hasMatch(digits) ||
-        RegExp(r'^1[0125]\d{8}$').hasMatch(digits)) {
-      return _countryByIsoCode('EG');
-    }
-
-    if (RegExp(r'^07[3-9]\d{8}$').hasMatch(digits) ||
-        RegExp(r'^7[3-9]\d{8}$').hasMatch(digits)) {
-      return _countryByIsoCode('IQ');
-    }
-
-    if (RegExp(r'^05\d{8}$').hasMatch(digits) ||
-        RegExp(r'^5\d{8}$').hasMatch(digits)) {
-      return _countryByIsoCode('SA');
-    }
-
-    return null;
-  }
-
-  PhoneCountry? _countryByIsoCode(String isoCode) {
-    for (final country in kPhoneCountries) {
-      if (country.isoCode == isoCode) return country;
-    }
-    return null;
-  }
-
-  bool _isPhoneCandidate(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return false;
-    if (trimmed.contains('@')) return false;
-    return RegExp(r'^\+?\d[\d\s().-]*$').hasMatch(trimmed);
-  }
-
   Widget _buildRememberAndForgotRow(
     ThemeData theme,
     bool isDarkMode,
@@ -568,6 +514,109 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
+  String? _validateIdentifier(String? value) {
+    final identifier = value?.trim() ?? '';
+    if (identifier.isEmpty) return AppTranslations.current.fieldRequired;
+
+    if (identifier.contains('@')) {
+      return Validators.email(identifier);
+    }
+
+    if (RegExp(r'^\+?\d+$').hasMatch(identifier)) {
+      final digits = identifier.replaceAll(RegExp(r'\D'), '');
+      if (digits.length < 8 || digits.length > 15) {
+        return context.tr('Enter a valid email, username, or phone.');
+      }
+      return null;
+    }
+
+    if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(identifier)) {
+      return context.tr('Enter a valid email, username, or phone.');
+    }
+
+    return null;
+  }
+
+  Future<void> _showSessionExpiredDialog() {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final panelColor = isDarkMode ? const Color(0xFF222326) : Colors.white;
+    final textColor = isDarkMode ? Colors.white : AppColors.lightTextPrimary;
+    final mutedColor = isDarkMode
+        ? Colors.white.withValues(alpha: 0.62)
+        : Colors.black.withValues(alpha: 0.56);
+
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: panelColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+              color: isDarkMode
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.primary.withValues(alpha: 0.12),
+            ),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
+          contentPadding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
+          title: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(
+                    alpha: isDarkMode ? 0.18 : 0.10,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  AppIcons.security_safe,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  context.tr('Session expired'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                context.tr(
+                  'Your session ended because Remember Me was off. Turn it on to stay signed in for 30 days when you close the app.',
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: mutedColor,
+                  height: 1.55,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 20),
+              AppActionButton(
+                label: AppStrings.signIn,
+                icon: AppIcons.arrow_right_3,
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _signInErrorTitle(String? message, AppTranslations strings) {
     final normalizedMessage = message?.toLowerCase() ?? '';
 
@@ -576,8 +625,7 @@ class _LoginViewState extends State<LoginView> {
       return strings.signInCreateAccountTitle;
     }
 
-    if (normalizedMessage.contains('invalid email or password') ||
-        normalizedMessage.contains('invalid login credentials')) {
+    if (normalizedMessage.contains('invalid email or password')) {
       return strings.signInCredentialsTitle;
     }
 

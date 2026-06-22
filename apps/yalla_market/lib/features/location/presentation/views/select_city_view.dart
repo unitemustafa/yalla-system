@@ -10,8 +10,11 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/routing/app_routes.dart';
+import '../../../auth/presentation/cubit/auth_cubit.dart';
+import '../../../auth/presentation/cubit/auth_state.dart';
 import '../../../store/presentation/cubit/product_catalog_cubit.dart';
 import '../../../store/presentation/cubit/product_discovery_cubit.dart';
+import '../../data/datasources/location_preferences.dart';
 import '../../domain/entities/city_data.dart';
 import '../cubit/location_cubit.dart';
 import '../cubit/location_state.dart';
@@ -315,6 +318,14 @@ class _SelectCityViewState extends State<SelectCityView>
       source: source,
     );
     if (!context.mounted || selectedCity == null) return;
+
+    final authState = context.read<AuthCubit>().state;
+    if (authState is AuthAuthenticated) {
+      await LocationPreferences().setSelectedCityUserId(
+        authState.session.user.id,
+      );
+    }
+    if (!context.mounted) return;
 
     await context.read<ProductCatalogCubit>().loadProducts(force: true);
     if (!context.mounted) return;

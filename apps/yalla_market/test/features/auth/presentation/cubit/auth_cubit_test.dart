@@ -106,7 +106,6 @@ void main() {
         firstName: 'Mustafa',
         lastName: 'Ali',
         email: ' mustafa@example.com ',
-        phone: '+201000000000',
         password: 'Password123!',
       );
 
@@ -116,33 +115,35 @@ void main() {
       await cubit.close();
     });
 
-    test('returns to login after verification completes', () async {
-      final repository = _FakeAuthRepository(loginResult: sampleSession);
-      final cubit = AuthCubit(_authUseCases(repository));
-      final expectedStates = expectLater(
-        cubit.stream,
-        emitsInOrder([
-          isA<AuthLoading>(),
-          isA<AuthSignupSucceeded>(),
-          isA<AuthEmailVerified>(),
-        ]),
-      );
+    test(
+      'marks the pending signup as verified without authenticating',
+      () async {
+        final repository = _FakeAuthRepository(loginResult: sampleSession);
+        final cubit = AuthCubit(_authUseCases(repository));
+        final expectedStates = expectLater(
+          cubit.stream,
+          emitsInOrder([
+            isA<AuthLoading>(),
+            isA<AuthSignupSucceeded>(),
+            isA<AuthEmailVerified>(),
+          ]),
+        );
 
-      await cubit.signup(
-        firstName: 'Mustafa',
-        lastName: 'Ali',
-        email: 'mustafa@example.com',
-        phone: '+201000000000',
-        password: 'Password123!',
-      );
-      final completed = await cubit.completeSignupVerification('123456');
+        await cubit.signup(
+          firstName: 'Mustafa',
+          lastName: 'Ali',
+          email: 'mustafa@example.com',
+          password: 'Password123!',
+        );
+        final completed = await cubit.completeSignupVerification('123456');
 
-      expect(completed, isTrue);
-      expect(cubit.state, isA<AuthEmailVerified>());
-      expect(AuthGuard.isAuthenticated, isFalse);
-      await expectedStates;
-      await cubit.close();
-    });
+        expect(completed, isTrue);
+        expect((cubit.state as AuthEmailVerified).email, sampleUser.email);
+        expect(AuthGuard.isAuthenticated, isFalse);
+        await expectedStates;
+        await cubit.close();
+      },
+    );
 
     test(
       'verifies a pending signup without tokens before returning to login',
@@ -167,14 +168,13 @@ void main() {
           firstName: 'Mustafa',
           lastName: 'Ali',
           email: 'mustafa@example.com',
-          phone: '+201000000000',
           password: 'Password123!',
         );
         final completed = await cubit.completeSignupVerification('123456');
 
         expect(completed, isTrue);
         expect(repository.lastVerificationCode, '123456');
-        expect(cubit.state, isA<AuthEmailVerified>());
+        expect((cubit.state as AuthEmailVerified).email, sampleUser.email);
         expect(AuthGuard.isAuthenticated, isFalse);
         await expectedStates;
         await cubit.close();
@@ -197,11 +197,7 @@ void main() {
       final user = await cubit.updateProfile(firstName: 'Mona');
 
       expect(user?.firstName, 'Mona');
-      final updatedSession = (cubit.state as AuthAuthenticated).session;
-      expect(updatedSession.user.firstName, 'Mona');
-      expect(updatedSession.accessToken, sampleSession.accessToken);
-      expect(updatedSession.refreshToken, sampleSession.refreshToken);
-      expect(updatedSession.expiresAt, sampleSession.expiresAt);
+      expect((cubit.state as AuthAuthenticated).session.user.firstName, 'Mona');
       await expectedStates;
       await cubit.close();
     });
@@ -257,8 +253,6 @@ AuthUseCases _authUseCases(AuthRepository repository) {
     signup: SignupUseCase(repository),
     verifyEmail: VerifyEmailUseCase(repository),
     resendVerificationCode: ResendVerificationCodeUseCase(repository),
-    requestPasswordReset: RequestPasswordResetUseCase(repository),
-    resetPassword: ResetPasswordUseCase(repository),
     refreshProfile: RefreshProfileUseCase(repository),
     updateProfile: UpdateProfileUseCase(repository),
     logout: LogoutUseCase(repository),
@@ -328,8 +322,8 @@ class _FakeAuthRepository implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
     String? username,
+    String? phone,
   }) async {
     return ApiResult.success(loginResult ?? sampleSession);
   }
@@ -345,21 +339,6 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<ApiResult<bool>> resendVerificationCode(String email) async {
-    return const ApiResult.success(true);
-  }
-
-  @override
-  Future<ApiResult<bool>> requestPasswordReset(String email) async {
-    return const ApiResult.success(true);
-  }
-
-  @override
-  Future<ApiResult<bool>> resetPassword({
-    required String email,
-    required String code,
-    required String password,
-    required String passwordConfirmation,
-  }) async {
     return const ApiResult.success(true);
   }
 

@@ -160,11 +160,10 @@ class _VerifyEmailViewState extends State<VerifyEmailView> {
       title: _copy(context, ar: 'تم تأكيد الإيميل', en: 'Email verified'),
       message: _copy(
         context,
-        ar: 'سجل دخولك دلوقتي عشان تكمل اختيار المنطقة.',
-        en: 'Sign in now to continue choosing your region.',
+        ar: 'حسابك اتأكد. سجل دخولك عشان تكمل.',
+        en: 'Your account is verified. Sign in to continue.',
       ),
     );
-
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.login,

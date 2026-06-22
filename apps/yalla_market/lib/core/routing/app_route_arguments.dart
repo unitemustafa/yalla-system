@@ -4,6 +4,12 @@ class NavigationMenuRouteArgs {
   final int initialIndex;
 }
 
+class LoginRouteArgs {
+  const LoginRouteArgs({this.showSessionExpiredNotice = false});
+
+  final bool showSessionExpiredNotice;
+}
+
 class AllProductsRouteArgs {
   const AllProductsRouteArgs({
     this.title = 'Popular Products',

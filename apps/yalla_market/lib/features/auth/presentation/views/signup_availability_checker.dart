@@ -179,6 +179,7 @@ class SignupAvailabilityChecker {
               'This email is already registered.',
             );
       onStateChanged();
+      if (isAvailable) schedulePhoneCheck();
 
       return isAvailable;
     } catch (_) {
@@ -450,6 +451,7 @@ class SignupAvailabilityChecker {
               'This username is already taken.',
             );
       onStateChanged();
+      if (isAvailable) scheduleEmailCheck();
 
       return isAvailable;
     } catch (_) {

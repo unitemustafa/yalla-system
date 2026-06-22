@@ -5,7 +5,6 @@ import '../../../../core/errors/api_error_handler.dart';
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_result.dart';
-import '../../../../core/session/session_expired_notifier.dart';
 import '../../../../core/storage/token_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
@@ -16,8 +15,6 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
 
   static const _legacySessionKey = 'auth.local_session';
   static const _legacyAccountsKey = 'auth.local_accounts';
-  static const _sessionOnlyLifetime = Duration(hours: 8);
-  static const _rememberedLifetime = Duration(days: 30);
 
   final ApiClient _apiClient;
   final TokenStore _tokenStore;
@@ -27,16 +24,8 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
     return _guard(() async {
       await _clearLegacyLocalAuth();
       final tokens = await _tokenStore.read();
-      if (tokens == null) {
-        if (await _tokenStore.consumeExpiredSessionMarker()) {
-          SessionExpiredNotifier.instance.notifyExpired();
-        }
-        return null;
-      }
-
-      if (tokens.isExpired) {
+      if (tokens == null || tokens.isExpired) {
         await _tokenStore.clear();
-        SessionExpiredNotifier.instance.notifyExpired();
         return null;
       }
 
@@ -45,7 +34,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         user: user,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        expiresAt: tokens.sessionExpiresAt ?? tokens.expiresAt,
+        expiresAt: tokens.expiresAt,
       );
     });
   }
@@ -57,13 +46,10 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
     bool rememberMe = false,
   }) {
     return _guard(() async {
-      final loginIdentifier = email.trim();
       final payload = await _apiClient.post<Map<String, dynamic>>(
         '/auth/login',
         data: {
-          'email': loginIdentifier,
-          'identifier': loginIdentifier,
-          'login': loginIdentifier,
+          'identifier': email,
           'password': password,
           'rememberMe': rememberMe,
         },
@@ -111,8 +97,8 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
     String? username,
+    String? phone,
   }) {
     return _guard(() async {
       await _tokenStore.clear();
@@ -123,8 +109,8 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
           'lastName': lastName,
           'email': email,
           'password': password,
-          if (username?.trim().isNotEmpty == true) 'username': username,
-          'phone': phone,
+          'username': username?.trim() ?? '',
+          if (phone?.trim().isNotEmpty == true) 'phone': phone,
         },
       );
       return _signupSessionFromPayload(
@@ -179,7 +165,8 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         await _apiClient.post<Object?>(
           '/auth/logout',
           data: {
-            if (tokens != null) 'refreshToken': tokens.refreshToken,
+            if (tokens?.refreshToken.trim().isNotEmpty == true)
+              'refreshToken': tokens!.refreshToken,
           },
         );
       } finally {
@@ -212,10 +199,13 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
   }) async {
     final user = _userFromPayload(payload);
     final tokensPayload = _asJsonMap(payload['tokens']) ?? payload;
+    final now = DateTime.now();
     final tokens = tokensFromApiPayload(tokensPayload).copyWith(
       isSessionOnly: !persistTokens,
-      sessionExpiresAt: DateTime.now().add(
-        persistTokens ? _rememberedLifetime : _sessionOnlyLifetime,
+      sessionExpiresAt: now.add(
+        persistTokens
+            ? StoredAuthTokens.rememberedLifetime
+            : StoredAuthTokens.sessionOnlyLifetime,
       ),
     );
     await _tokenStore.save(tokens);
@@ -223,7 +213,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
       user: user,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresAt: tokens.sessionExpiresAt ?? tokens.expiresAt,
+      expiresAt: tokens.expiresAt,
     );
   }
 
@@ -243,19 +233,16 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
       username: username,
       phone: phone,
     );
-    final tokens = _optionalTokensFromPayload(payload)?.copyWith(
-      isSessionOnly: true,
-      sessionExpiresAt: DateTime.now().add(_sessionOnlyLifetime),
-    );
+    final tokens = _optionalTokensFromPayload(payload);
     if (tokens != null) {
-      await _tokenStore.save(tokens);
+      await _tokenStore.save(tokens.copyWith(isSessionOnly: true));
     }
 
     return AuthSession(
       user: user,
       accessToken: tokens?.accessToken,
       refreshToken: tokens?.refreshToken,
-      expiresAt: tokens?.sessionExpiresAt ?? tokens?.expiresAt,
+      expiresAt: tokens?.expiresAt,
     );
   }
 
@@ -269,7 +256,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         '/auth/verify-email',
         data: {'email': email, 'code': code},
       );
-      return _sessionFromPayload(payload, persistTokens: false);
+      return AuthSession(user: _userFromPayload(payload));
     });
   }
 
@@ -280,50 +267,6 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
         '/auth/resend-verification',
         data: {'email': email},
       );
-      return payload is bool ? payload : true;
-    });
-  }
-
-  @override
-  Future<ApiResult<bool>> requestPasswordReset(String email) {
-    return _guard(() async {
-      final normalizedEmail = email.trim();
-      final registrationPayload = await _apiClient.get<Map<String, dynamic>>(
-        '/auth/check-email',
-        queryParameters: {'email': normalizedEmail},
-      );
-      final isRegistered = _registrationFromPayload(registrationPayload);
-
-      if (!isRegistered) {
-        throw const ValidationFailure('No account found with this email.');
-      }
-
-      final payload = await _apiClient.post<Object?>(
-        '/auth/forgot-password',
-        data: {'email': normalizedEmail},
-      );
-      return payload is bool ? payload : true;
-    });
-  }
-
-  @override
-  Future<ApiResult<bool>> resetPassword({
-    required String email,
-    required String code,
-    required String password,
-    required String passwordConfirmation,
-  }) {
-    return _guard(() async {
-      final payload = await _apiClient.post<Object?>(
-        '/auth/reset-password',
-        data: {
-          'email': email.trim(),
-          'code': code.trim(),
-          'password': password,
-          'passwordConfirm': passwordConfirmation,
-        },
-      );
-      await _tokenStore.clear();
       return payload is bool ? payload : true;
     });
   }

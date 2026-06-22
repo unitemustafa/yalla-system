@@ -103,12 +103,10 @@ class BrandCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       context.tr(productCount),
-                      style: Theme.of(context).textTheme.labelMedium!.copyWith(
-                        color: Colors.grey,
-                        fontSize: 12,
-                        height: 1.1,
-                      ),
                       maxLines: 1,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.labelMedium!.apply(color: Colors.grey),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],

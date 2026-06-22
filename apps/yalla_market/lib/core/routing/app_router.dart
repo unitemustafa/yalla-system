@@ -67,7 +67,13 @@ class AppRouter {
         return _buildRoute(const OnboardingView(), settings);
 
       case AppRoutes.login:
-        return _buildRoute(const LoginView(), settings);
+        final args = settings.arguments as LoginRouteArgs?;
+        return _buildRoute(
+          LoginView(
+            showSessionExpiredNotice: args?.showSessionExpiredNotice ?? false,
+          ),
+          settings,
+        );
 
       case AppRoutes.signup:
         return _buildRoute(const SignupView(), settings);

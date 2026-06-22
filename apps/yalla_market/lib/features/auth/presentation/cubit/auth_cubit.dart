@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/network/api_result.dart';
 import '../../../../core/routing/auth_guard.dart';
 import '../../../../core/session/session_expired_notifier.dart';
+import '../../../../core/storage/token_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/usecases/auth_usecases.dart';
@@ -23,6 +24,7 @@ class AuthCubit extends Cubit<AuthState> {
   final AuthUseCases _authUseCases;
   final SessionExpiredNotifier _sessionExpiredNotifier;
   AuthSession? _pendingSignupSession;
+  Timer? _sessionExpiryTimer;
 
   @override
   void onChange(Change<AuthState> change) {
@@ -30,9 +32,8 @@ class AuthCubit extends Cubit<AuthState> {
     if (change.nextState is AuthAuthenticated) {
       AuthGuard.setAuthenticated();
     } else if (change.nextState is AuthInitial ||
-        change.nextState is AuthSignupSucceeded ||
-        change.nextState is AuthPasswordResetSucceeded ||
         change.nextState is AuthSessionExpired ||
+        change.nextState is AuthSignupSucceeded ||
         change.nextState is AuthEmailVerified) {
       AuthGuard.clearAuthentication();
     }
@@ -42,21 +43,32 @@ class AuthCubit extends Cubit<AuthState> {
 
   @override
   Future<void> close() {
+    _sessionExpiryTimer?.cancel();
     _sessionExpiredNotifier.removeListener(_handleSessionExpired);
     return super.close();
   }
 
   void _handleSessionExpired() {
+    _sessionExpiryTimer?.cancel();
     _pendingSignupSession = null;
     AuthGuard.clearAuthentication();
-    if (!isClosed) {
+    if (!isClosed && state is! AuthSessionExpired) {
       emit(const AuthSessionExpired());
     }
+  }
+
+  void _scheduleSessionExpiry(Duration duration) {
+    _sessionExpiryTimer?.cancel();
+    _sessionExpiryTimer = Timer(duration, () async {
+      await _authUseCases.logout();
+      if (!isClosed) _handleSessionExpired();
+    });
   }
 
   /// Hydrates auth state from an already-resolved session (e.g. from SplashCubit).
   void hydrate(AuthSession session) {
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(AuthAuthenticated(session));
   }
 
@@ -64,6 +76,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (state is AuthLoading) return false;
 
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(const AuthLoading());
 
     final result = await _authUseCases.restoreSavedSession();
@@ -102,6 +115,11 @@ class AuthCubit extends Cubit<AuthState> {
     result.when(
       success: (session) {
         emit(AuthAuthenticated(session));
+        _scheduleSessionExpiry(
+          rememberMe
+              ? StoredAuthTokens.rememberedLifetime
+              : StoredAuthTokens.sessionOnlyLifetime,
+        );
       },
       failure: (failure) {
         emit(AuthFailure(failure.message));
@@ -115,7 +133,7 @@ class AuthCubit extends Cubit<AuthState> {
     );
     return result.when(
       success: (isAvailable) => isAvailable,
-      failure: (failure) => throw StateError(failure.message),
+      failure: (_) => false,
     );
   }
 
@@ -123,7 +141,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkEmailRegistration(email.trim());
     return result.when(
       success: (isRegistered) => isRegistered,
-      failure: (failure) => throw StateError(failure.message),
+      failure: (_) => false,
     );
   }
 
@@ -131,7 +149,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkEmailRegistration(email.trim());
     return result.when(
       success: (isRegistered) => !isRegistered,
-      failure: (failure) => throw StateError(failure.message),
+      failure: (_) => false,
     );
   }
 
@@ -139,7 +157,7 @@ class AuthCubit extends Cubit<AuthState> {
     final result = await _authUseCases.checkPhoneRegistration(phone.trim());
     return result.when(
       success: (isRegistered) => !isRegistered,
-      failure: (failure) => throw StateError(failure.message),
+      failure: (_) => false,
     );
   }
 
@@ -148,12 +166,13 @@ class AuthCubit extends Cubit<AuthState> {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
     String? username,
+    String? phone,
   }) async {
     if (state is AuthLoading) return;
 
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     emit(const AuthLoading());
 
     final result = await _authUseCases.signup(
@@ -161,8 +180,8 @@ class AuthCubit extends Cubit<AuthState> {
       lastName: lastName.trim(),
       email: email.trim(),
       password: password,
-      phone: phone.trim(),
       username: username?.trim(),
+      phone: phone?.trim(),
     );
     result.when(
       success: (session) {
@@ -186,8 +205,7 @@ class AuthCubit extends Cubit<AuthState> {
 
     if (session.accessToken != null && session.refreshToken != null) {
       _pendingSignupSession = null;
-      unawaited(_authUseCases.logout());
-      emit(const AuthEmailVerified());
+      emit(AuthEmailVerified(session.user.email));
       return true;
     }
 
@@ -197,10 +215,9 @@ class AuthCubit extends Cubit<AuthState> {
       code: code.trim(),
     );
     return result.when(
-      success: (_) {
+      success: (verifiedSession) {
         _pendingSignupSession = null;
-        unawaited(_authUseCases.logout());
-        emit(const AuthEmailVerified());
+        emit(AuthEmailVerified(verifiedSession.user.email));
         return true;
       },
       failure: (failure) {
@@ -226,53 +243,9 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  Future<bool> requestPasswordReset(String email) async {
-    if (state is AuthLoading) return false;
-
-    emit(const AuthLoading());
-
-    final result = await _authUseCases.requestPasswordReset(email.trim());
-    return result.when(
-      success: (sent) {
-        emit(AuthPasswordResetRequested(email.trim()));
-        return sent;
-      },
-      failure: (failure) {
-        emit(AuthFailure(failure.message));
-        return false;
-      },
-    );
-  }
-
-  Future<bool> resetPassword({
-    required String email,
-    required String code,
-    required String password,
-    required String passwordConfirmation,
-  }) async {
-    if (state is AuthLoading) return false;
-
-    emit(const AuthLoading());
-    final result = await _authUseCases.resetPassword(
-      email: email.trim(),
-      code: code.trim(),
-      password: password,
-      passwordConfirmation: passwordConfirmation,
-    );
-    return result.when(
-      success: (reset) {
-        emit(const AuthPasswordResetSucceeded());
-        return reset;
-      },
-      failure: (failure) {
-        emit(AuthFailure(failure.message));
-        return false;
-      },
-    );
-  }
-
   Future<void> logout() async {
     _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
     final result = await _authUseCases.logout();
     result.when(
       success: (_) => emit(const AuthInitial()),
@@ -284,17 +257,6 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
-  Future<void> expireSession() async {
-    if (state is AuthSessionExpired) return;
-
-    _pendingSignupSession = null;
-    AuthGuard.clearAuthentication();
-    await _authUseCases.logout();
-    if (!isClosed) {
-      emit(const AuthSessionExpired());
-    }
-  }
-
   Future<bool> deleteAccountWithPassword(String password) {
     return _deleteAccount(
       () => _authUseCases.deleteAccountWithPassword(password),
@@ -302,13 +264,12 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<AuthUser?> refreshProfile() async {
-    final currentState = state;
-    if (currentState is! AuthAuthenticated) return null;
+    if (state is! AuthAuthenticated) return null;
 
     final result = await _authUseCases.refreshProfile();
     return result.when(
       success: (user) {
-        emit(AuthAuthenticated(currentState.session.copyWith(user: user)));
+        emit(AuthAuthenticated(AuthSession(user: user)));
         return user;
       },
       failure: (_) => null,
@@ -324,9 +285,6 @@ class AuthCubit extends Cubit<AuthState> {
     String? gender,
     DateTime? birthDate,
   }) async {
-    final currentSession = state is AuthAuthenticated
-        ? (state as AuthAuthenticated).session
-        : null;
     final result = await _authUseCases.updateProfile(
       firstName: firstName,
       lastName: lastName,
@@ -338,11 +296,7 @@ class AuthCubit extends Cubit<AuthState> {
     );
     return result.when(
       success: (user) {
-        emit(
-          AuthAuthenticated(
-            currentSession?.copyWith(user: user) ?? AuthSession(user: user),
-          ),
-        );
+        emit(AuthAuthenticated(AuthSession(user: user)));
         return user;
       },
       failure: (failure) {

@@ -45,12 +45,14 @@ extension _SignupFormFields on _SignupViewState {
             labelText: AppStrings.firstName,
             prefixIcon: AppIcons.user,
             validator: Validators.required,
+            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
           ),
           CustomTextField(
             controller: _lastNameController,
             labelText: AppStrings.lastName,
             prefixIcon: AppIcons.user,
             validator: Validators.required,
+            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
           ),
         ],
       );
@@ -64,6 +66,7 @@ extension _SignupFormFields on _SignupViewState {
             labelText: AppStrings.firstName,
             prefixIcon: AppIcons.user,
             validator: Validators.required,
+            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
           ),
         ),
         const SizedBox(width: 14),
@@ -73,6 +76,7 @@ extension _SignupFormFields on _SignupViewState {
             labelText: AppStrings.lastName,
             prefixIcon: AppIcons.user,
             validator: Validators.required,
+            inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
           ),
         ),
       ],
@@ -85,6 +89,7 @@ extension _SignupFormFields on _SignupViewState {
       labelText: AppStrings.username,
       prefixIcon: AppIcons.user_edit,
       validator: _validateUsername,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9._]')),
       ],
@@ -107,6 +112,8 @@ extension _SignupFormFields on _SignupViewState {
       prefixIcon: AppIcons.direct_right,
       keyboardType: TextInputType.emailAddress,
       validator: _validateEmail,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
       suffix: _buildAvailabilityStatusSuffix(
         isDarkMode,
         isChecking: _checker.isCheckingEmail,
@@ -172,6 +179,8 @@ extension _SignupFormFields on _SignupViewState {
         controller: _phoneController,
         keyboardType: TextInputType.phone,
         validator: _validatePhone,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         cursorColor: theme.colorScheme.primary,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: textColor,

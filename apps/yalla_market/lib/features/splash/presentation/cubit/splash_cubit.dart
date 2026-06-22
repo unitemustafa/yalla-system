@@ -1,8 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/routing/app_routes.dart';
+import '../../../../core/storage/token_store.dart';
 import '../../../auth/domain/entities/auth_session.dart';
 import '../../../auth/domain/usecases/auth_usecases.dart';
+import '../../../location/data/datasources/location_preferences.dart';
 import '../../../location/domain/entities/city_data.dart';
 import '../../../location/domain/usecases/location_usecases.dart';
 import '../../../onboarding/domain/usecases/onboarding_usecases.dart';
@@ -36,19 +38,35 @@ class SplashCubit extends Cubit<SplashState> {
     session = sessionResult.when(success: (s) => s, failure: (_) => null);
 
     if (session == null) {
-      emit(const SplashNavigateTo(AppRoutes.login));
+      final showSessionExpiredNotice =
+          await SessionLifecycleStore.consumeClosedSessionNotice();
+      emit(
+        SplashNavigateTo(
+          AppRoutes.login,
+          showSessionExpiredNotice: showSessionExpiredNotice,
+        ),
+      );
       return;
     }
 
     CityData? city;
     final cityResult = await _locationUseCases.getSelectedCity();
     city = cityResult.when(success: (c) => c, failure: (_) => null);
+    final selectedCityUserId = await LocationPreferences()
+        .getSelectedCityUserId();
+    final hasLegacyCity = city != null && selectedCityUserId == null;
+    if (hasLegacyCity) {
+      await LocationPreferences().setSelectedCityUserId(session.user.id);
+    }
+    final hasCityForCurrentUser =
+        city != null &&
+        (selectedCityUserId == session.user.id || hasLegacyCity);
 
     emit(
       SplashNavigateTo(
-        city == null ? AppRoutes.selectCity : AppRoutes.navigationMenu,
+        hasCityForCurrentUser ? AppRoutes.navigationMenu : AppRoutes.selectCity,
         session: session,
-        city: city,
+        city: hasCityForCurrentUser ? city : null,
       ),
     );
   }

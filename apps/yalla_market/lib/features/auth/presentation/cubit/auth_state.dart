@@ -9,12 +9,7 @@ final class AuthInitial extends AuthState {
 }
 
 final class AuthSessionExpired extends AuthState {
-  const AuthSessionExpired([
-    this.message =
-        'Your session has expired. Please sign in again. To keep your session longer, turn on Remember Me when signing in.',
-  ]);
-
-  final String message;
+  const AuthSessionExpired();
 }
 
 final class AuthLoading extends AuthState {
@@ -33,18 +28,10 @@ final class AuthSignupSucceeded extends AuthState {
   final String email;
 }
 
-final class AuthPasswordResetRequested extends AuthState {
-  const AuthPasswordResetRequested(this.email);
+final class AuthEmailVerified extends AuthState {
+  const AuthEmailVerified(this.email);
 
   final String email;
-}
-
-final class AuthPasswordResetSucceeded extends AuthState {
-  const AuthPasswordResetSucceeded();
-}
-
-final class AuthEmailVerified extends AuthState {
-  const AuthEmailVerified();
 }
 
 final class AuthFailure extends AuthState {

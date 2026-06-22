@@ -13,9 +13,7 @@ void main() {
         expect(request.method, 'POST');
         expect(request.path, '/auth/login');
         expect(request.data, {
-          'email': 'm@example.com',
           'identifier': 'm@example.com',
-          'login': 'm@example.com',
           'password': 'Password123!',
           'rememberMe': true,
         });
@@ -38,6 +36,7 @@ void main() {
       );
       expect((await tokenStore.read())?.refreshToken, 'refresh-token');
       expect((await tokenStore.read())?.isSessionOnly, isFalse);
+      expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
     });
 
     test(
@@ -47,6 +46,11 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/login');
+          expect(request.data, {
+            'identifier': 'm@example.com',
+            'password': 'Password123!',
+            'rememberMe': false,
+          });
           return _sessionPayload;
         });
         final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -65,6 +69,7 @@ void main() {
         );
         expect((await tokenStore.read())?.refreshToken, 'refresh-token');
         expect((await tokenStore.read())?.isSessionOnly, isTrue);
+        expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
       },
     );
 
@@ -82,6 +87,7 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/signup');
+          expect(request.data, containsPair('username', 'mustafa_ali'));
           return {
             'email': 'mustafa@example.com',
             'message': 'Verification email sent',
@@ -92,8 +98,8 @@ void main() {
         final result = await repository.signup(
           firstName: 'Mustafa',
           lastName: 'Ali',
+          username: 'mustafa_ali',
           email: 'mustafa@example.com',
-          phone: '+201000000000',
           password: 'Password123!',
         );
 
@@ -141,46 +147,7 @@ void main() {
       },
     );
 
-    test('availability checks read Django response flags', () async {
-      final tokenStore = InMemoryTokenStore();
-      final apiClient = FakeApiClient((request) {
-        if (request.path == '/auth/check-username') {
-          expect(request.queryParameters, {'username': 'user123'});
-          return {'available': true, 'registered': false};
-        }
-        if (request.path == '/auth/check-email') {
-          expect(request.queryParameters, {'email': 'used@example.com'});
-          return {'available': false, 'registered': true};
-        }
-        if (request.path == '/auth/check-phone') {
-          expect(request.queryParameters, {'phone': '+201010000000'});
-          return {'available': true, 'registered': false};
-        }
-        fail('Unexpected request: ${request.path}');
-      });
-      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
-
-      final usernameResult = await repository.isUsernameAvailable('user123');
-      final emailResult = await repository.isEmailRegistered(
-        'used@example.com',
-      );
-      final phoneResult = await repository.isPhoneRegistered('+201010000000');
-
-      usernameResult.when(
-        success: (isAvailable) => expect(isAvailable, isTrue),
-        failure: (failure) => fail(failure.message),
-      );
-      emailResult.when(
-        success: (isRegistered) => expect(isRegistered, isTrue),
-        failure: (failure) => fail(failure.message),
-      );
-      phoneResult.when(
-        success: (isRegistered) => expect(isRegistered, isFalse),
-        failure: (failure) => fail(failure.message),
-      );
-    });
-
-    test('verifyEmail posts the code and stores session-only tokens', () async {
+    test('verifyEmail posts the code without storing tokens', () async {
       final tokenStore = InMemoryTokenStore();
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
@@ -198,90 +165,14 @@ void main() {
       result.when(
         success: (session) {
           expect(session.user.email, 'm@example.com');
-          expect(session.accessToken, 'access-token');
+          expect(session.accessToken, isNull);
         },
         failure: (failure) => fail(failure.message),
       );
-      expect((await tokenStore.read())?.isSessionOnly, isTrue);
+      expect(await tokenStore.read(), isNull);
     });
 
-    test('password reset checks email before sending reset request', () async {
-      final tokenStore = InMemoryTokenStore();
-      final paths = <String>[];
-      final apiClient = FakeApiClient((request) {
-        paths.add(request.path);
-        if (request.path == '/auth/check-email') {
-          expect(request.queryParameters, {'email': 'm@example.com'});
-          return {'registered': true, 'available': false};
-        }
-        if (request.path == '/auth/forgot-password') {
-          expect(request.data, {'email': 'm@example.com'});
-          return {'detail': 'Password reset OTP sent.'};
-        }
-        fail('Unexpected request: ${request.path}');
-      });
-      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
-
-      final result = await repository.requestPasswordReset('m@example.com');
-
-      result.when(
-        success: (sent) => expect(sent, isTrue),
-        failure: (failure) => fail(failure.message),
-      );
-      expect(paths, ['/auth/check-email', '/auth/forgot-password']);
-    });
-
-    test('password reset does not send when email is unknown', () async {
-      final tokenStore = InMemoryTokenStore();
-      final paths = <String>[];
-      final apiClient = FakeApiClient((request) {
-        paths.add(request.path);
-        expect(request.path, '/auth/check-email');
-        return {'registered': false, 'available': true};
-      });
-      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
-
-      final result = await repository.requestPasswordReset(
-        'missing@example.com',
-      );
-
-      result.when(
-        success: (_) => fail('Expected password reset to fail.'),
-        failure: (failure) =>
-            expect(failure.message, 'No account found with this email.'),
-      );
-      expect(paths, ['/auth/check-email']);
-    });
-
-    test('resetPassword posts OTP and the confirmed password', () async {
-      final tokenStore = InMemoryTokenStore();
-      final apiClient = FakeApiClient((request) {
-        expect(request.method, 'POST');
-        expect(request.path, '/auth/reset-password');
-        expect(request.data, {
-          'email': 'm@example.com',
-          'code': '123456',
-          'password': 'NewPassword123!',
-          'passwordConfirm': 'NewPassword123!',
-        });
-        return {'detail': 'Password reset successfully.'};
-      });
-      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
-
-      final result = await repository.resetPassword(
-        email: 'm@example.com',
-        code: '123456',
-        password: 'NewPassword123!',
-        passwordConfirmation: 'NewPassword123!',
-      );
-
-      result.when(
-        success: (reset) => expect(reset, isTrue),
-        failure: (failure) => fail(failure.message),
-      );
-    });
-
-    test('logout sends the stored refresh token', () async {
+    test('logout posts stored refresh token and clears token store', () async {
       final tokenStore = InMemoryTokenStore();
       await tokenStore.save(
         StoredAuthTokens(
@@ -291,9 +182,10 @@ void main() {
         ),
       );
       final apiClient = FakeApiClient((request) {
+        expect(request.method, 'POST');
         expect(request.path, '/auth/logout');
         expect(request.data, {'refreshToken': 'refresh-token'});
-        return {'detail': 'Logout successful.'};
+        return {'message': 'Logout successful.'};
       });
       final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
 

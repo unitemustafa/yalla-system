@@ -78,6 +78,9 @@ class _YallaMarketAppState extends State<YallaMarketApp> {
             _sessionExpiryTimer?.cancel();
             UserProfileController.instance.reset();
             AppNavigator.goToLogin();
+          } else if (state is AuthSessionExpired) {
+            UserProfileController.instance.reset();
+            AppNavigator.goToLogin(showSessionExpiredNotice: true);
           }
         },
         child: ValueListenableBuilder<AppLanguage>(

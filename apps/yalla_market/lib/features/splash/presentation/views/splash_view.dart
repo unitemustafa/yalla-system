@@ -10,6 +10,7 @@ import '../../../auth/presentation/cubit/auth_cubit.dart';
 import '../../../location/presentation/cubit/location_cubit.dart';
 import '../cubit/splash_cubit.dart';
 import '../cubit/splash_state.dart';
+import '../../../../core/routing/app_route_arguments.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -107,7 +108,12 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
         if (state.city != null) {
           context.read<LocationCubit>().syncCity(state.city);
         }
-        Navigator.of(context).pushReplacementNamed(state.route);
+        Navigator.of(context).pushReplacementNamed(
+          state.route,
+          arguments: state.showSessionExpiredNotice
+              ? const LoginRouteArgs(showSessionExpiredNotice: true)
+              : null,
+        );
       },
       child: Scaffold(
         body: DecoratedBox(

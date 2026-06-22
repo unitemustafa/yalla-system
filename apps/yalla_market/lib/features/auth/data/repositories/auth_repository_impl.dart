@@ -4,14 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/errors/failure.dart';
 import '../../../../core/network/api_result.dart';
-import '../../../../core/session/session_expired_notifier.dart';
+import '../../../../core/storage/token_store.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   static const String _sessionKey = 'auth.local_session';
-  static const String _sessionMarkerKey = 'auth.local_session_marker';
   static const String _accountsKey = 'auth.local_accounts';
   static const String _demoEmail = 'm@example.com';
   static const String _demoPassword = 'Password123!';
@@ -23,10 +22,9 @@ class AuthRepositoryImpl implements AuthRepository {
     'yallamarket',
     'taken_user',
   };
-  static const _sessionOnlyLifetime = Duration(hours: 8);
-  static const _rememberedLifetime = Duration(days: 30);
 
   AuthSession? _session;
+  DateTime? _sessionExpiresAt;
 
   @override
   Future<ApiResult<AuthSession?>> restoreSavedSession() {
@@ -75,8 +73,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
     String? username,
+    String? phone,
   }) {
     return _guard(
       () => _signup(
@@ -84,8 +82,8 @@ class AuthRepositoryImpl implements AuthRepository {
         lastName: lastName,
         email: email,
         password: password,
-        phone: phone,
         username: username,
+        phone: phone,
       ),
       'Could not create your account.',
     );
@@ -107,32 +105,6 @@ class AuthRepositoryImpl implements AuthRepository {
     return _guard(
       () => _resendVerificationCode(email),
       'Could not send a new verification code.',
-    );
-  }
-
-  @override
-  Future<ApiResult<bool>> requestPasswordReset(String email) {
-    return _guard(
-      () => _requestPasswordReset(email),
-      'Could not send a password reset code.',
-    );
-  }
-
-  @override
-  Future<ApiResult<bool>> resetPassword({
-    required String email,
-    required String code,
-    required String password,
-    required String passwordConfirmation,
-  }) {
-    return _guard(
-      () => _resetPassword(
-        email: email,
-        code: code,
-        password: password,
-        passwordConfirmation: passwordConfirmation,
-      ),
-      'Could not reset your password.',
     );
   }
 
@@ -203,33 +175,33 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<AuthSession?> _restoreSavedSession() async {
-    if (_session != null) return _session;
+    if (_session != null) {
+      if (_isCurrentSessionExpired) {
+        await _clearSession();
+        return null;
+      }
+      return _session;
+    }
 
     final preferences = await SharedPreferences.getInstance();
     final rawSession = preferences.getString(_sessionKey);
-    if (rawSession == null || rawSession.trim().isEmpty) {
-      if (await _consumeExpiredSessionMarker(preferences)) {
-        SessionExpiredNotifier.instance.notifyExpired();
-      }
-      return null;
-    }
+    if (rawSession == null || rawSession.trim().isEmpty) return null;
 
     final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
-    final savedUser = _userFromJson(decoded);
-    final expiresAt = _dateFromString(decoded['expiresAt']);
-    if (expiresAt != null && !expiresAt.isAfter(DateTime.now())) {
+    final sessionExpiresAt = _dateFromString(decoded['sessionExpiresAt']);
+    if (sessionExpiresAt != null && !sessionExpiresAt.isAfter(DateTime.now())) {
       await _clearSession();
-      SessionExpiredNotifier.instance.notifyExpired();
       return null;
     }
-
+    final savedUser = _userFromJson(decoded);
     final account = (await _loadAccounts())._byUserId(savedUser.id);
     if (account == null) {
       await _clearSession();
       return null;
     }
 
-    _session = AuthSession(user: account.user, expiresAt: expiresAt);
+    _session = AuthSession(user: account.user);
+    _sessionExpiresAt = sessionExpiresAt;
     return _session;
   }
 
@@ -238,16 +210,14 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
     bool rememberMe = false,
   }) async {
-    final normalizedIdentifier = email.trim().toLowerCase();
-    if (normalizedIdentifier.isEmpty || password.isEmpty) {
+    final identifier = email.trim();
+    if (identifier.isEmpty || password.isEmpty) {
       throw const _AuthRepositoryException(
-        ValidationFailure('Login identifier and password are required.'),
+        ValidationFailure('Email and password are required.'),
       );
     }
 
-    final account = (await _loadAccounts())._byLoginIdentifier(
-      normalizedIdentifier,
-    );
+    final account = (await _loadAccounts())._byIdentifier(identifier);
     if (account == null ||
         account.passwordDigest !=
             _passwordDigest(account.user.email, password)) {
@@ -280,11 +250,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   Future<bool> _isPhoneRegistered(String phone) async {
-    final normalized = _normalizePhone(phone);
-    if (normalized.isEmpty) return false;
+    final lookupKeys = _phoneLookupKeys(phone);
+    if (lookupKeys.isEmpty) return false;
 
     return (await _loadAccounts()).any(
-      (account) => _normalizePhone(account.user.phone ?? '') == normalized,
+      (account) => _phoneLookupKeys(
+        account.user.phone ?? '',
+      ).intersection(lookupKeys).isNotEmpty,
     );
   }
 
@@ -293,8 +265,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
-    required String phone,
     String? username,
+    String? phone,
   }) async {
     final normalizedEmail = _normalizeEmail(email);
     final normalizedUsername = _normalizeUsername(username ?? '');
@@ -304,10 +276,9 @@ class AuthRepositoryImpl implements AuthRepository {
     if (cleanFirstName.isEmpty ||
         cleanLastName.isEmpty ||
         normalizedEmail.isEmpty ||
-        _normalizePhone(phone).isEmpty ||
         password.isEmpty) {
       throw const _AuthRepositoryException(
-        ValidationFailure('Name, email, phone, and password are required.'),
+        ValidationFailure('Name, email, and password are required.'),
       );
     }
 
@@ -318,7 +289,9 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     }
 
-    if (await _isPhoneRegistered(phone)) {
+    if (phone != null &&
+        _normalizePhone(phone).isNotEmpty &&
+        await _isPhoneRegistered(phone)) {
       throw const _AuthRepositoryException(
         ValidationFailure('Phone number is already registered.'),
       );
@@ -337,7 +310,7 @@ class AuthRepositoryImpl implements AuthRepository {
       firstName: cleanFirstName,
       lastName: cleanLastName,
       username: normalizedUsername.isEmpty ? null : normalizedUsername,
-      phone: phone.trim(),
+      phone: phone?.trim().isEmpty ?? true ? null : phone?.trim(),
       role: 'CUSTOMER',
     );
 
@@ -348,7 +321,7 @@ class AuthRepositoryImpl implements AuthRepository {
         passwordDigest: _passwordDigest(normalizedEmail, password),
       ),
     ]);
-    return _startSession(user, rememberSession: false);
+    return AuthSession(user: user);
   }
 
   Future<AuthSession> _verifyEmail({
@@ -367,7 +340,7 @@ class AuthRepositoryImpl implements AuthRepository {
     final currentSession = _session;
     if (currentSession != null &&
         _normalizeEmail(currentSession.user.email) == normalizedEmail) {
-      return currentSession;
+      return AuthSession(user: currentSession.user);
     }
 
     final account = (await _loadAccounts())._byEmail(normalizedEmail);
@@ -377,7 +350,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
     }
 
-    return _startSession(account.user, rememberSession: false);
+    return AuthSession(user: account.user);
   }
 
   Future<bool> _resendVerificationCode(String email) async {
@@ -389,61 +362,10 @@ class AuthRepositoryImpl implements AuthRepository {
     return true;
   }
 
-  Future<bool> _requestPasswordReset(String email) async {
-    final normalizedEmail = _normalizeEmail(email);
-    if (normalizedEmail.isEmpty) {
-      throw const _AuthRepositoryException(
-        ValidationFailure('Email is required.'),
-      );
-    }
-
-    if ((await _loadAccounts())._byEmail(normalizedEmail) == null) {
-      throw const _AuthRepositoryException(
-        ValidationFailure('No account found with this email.'),
-      );
-    }
-
-    return true;
-  }
-
-  Future<bool> _resetPassword({
-    required String email,
-    required String code,
-    required String password,
-    required String passwordConfirmation,
-  }) async {
-    final normalizedEmail = _normalizeEmail(email);
-    if (!RegExp(r'^\d{6}$').hasMatch(code.trim())) {
-      throw const _AuthRepositoryException(
-        ValidationFailure('Enter the 6-digit verification code.'),
-      );
-    }
-    if (password != passwordConfirmation) {
-      throw const _AuthRepositoryException(
-        ValidationFailure('Passwords do not match.'),
-      );
-    }
-
-    final accounts = await _loadAccounts();
-    final index = accounts.indexWhere(
-      (account) => _normalizeEmail(account.user.email) == normalizedEmail,
-    );
-    if (index < 0) {
-      throw const _AuthRepositoryException(
-        ValidationFailure('No account found with this email.'),
-      );
-    }
-
-    final updated = [...accounts];
-    updated[index] = accounts[index].copyWith(
-      passwordDigest: _passwordDigest(normalizedEmail, password),
-    );
-    await _saveAccounts(updated);
-    await _clearSession();
-    return true;
-  }
-
   Future<AuthUser> _me() async {
+    if (_session != null && _isCurrentSessionExpired) {
+      await _clearSession();
+    }
     final session = _session ?? await _restoreSavedSession();
     if (session == null) {
       throw const _AuthRepositoryException(
@@ -543,8 +465,7 @@ class AuthRepositoryImpl implements AuthRepository {
     );
     await _saveAccounts(updatedAccounts);
 
-    final updatedSession =
-        _session?.copyWith(user: updatedUser) ?? AuthSession(user: updatedUser);
+    final updatedSession = AuthSession(user: updatedUser);
     _session = updatedSession;
     await _saveSession(updatedSession);
     return updatedUser;
@@ -578,18 +499,21 @@ class AuthRepositoryImpl implements AuthRepository {
     AuthUser user, {
     required bool rememberSession,
   }) async {
-    final expiresAt = DateTime.now().add(
-      rememberSession ? _rememberedLifetime : _sessionOnlyLifetime,
-    );
-    final session = AuthSession(user: user, expiresAt: expiresAt);
+    final session = AuthSession(user: user);
     _session = session;
+    _sessionExpiresAt = DateTime.now().add(
+      rememberSession
+          ? StoredAuthTokens.rememberedLifetime
+          : StoredAuthTokens.sessionOnlyLifetime,
+    );
 
     if (rememberSession) {
       await _saveSession(session);
+      await SessionLifecycleStore.clearSessionOnlyNotice();
     } else {
       final preferences = await SharedPreferences.getInstance();
       await preferences.remove(_sessionKey);
-      await _saveSessionMarker(preferences, session);
+      await SessionLifecycleStore.markSessionOnlyActive();
     }
 
     return session;
@@ -621,41 +545,22 @@ class AuthRepositoryImpl implements AuthRepository {
 
   Future<void> _saveSession(AuthSession session) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
-      _sessionKey,
-      jsonEncode({
-        ..._userToJson(session.user),
-        'expiresAt': session.expiresAt?.toIso8601String(),
-      }),
-    );
-    await _saveSessionMarker(preferences, session);
+    final payload = _userToJson(session.user);
+    payload['sessionExpiresAt'] = _sessionExpiresAt?.toIso8601String();
+    await preferences.setString(_sessionKey, jsonEncode(payload));
   }
 
   Future<void> _clearSession() async {
     _session = null;
+    _sessionExpiresAt = null;
     final preferences = await SharedPreferences.getInstance();
     await preferences.remove(_sessionKey);
-    await preferences.remove(_sessionMarkerKey);
+    await SessionLifecycleStore.clearSessionOnlyNotice();
   }
 
-  Future<void> _saveSessionMarker(
-    SharedPreferences preferences,
-    AuthSession session,
-  ) async {
-    await preferences.setString(
-      _sessionMarkerKey,
-      jsonEncode({'expiresAt': session.expiresAt?.toIso8601String()}),
-    );
-  }
-
-  Future<bool> _consumeExpiredSessionMarker(
-    SharedPreferences preferences,
-  ) async {
-    final rawMarker = preferences.getString(_sessionMarkerKey);
-    if (rawMarker == null || rawMarker.trim().isEmpty) return false;
-
-    await preferences.remove(_sessionMarkerKey);
-    return true;
+  bool get _isCurrentSessionExpired {
+    final expiry = _sessionExpiresAt;
+    return expiry != null && !expiry.isAfter(DateTime.now());
   }
 
   List<_LocalAuthAccount> _seedAccounts() {
@@ -724,7 +629,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
   String _normalizeUsername(String value) => value.trim().toLowerCase();
 
-  String _normalizePhone(String value) => value.replaceAll(RegExp(r'\D'), '');
+  String _normalizePhone(String value) => _phoneDigits(value);
 
   String _localId(String seed) {
     final normalized = seed
@@ -812,30 +717,95 @@ DateTime? _dateFromString(Object? value) {
   return DateTime.tryParse(value);
 }
 
+const _phoneLoginDialCodes = [
+  '971',
+  '966',
+  '964',
+  '962',
+  '961',
+  '970',
+  '965',
+  '974',
+  '973',
+  '968',
+  '963',
+  '212',
+  '213',
+  '216',
+  '218',
+  '249',
+  '90',
+  '44',
+  '20',
+  '1',
+];
+
+String _phoneDigits(String value) {
+  var digits = value.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('00')) digits = digits.substring(2);
+  return digits;
+}
+
+Set<String> _phoneLookupKeys(String value) {
+  final digits = _phoneDigits(value);
+  if (digits.isEmpty) return const {};
+
+  final keys = <String>{digits};
+
+  if (digits.startsWith('0') && digits.length > 1) {
+    final national = digits.substring(1);
+    keys.add(national);
+    if (RegExp(r'^1[0125]\d{8}$').hasMatch(national)) {
+      keys.add('20$national');
+    }
+  }
+
+  if (RegExp(r'^1[0125]\d{8}$').hasMatch(digits)) {
+    keys
+      ..add('20$digits')
+      ..add('0$digits');
+  }
+
+  for (final dialCode in _phoneLoginDialCodes) {
+    if (!digits.startsWith(dialCode) || digits.length <= dialCode.length) {
+      continue;
+    }
+    final national = digits.substring(dialCode.length);
+    keys.add(national);
+    if (national.startsWith('0') && national.length > 1) {
+      keys.add(national.substring(1));
+    } else {
+      keys.add('0$national');
+    }
+  }
+
+  return keys;
+}
+
 extension _LocalAuthAccountsLookup on List<_LocalAuthAccount> {
-  _LocalAuthAccount? _byEmail(String email) {
-    final normalized = email.trim().toLowerCase();
+  _LocalAuthAccount? _byIdentifier(String identifier) {
+    final normalized = identifier.trim().toLowerCase();
+    final phoneKeys = _phoneLookupKeys(identifier);
     for (final account in this) {
-      if (account.user.email.trim().toLowerCase() == normalized) {
+      final user = account.user;
+      if (user.email.trim().toLowerCase() == normalized) return account;
+      if ((user.username ?? '').trim().toLowerCase() == normalized) {
+        return account;
+      }
+      if (phoneKeys.isNotEmpty &&
+          _phoneLookupKeys(
+            user.phone ?? '',
+          ).intersection(phoneKeys).isNotEmpty) {
         return account;
       }
     }
     return null;
   }
 
-  _LocalAuthAccount? _byLoginIdentifier(String identifier) {
-    final normalized = identifier.trim().toLowerCase();
-    final normalizedPhone = identifier.replaceAll(RegExp(r'\D'), '');
+  _LocalAuthAccount? _byEmail(String email) {
+    final normalized = email.trim().toLowerCase();
     for (final account in this) {
       if (account.user.email.trim().toLowerCase() == normalized) {
-        return account;
-      }
-      if ((account.user.username ?? '').trim().toLowerCase() == normalized) {
-        return account;
-      }
-      if (normalizedPhone.isNotEmpty &&
-          (account.user.phone ?? '').replaceAll(RegExp(r'\D'), '') ==
-              normalizedPhone) {
         return account;
       }
     }

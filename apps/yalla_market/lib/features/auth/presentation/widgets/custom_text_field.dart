@@ -16,7 +16,7 @@ class CustomTextField extends StatelessWidget {
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
-  final double? labelFontSize;
+  final AutovalidateMode? autovalidateMode;
 
   const CustomTextField({
     super.key,
@@ -32,7 +32,7 @@ class CustomTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.inputFormatters,
-    this.labelFontSize,
+    this.autovalidateMode,
   });
 
   @override
@@ -59,6 +59,7 @@ class CustomTextField extends StatelessWidget {
         validator: validator,
         onChanged: onChanged,
         inputFormatters: inputFormatters,
+        autovalidateMode: autovalidateMode,
         cursorColor: theme.colorScheme.primary,
         style: theme.textTheme.bodyMedium?.copyWith(
           color: textColor,
@@ -75,7 +76,7 @@ class CustomTextField extends StatelessWidget {
           ),
           labelStyle: TextStyle(
             color: iconColor,
-            fontSize: labelFontSize ?? 14,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
           prefixIcon: Icon(prefixIcon, size: 21, color: iconColor),

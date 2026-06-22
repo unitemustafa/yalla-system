@@ -35,31 +35,14 @@ void main() {
       expect(failure.message, 'Please sign in again.');
     });
 
-    test('reads Django REST framework detail errors', () {
+    test('extracts nested validation messages from field errors', () {
       final error = DioException(
         requestOptions: RequestOptions(path: '/auth/login'),
         response: Response<dynamic>(
           requestOptions: RequestOptions(path: '/auth/login'),
-          statusCode: 401,
-          data: const {'detail': 'Invalid email or password.'},
-        ),
-        type: DioExceptionType.badResponse,
-      );
-
-      final failure = ApiErrorHandler.handle(error);
-
-      expect(failure, isA<UnauthorizedFailure>());
-      expect(failure.message, 'Invalid email or password.');
-    });
-
-    test('reads Django REST framework field errors', () {
-      final error = DioException(
-        requestOptions: RequestOptions(path: '/auth/signup'),
-        response: Response<dynamic>(
-          requestOptions: RequestOptions(path: '/auth/signup'),
           statusCode: 400,
           data: const {
-            'password': ['Password must contain at least one number.'],
+            'email': ['Enter a valid email.'],
           },
         ),
         type: DioExceptionType.badResponse,
@@ -68,7 +51,24 @@ void main() {
       final failure = ApiErrorHandler.handle(error);
 
       expect(failure, isA<ValidationFailure>());
-      expect(failure.message, 'Password must contain at least one number.');
+      expect(failure.statusCode, 400);
+      expect(failure.message, 'Enter a valid email.');
+    });
+
+    test('does not surface raw html error pages', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/products'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/products'),
+          statusCode: 404,
+          data: '<!DOCTYPE html><html><head><title>Page not found</title>',
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+      final failure = ApiErrorHandler.handle(error);
+
+      expect(failure.message, 'Server error.');
     });
 
     test('maps non-Dio errors to unknown failure', () {

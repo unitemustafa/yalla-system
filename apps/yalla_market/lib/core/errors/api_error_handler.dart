@@ -51,18 +51,45 @@ abstract final class ApiErrorHandler {
   }
 
   static String? _messageFromResponse(Response<dynamic>? response) {
-    final data = response?.data;
-    if (data is Map<String, dynamic>) {
-      for (final key in const ['message', 'detail', 'error']) {
-        final message = _stringFromValue(data[key]);
+    return _firstMessage(response?.data);
+  }
+
+  static String? _firstMessage(Object? data) {
+    if (data is String) {
+      final message = data.trim();
+      if (_looksLikeHtml(message)) return null;
+      return message.isEmpty ? null : message;
+    }
+
+    if (data is List) {
+      for (final item in data) {
+        final message = _firstMessage(item);
+        if (message != null) return message;
+      }
+      return null;
+    }
+
+    if (data is Map) {
+      const preferredKeys = [
+        'message',
+        'detail',
+        'error',
+        'non_field_errors',
+        'identifier',
+        'email',
+        'phone',
+        'username',
+        'password',
+      ];
+
+      for (final key in preferredKeys) {
+        if (!data.containsKey(key)) continue;
+        final message = _firstMessage(data[key]);
         if (message != null) return message;
       }
 
-      final nonFieldError = _stringFromValue(data['non_field_errors']);
-      if (nonFieldError != null) return nonFieldError;
-
-      for (final entry in data.entries) {
-        final message = _stringFromValue(entry.value);
+      for (final value in data.values) {
+        final message = _firstMessage(value);
         if (message != null) return message;
       }
     }
@@ -70,20 +97,13 @@ abstract final class ApiErrorHandler {
     return null;
   }
 
-  static String? _stringFromValue(Object? value) {
-    if (value is String && value.trim().isNotEmpty) {
-      return value.trim();
-    }
-    if (value is List && value.isNotEmpty) {
-      return _stringFromValue(value.first);
-    }
-    if (value is Map && value.isNotEmpty) {
-      for (final nestedValue in value.values) {
-        final message = _stringFromValue(nestedValue);
-        if (message != null) return message;
-      }
-    }
-    return null;
+  static bool _looksLikeHtml(String value) {
+    final lower = value.toLowerCase();
+    return lower.startsWith('<!doctype html') ||
+        lower.startsWith('<html') ||
+        lower.contains('<html') ||
+        lower.contains('<body') ||
+        lower.contains('<head');
   }
 
   static String _fallbackMessage(DioException error) {
