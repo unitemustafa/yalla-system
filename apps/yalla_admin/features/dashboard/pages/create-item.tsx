@@ -36,6 +36,7 @@ import {
 } from "../data";
 import { AppSelect, Button, Input, Switch } from "../primitives";
 import { deliveryCityOptions, deliveryZones } from "../reference-data";
+import { dashboardFetch } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 
 type Language = "ar" | "en";
@@ -1261,7 +1262,7 @@ export function CreateItemPage() {
       setSaveError("");
 
       try {
-        const response = await fetch("/api/dashboard/items");
+        const response = await dashboardFetch("items");
 
         if (!response.ok) {
           throw new Error("Failed to load product");
@@ -1626,7 +1627,7 @@ export function CreateItemPage() {
     const formData = new FormData();
     formData.append("file", image.file);
 
-    const response = await fetch("/api/dashboard/uploads", {
+    const response = await dashboardFetch("uploads", {
       method: "POST",
       body: formData,
     });
@@ -1918,9 +1919,9 @@ export function CreateItemPage() {
         ? await uploadProductImage(selectedProductImage)
         : undefined;
       const endpoint = editItemId
-        ? `/api/dashboard/items/${encodeURIComponent(editItemId)}`
-        : "/api/dashboard/items";
-      const response = await fetch(endpoint, {
+        ? `items/${encodeURIComponent(editItemId)}`
+        : "items";
+      const response = await dashboardFetch(endpoint, {
         method: editItemId ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

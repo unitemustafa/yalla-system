@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from datetime import timedelta
 import os
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,16 +23,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-m*gme97(k%lgq+lq2tjwh48jkygaz-w8gpx67!wa0j)miv52yy'
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", default=True, cast=bool)
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.getenv(
+    for host in config(
         "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,0.0.0.0,testserver",
+        default="localhost,127.0.0.1,0.0.0.0,testserver",
     ).split(",")
     if host.strip()
 ]
@@ -95,15 +96,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "yalla_db"),
-        "USER": os.getenv("POSTGRES_USER", "yalla_user"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "1234"),
-        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": int(os.getenv("POSTGRES_CONN_MAX_AGE", "60")),
-        "OPTIONS": {
-            "connect_timeout": int(os.getenv("POSTGRES_CONNECT_TIMEOUT", "5")),
-        },
+        "NAME": config("POSTGRES_DB"),
+        "USER": config("POSTGRES_USER"),
+        "PASSWORD": config("POSTGRES_PASSWORD"),
+        "HOST": config("POSTGRES_HOST", default="localhost"),
+        "PORT": config("POSTGRES_PORT", default="5432"),
     }
 }
 
@@ -179,9 +176,9 @@ _default_cors_allowed_origins = (
 )
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv(
+    for origin in config(
         "DJANGO_CORS_ALLOWED_ORIGINS",
-        _default_cors_allowed_origins,
+        default=_default_cors_allowed_origins,
     ).split(",")
     if origin.strip()
 ]

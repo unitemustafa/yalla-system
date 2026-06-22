@@ -22,11 +22,16 @@ import { currentUser } from "@/features/dashboard/profile-data";
 import { useDashboardI18n } from "@/features/dashboard/i18n";
 import { Button, Card, Input, PageTitle } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
+<<<<<<< HEAD
 import { uploadDashboardImage } from "@/features/dashboard/upload-dashboard-image";
 import { removeInputWhitespace } from "@/lib/input-sanitizers";
+=======
+import { authFetch } from "@/lib/client-api";
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 
 const profileImageStorageKey = "yalla-dashboard-profile-image";
 
+<<<<<<< HEAD
 function InfoRow({
   icon,
   label,
@@ -119,6 +124,17 @@ function useTemporaryLastPasswordCharacter(
     if (passwordVisible || !appendedCharacter) {
       setShowLastCharacter(false);
       return;
+=======
+  async function updateAccount(body: BodyInit, multipart = false) {
+    const response = await authFetch("me", {
+      method: "PATCH",
+      headers: multipart ? undefined : { "content-type": "application/json" },
+      body,
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.user) {
+      throw new Error(data?.message || "تعذر تحديث الحساب.");
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     }
 
     setShowLastCharacter(true);
@@ -261,6 +277,7 @@ export function AccountPage() {
 
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+<<<<<<< HEAD
     setStatus("تم حفظ بيانات البروفايل على الصفحة.");
     showSnackbar({ message: "تم حفظ بيانات البروفايل." });
   }
@@ -272,6 +289,23 @@ export function AccountPage() {
     if (!currentPassword) {
       setCurrentPasswordError("كلمة المرور الحالية مطلوبة");
       setShowPasswordStrengthErrors(false);
+=======
+    const response = await authFetch("change-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+        passwordConfirm,
+      }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      showSnackbar({
+        message: data?.message || "تعذر تغيير كلمة المرور.",
+        tone: "danger",
+      });
+>>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
       return;
     }
 
