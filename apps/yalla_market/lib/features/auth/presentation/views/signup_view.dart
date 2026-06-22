@@ -186,7 +186,7 @@ class _SignupViewState extends State<SignupView> {
       context.read<AuthCubit>().signup(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
-        username: username.isEmpty ? null : username,
+        username: username,
         email: _emailController.text.trim(),
         phone: '${_selectedCountry.dialCode}$digits',
         password: _passwordController.text,
@@ -413,7 +413,6 @@ class _SignupViewState extends State<SignupView> {
 
     final username = _usernameController.text.trim();
     if (_validateUsername(username) != null) return false;
-    if (username.isEmpty) return true;
 
     return _checker.lastCheckedUsername == username &&
         _checker.isUsernameAvailable == true;
@@ -429,7 +428,7 @@ class _SignupViewState extends State<SignupView> {
   String? _validateUsername(String? value) {
     final username = value?.trim() ?? '';
 
-    if (username.isEmpty) return null;
+    if (username.isEmpty) return AppTranslations.current.fieldRequired;
 
     if (username.length < 3) {
       return context.isArabicLanguage

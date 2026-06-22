@@ -105,7 +105,7 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
           'lastName': lastName,
           'email': email,
           'password': password,
-          if (username?.trim().isNotEmpty == true) 'username': username,
+          'username': username?.trim() ?? '',
           if (phone?.trim().isNotEmpty == true) 'phone': phone,
         },
       );
@@ -156,8 +156,15 @@ class AuthRemoteRepositoryImpl implements AuthRepository {
   @override
   Future<ApiResult<bool>> logout() {
     return _guard(() async {
+      final tokens = await _tokenStore.read();
       try {
-        await _apiClient.post<Object?>('/auth/logout');
+        await _apiClient.post<Object?>(
+          '/auth/logout',
+          data: {
+            if (tokens?.refreshToken.trim().isNotEmpty == true)
+              'refreshToken': tokens!.refreshToken,
+          },
+        );
       } finally {
         await _tokenStore.clear();
       }

@@ -326,7 +326,10 @@ class SignupAvailabilityChecker {
   Future<bool> ensureUsernameAvailable(BuildContext context) async {
     final username = usernameController.text.trim();
 
-    if (username.isEmpty) return true;
+    if (username.isEmpty) {
+      formKey.currentState?.validate();
+      return false;
+    }
 
     if (_lastCheckedUsername == username && isUsernameAvailable == true) {
       return true;
@@ -355,9 +358,9 @@ class SignupAvailabilityChecker {
       isCheckingUsername = false;
       isUsernameAvailable = null;
       _lastCheckedUsername = null;
-      usernameAvailabilityMessage = null;
+      usernameAvailabilityMessage = validationMessage;
       onStateChanged();
-      return true;
+      return false;
     }
 
     if (validationMessage != null) {

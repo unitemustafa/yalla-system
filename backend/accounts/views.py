@@ -4,10 +4,12 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
     OutstandingToken,
@@ -371,11 +373,26 @@ class V1RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        refresh_value = request.data.get("refresh") or request.data.get("refreshToken")
+        user = None
+        if refresh_value:
+            try:
+                refresh = RefreshToken(refresh_value)
+                user = User.objects.filter(pk=refresh["user_id"]).first()
+            except TokenError:
+                user = None
+
         serializer = EmailTokenRefreshSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if user is None:
+            return Response(
+                {"message": "Invalid or expired refresh token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(
             {
+                "user": ApiUserSerializer(user).data,
                 **data,
                 "expiresAt": access_token_expires_at(data["accessToken"]),
             }
@@ -388,8 +405,19 @@ class V1LogoutView(APIView):
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-        return Response(True, status=status.HTTP_200_OK)
+            try:
+                serializer.save()
+            except ValidationError:
+                return Response(
+                    {"message": "Invalid or expired refresh token."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif request.data.get("refresh") or request.data.get("refreshToken"):
+            return Response(
+                {"message": "Invalid or expired refresh token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"message": "Logout successful."}, status=status.HTTP_200_OK)
 
 
 class CustomerMeView(APIView):
@@ -416,11 +444,15 @@ class CustomerMeView(APIView):
         if "lastName" in data:
             user.last_name = data["lastName"]
         if "username" in data and data["username"]:
+            if user.username != data["username"]:
+                user.username_changed_at = timezone.now()
             user.username = data["username"]
-        if "email" in data:
-            user.email = data["email"]
         if "phone" in data and data["phone"]:
             user.phone = data["phone"]
+        if "gender" in data:
+            user.gender = data["gender"]
+        if "birthDate" in data:
+            user.birth_date = data["birthDate"]
         user.save()
         return Response(ApiUserSerializer(user).data)
 
@@ -437,7 +469,7 @@ class CustomerMeView(APIView):
         blacklist_user_tokens(user)
         user.is_active = False
         user.save(update_fields=["is_active"])
-        return Response(True, status=status.HTTP_200_OK)
+        return Response({"message": "Account deactivated."}, status=status.HTTP_200_OK)
 
 
 class UsernameAvailabilityView(APIView):

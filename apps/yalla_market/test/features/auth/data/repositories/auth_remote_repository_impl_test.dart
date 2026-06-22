@@ -75,6 +75,7 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/signup');
+          expect(request.data, containsPair('username', 'mustafa_ali'));
           return {
             'email': 'mustafa@example.com',
             'message': 'Verification email sent',
@@ -85,6 +86,7 @@ void main() {
         final result = await repository.signup(
           firstName: 'Mustafa',
           lastName: 'Ali',
+          username: 'mustafa_ali',
           email: 'mustafa@example.com',
           password: 'Password123!',
         );
@@ -156,6 +158,32 @@ void main() {
         failure: (failure) => fail(failure.message),
       );
       expect((await tokenStore.read())?.isSessionOnly, isTrue);
+    });
+
+    test('logout posts stored refresh token and clears token store', () async {
+      final tokenStore = InMemoryTokenStore();
+      await tokenStore.save(
+        StoredAuthTokens(
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      final apiClient = FakeApiClient((request) {
+        expect(request.method, 'POST');
+        expect(request.path, '/auth/logout');
+        expect(request.data, {'refreshToken': 'refresh-token'});
+        return {'message': 'Logout successful.'};
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.logout();
+
+      result.when(
+        success: (loggedOut) => expect(loggedOut, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      expect(await tokenStore.read(), isNull);
     });
   });
 }

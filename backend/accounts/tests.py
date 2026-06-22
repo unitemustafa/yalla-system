@@ -303,6 +303,20 @@ class V1AuthenticationAPITests(APITestCase):
         refresh = RefreshToken.for_user(user)
         return {"HTTP_AUTHORIZATION": f"Bearer {refresh.access_token}"}
 
+    def assert_v1_auth_payload(self, data):
+        self.assertIn("user", data)
+        self.assertIn("accessToken", data)
+        self.assertIn("refreshToken", data)
+        self.assertIn("expiresAt", data)
+        self.assertNotIn("access", data)
+        self.assertNotIn("refresh", data)
+        self.assertIn("firstName", data["user"])
+        self.assertIn("lastName", data["user"])
+        self.assertIn("avatarUrl", data["user"])
+        self.assertIn("birthDate", data["user"])
+        self.assertIn("usernameChangedAt", data["user"])
+        self.assertIn("hasPassword", data["user"])
+
     def test_market_signup_accepts_flutter_payload_and_verifies_with_code(self):
         signup_response = self.client.post(
             "/api/v1/auth/signup",
@@ -338,9 +352,7 @@ class V1AuthenticationAPITests(APITestCase):
         self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
         self.assertEqual(verify_response.data["user"]["firstName"], "Mustafa")
         self.assertEqual(verify_response.data["user"]["role"], "CUSTOMER")
-        self.assertIn("accessToken", verify_response.data)
-        self.assertIn("refreshToken", verify_response.data)
-        self.assertIn("expiresAt", verify_response.data)
+        self.assert_v1_auth_payload(verify_response.data)
 
     def test_market_signup_requires_username(self):
         response = self.client.post(
@@ -357,6 +369,37 @@ class V1AuthenticationAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("username", response.data)
+
+    def test_resend_verification_endpoint_regenerates_registration_otp(self):
+        signup_response = self.client.post(
+            "/api/v1/auth/signup",
+            {
+                "firstName": "Resend",
+                "lastName": "User",
+                "username": "resend_user",
+                "email": "resend@example.com",
+                "password": self.password,
+                "phone": "+201001234569",
+            },
+            format="json",
+        )
+        self.assertEqual(signup_response.status_code, status.HTTP_201_CREATED)
+
+        response = self.client.post(
+            "/api/v1/auth/resend-verification",
+            {"email": "resend@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "A new verification code has been sent.")
+        self.assertEqual(len(response.data["dev_otp"]), 6)
+        active_otps = OneTimePassword.objects.filter(
+            user__email="resend@example.com",
+            purpose=OneTimePassword.Purpose.REGISTRATION,
+            used_at__isnull=True,
+        )
+        self.assertEqual(active_otps.count(), 1)
 
     def test_market_availability_and_me_endpoints_use_customer_role(self):
         user = self.create_user(
@@ -385,12 +428,127 @@ class V1AuthenticationAPITests(APITestCase):
 
         patch_response = self.client.patch(
             "/api/v1/auth/me",
-            {"firstName": "Updated"},
+            {
+                "firstName": "Updated",
+                "username": "updated_customer",
+                "gender": "male",
+                "birthDate": "1995-06-01",
+            },
             format="json",
             **self.bearer(user),
         )
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
         self.assertEqual(patch_response.data["firstName"], "Updated")
+        self.assertEqual(patch_response.data["username"], "updated_customer")
+        self.assertEqual(patch_response.data["gender"], "male")
+        self.assertEqual(patch_response.data["birthDate"], "1995-06-01")
+        self.assertIsNotNone(patch_response.data["usernameChangedAt"])
+        user.refresh_from_db()
+        self.assertEqual(user.gender, "male")
+        self.assertEqual(user.birth_date.isoformat(), "1995-06-01")
+        self.assertIsNotNone(user.username_changed_at)
+
+    def test_customer_me_delete_deactivates_account_with_password(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="delete_customer",
+            email="delete.customer@example.com",
+            phone="+201001111112",
+        )
+
+        response = self.client.delete(
+            "/api/v1/auth/me",
+            {"password": self.password},
+            format="json",
+            **self.bearer(user),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "Account deactivated.")
+        user.refresh_from_db()
+        self.assertFalse(user.is_active)
+
+    def test_customer_login_refresh_and_logout_use_v1_shape(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="login_customer",
+            email="login.customer@example.com",
+            phone="+201001111113",
+            first_name="Login",
+            last_name="Customer",
+        )
+
+        login_response = self.client.post(
+            "/api/v1/auth/login",
+            {"email": user.email, "password": self.password},
+            format="json",
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(login_response.data["user"]["role"], "CUSTOMER")
+        self.assert_v1_auth_payload(login_response.data)
+
+        refresh_response = self.client.post(
+            "/api/v1/auth/refresh",
+            {"refreshToken": login_response.data["refreshToken"]},
+            format="json",
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(refresh_response.data["user"]["role"], "CUSTOMER")
+        self.assert_v1_auth_payload(refresh_response.data)
+
+        logout_refresh_token = refresh_response.data["refreshToken"]
+        refresh_jti = RefreshToken(logout_refresh_token)["jti"]
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {login_response.data['accessToken']}"
+        )
+        logout_response = self.client.post(
+            "/api/v1/auth/logout",
+            {"refreshToken": logout_refresh_token},
+            format="json",
+        )
+        self.assertEqual(logout_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(logout_response.data["message"], "Logout successful.")
+        self.assertTrue(
+            BlacklistedToken.objects.filter(
+                token__jti=refresh_jti
+            ).exists()
+        )
+
+    def test_v1_logout_accepts_missing_refresh_token(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="logout_customer",
+            email="logout.customer@example.com",
+            phone="+201001111114",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/logout",
+            {},
+            format="json",
+            **self.bearer(user),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["message"], "Logout successful.")
+
+    def test_v1_logout_returns_useful_error_for_invalid_refresh_token(self):
+        user = self.create_user(
+            User.Role.CLIENT,
+            username="bad_logout_customer",
+            email="bad.logout.customer@example.com",
+            phone="+201001111115",
+        )
+
+        response = self.client.post(
+            "/api/v1/auth/logout",
+            {"refreshToken": "invalid-token"},
+            format="json",
+            **self.bearer(user),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["message"], "Invalid or expired refresh token.")
 
     def test_customer_login_rejects_dashboard_and_courier_accounts(self):
         admin = self.create_user(
@@ -431,6 +589,7 @@ class V1AuthenticationAPITests(APITestCase):
         )
         self.assertEqual(dashboard_login.status_code, status.HTTP_200_OK)
         self.assertEqual(dashboard_login.data["user"]["role"], "ADMIN")
+        self.assert_v1_auth_payload(dashboard_login.data)
 
         create_response = self.client.post(
             "/api/v1/dashboard/couriers",
@@ -462,6 +621,7 @@ class V1AuthenticationAPITests(APITestCase):
         )
         self.assertEqual(courier_login.status_code, status.HTTP_200_OK)
         self.assertEqual(courier_login.data["user"]["role"], "REPRESENTATIVE")
+        self.assert_v1_auth_payload(courier_login.data)
         self.assertEqual(courier_login.data["courier"]["vehicle"], "Motorbike")
 
     def test_role_isolation_for_dashboard_and_courier_me(self):

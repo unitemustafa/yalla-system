@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
@@ -64,6 +65,7 @@ class ApiUserSerializer(serializers.ModelSerializer):
             "hasPassword",
             "username",
             "phone",
+            "gender",
             "avatarUrl",
             "birthDate",
             "usernameChangedAt",
@@ -79,9 +81,13 @@ class ApiUserSerializer(serializers.ModelSerializer):
         return obj.has_usable_password()
 
     def get_birthDate(self, obj):
+        if obj.birth_date:
+            return obj.birth_date.isoformat()
         return None
 
     def get_usernameChangedAt(self, obj):
+        if obj.username_changed_at:
+            return obj.username_changed_at.isoformat().replace("+00:00", "Z")
         return None
 
     def get_role(self, obj):
@@ -395,6 +401,8 @@ class MeUpdateSerializer(serializers.Serializer):
     )
     email = serializers.EmailField(required=False)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    gender = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    birthDate = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_email(self, value):
         email = normalize_email(value)
@@ -427,6 +435,17 @@ class MeUpdateSerializer(serializers.Serializer):
         if exists:
             raise serializers.ValidationError("Phone number is already registered.")
         return phone
+
+    def validate_birthDate(self, value):
+        if value in (None, ""):
+            return None
+        date_value = parse_date(value)
+        if date_value is not None:
+            return date_value
+        datetime_value = parse_datetime(value)
+        if datetime_value is not None:
+            return datetime_value.date()
+        raise serializers.ValidationError("Birth date must be a valid date.")
 
 
 class DeleteAccountSerializer(RequiredFieldMessagesMixin, serializers.Serializer):
