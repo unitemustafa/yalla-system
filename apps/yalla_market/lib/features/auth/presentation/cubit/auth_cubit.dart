@@ -34,7 +34,8 @@ class AuthCubit extends Cubit<AuthState> {
     } else if (change.nextState is AuthInitial ||
         change.nextState is AuthSessionExpired ||
         change.nextState is AuthSignupSucceeded ||
-        change.nextState is AuthEmailVerified) {
+        change.nextState is AuthEmailVerified ||
+        change.nextState is AuthPasswordResetSucceeded) {
       AuthGuard.clearAuthentication();
     }
   }
@@ -181,7 +182,7 @@ class AuthCubit extends Cubit<AuthState> {
       email: email.trim(),
       password: password,
       username: username?.trim(),
-      phone: phone?.trim(),
+      phone: phone?.trim() ?? '',
     );
     result.when(
       success: (session) {
@@ -243,6 +244,41 @@ class AuthCubit extends Cubit<AuthState> {
     );
   }
 
+  Future<bool> requestPasswordReset(String email) async {
+    final result = await _authUseCases.requestPasswordReset(email.trim());
+    return result.when(
+      success: (sent) => sent,
+      failure: (failure) {
+        emit(AuthFailure(failure.message));
+        return false;
+      },
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    if (state is AuthLoading) return;
+
+    _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
+    emit(const AuthLoading());
+
+    final result = await _authUseCases.resetPassword(
+      email: email.trim(),
+      code: code.trim(),
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+    );
+    result.when(
+      success: (_) => emit(AuthPasswordResetSucceeded(email.trim())),
+      failure: (failure) => emit(AuthFailure(failure.message)),
+    );
+  }
+
   Future<void> logout() async {
     _pendingSignupSession = null;
     _sessionExpiryTimer?.cancel();
@@ -261,6 +297,17 @@ class AuthCubit extends Cubit<AuthState> {
     return _deleteAccount(
       () => _authUseCases.deleteAccountWithPassword(password),
     );
+  }
+
+  Future<void> expireSession([
+    String message =
+        'Your session has expired. Please sign in again. To keep your session longer, turn on Remember Me when signing in.',
+  ]) async {
+    _pendingSignupSession = null;
+    _sessionExpiryTimer?.cancel();
+    await _authUseCases.logout();
+    AuthGuard.clearAuthentication();
+    if (!isClosed) emit(AuthSessionExpired(message));
   }
 
   Future<AuthUser?> refreshProfile() async {

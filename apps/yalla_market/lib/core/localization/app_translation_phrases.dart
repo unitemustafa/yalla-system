@@ -528,7 +528,6 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Email verified': 'تم تأكيد الإيميل',
     'Your account is verified. Sign in to continue.':
         'حسابك اتأكد. سجل دخولك عشان تكمل.',
-    'Invalid email or password.': 'الإيميل أو كلمة السر مش صح.',
     'Account is not active.': 'الحساب مش متفعل.',
     'This account cannot access this app.':
         'الحساب ده مش مسموح له يستخدم التطبيق ده.',
@@ -563,7 +562,6 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Medium password': 'كلمة سر متوسطة',
     'Name is too short': 'الاسم قصير جدًا',
     'No local user session.': 'مفيش جلسة مستخدم محفوظة.',
-    'No account found with this email.': 'مفيش حساب بالإيميل ده.',
     'No products available': 'مفيش منتجات متاحة',
     'Products could not load': 'المنتجات محملتش',
     'Please check your connection and try again.':
@@ -613,7 +611,6 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'This cannot be undone. Enter your account password to confirm permanent deletion.':
         'الإجراء ده نهائي. اكتب كلمة سر الحساب لتأكيد الحذف.',
     'This field is required': 'الخانة دي مطلوبة',
-    'Session expired': 'الجلسة انتهت',
     'Your session ended because Remember Me was off. Turn it on to stay signed in for 30 days when you close the app.':
         'الجلسة انتهت عشان افتكرني مكانتش متفعّلة. فعّلها عشان تفضل مسجل دخول لمدة 30 يوم حتى لو قفلت التطبيق.',
     'This information appears on your يلا ماركت profile.':

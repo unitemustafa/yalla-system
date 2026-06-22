@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -22,16 +22,11 @@ import { currentUser } from "@/features/dashboard/profile-data";
 import { useDashboardI18n } from "@/features/dashboard/i18n";
 import { Button, Card, Input, PageTitle } from "@/features/dashboard/primitives";
 import { useSnackbar } from "@/features/dashboard/snackbar";
-<<<<<<< HEAD
 import { uploadDashboardImage } from "@/features/dashboard/upload-dashboard-image";
 import { removeInputWhitespace } from "@/lib/input-sanitizers";
-=======
-import { authFetch } from "@/lib/client-api";
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 
 const profileImageStorageKey = "yalla-dashboard-profile-image";
 
-<<<<<<< HEAD
 function InfoRow({
   icon,
   label,
@@ -57,15 +52,15 @@ function InfoRow({
 function getPasswordRequirements(password: string) {
   return [
     {
-      label: "8 أحرف على الأقل",
+      label: "8 ط£ط­ط±ظپ ط¹ظ„ظ‰ ط§ظ„ط£ظ‚ظ„",
       isMet: password.length >= 8,
     },
     {
-      label: "حرف كبير وصغير",
+      label: "ط­ط±ظپ ظƒط¨ظٹط± ظˆطµط؛ظٹط±",
       isMet: /[A-Z]/.test(password) && /[a-z]/.test(password),
     },
     {
-      label: "رقم ورمز خاص",
+      label: "ط±ظ‚ظ… ظˆط±ظ…ط² ط®ط§طµ",
       isMet: /\d/.test(password) && /[^A-Za-z0-9]/.test(password),
     },
   ];
@@ -82,7 +77,7 @@ function PasswordStrengthMeter({
 
   return (
     <div
-      aria-label="متطلبات قوة كلمة المرور"
+      aria-label="ظ…طھط·ظ„ط¨ط§طھ ظ‚ظˆط© ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±"
       aria-live="polite"
       className="grid grid-cols-3 gap-2 text-center"
       role="status"
@@ -124,17 +119,6 @@ function useTemporaryLastPasswordCharacter(
     if (passwordVisible || !appendedCharacter) {
       setShowLastCharacter(false);
       return;
-=======
-  async function updateAccount(body: BodyInit, multipart = false) {
-    const response = await authFetch("me", {
-      method: "PATCH",
-      headers: multipart ? undefined : { "content-type": "application/json" },
-      body,
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.user) {
-      throw new Error(data?.message || "تعذر تحديث الحساب.");
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
     }
 
     setShowLastCharacter(true);
@@ -163,7 +147,7 @@ function HiddenPasswordValue({
       {password
         .split("")
         .map((character, index) =>
-          showLastCharacter && index === password.length - 1 ? character : "•",
+          showLastCharacter && index === password.length - 1 ? character : "â€¢",
         )
         .join("")}
     </span>
@@ -172,15 +156,15 @@ function HiddenPasswordValue({
 
 function translatePasswordChangeError(message: string) {
   if (/current password is incorrect/i.test(message)) {
-    return "كلمة المرور الحالية غير صحيحة.";
+    return "ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط© ط؛ظٹط± طµط­ظٹط­ط©.";
   }
 
   if (/passwords do not match/i.test(message)) {
-    return "تأكيد كلمة المرور غير مطابق.";
+    return "طھط£ظƒظٹط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط؛ظٹط± ظ…ط·ط§ط¨ظ‚.";
   }
 
   if (/could not change password/i.test(message)) {
-    return "تعذر تغيير كلمة المرور. حاول مرة أخرى.";
+    return "طھط¹ط°ط± طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±. ط­ط§ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.";
   }
 
   return message;
@@ -261,12 +245,12 @@ export function AccountPage() {
       const uploadedImageUrl = await uploadDashboardImage(file);
       localStorage.setItem(profileImageStorageKey, uploadedImageUrl);
       setProfileImage(uploadedImageUrl);
-      setStatus("تم حفظ صورة البروفايل.");
-      showSnackbar({ message: "تم حفظ صورة البروفايل." });
+      setStatus("طھظ… ط­ظپط¸ طµظˆط±ط© ط§ظ„ط¨ط±ظˆظپط§ظٹظ„.");
+      showSnackbar({ message: "طھظ… ط­ظپط¸ طµظˆط±ط© ط§ظ„ط¨ط±ظˆظپط§ظٹظ„." });
     } catch {
-      setStatus("تعذر رفع صورة البروفايل الآن.");
+      setStatus("طھط¹ط°ط± ط±ظپط¹ طµظˆط±ط© ط§ظ„ط¨ط±ظˆظپط§ظٹظ„ ط§ظ„ط¢ظ†.");
       showSnackbar({
-        message: "تعذر رفع صورة البروفايل.",
+        message: "طھط¹ط°ط± ط±ظپط¹ طµظˆط±ط© ط§ظ„ط¨ط±ظˆظپط§ظٹظ„.",
         tone: "danger",
       });
     } finally {
@@ -277,9 +261,8 @@ export function AccountPage() {
 
   function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-<<<<<<< HEAD
-    setStatus("تم حفظ بيانات البروفايل على الصفحة.");
-    showSnackbar({ message: "تم حفظ بيانات البروفايل." });
+    setStatus("طھظ… ط­ظپط¸ ط¨ظٹط§ظ†ط§طھ ط§ظ„ط¨ط±ظˆظپط§ظٹظ„ ط¹ظ„ظ‰ ط§ظ„طµظپط­ط©.");
+    showSnackbar({ message: "طھظ… ط­ظپط¸ ط¨ظٹط§ظ†ط§طھ ط§ظ„ط¨ط±ظˆظپط§ظٹظ„." });
   }
 
   async function handleSavePassword(event: React.FormEvent<HTMLFormElement>) {
@@ -287,25 +270,8 @@ export function AccountPage() {
     setPasswordStatus(null);
 
     if (!currentPassword) {
-      setCurrentPasswordError("كلمة المرور الحالية مطلوبة");
+      setCurrentPasswordError("ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط© ظ…ط·ظ„ظˆط¨ط©");
       setShowPasswordStrengthErrors(false);
-=======
-    const response = await authFetch("change-password", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        currentPassword,
-        newPassword,
-        passwordConfirm,
-      }),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) {
-      showSnackbar({
-        message: data?.message || "تعذر تغيير كلمة المرور.",
-        tone: "danger",
-      });
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
       return;
     }
 
@@ -321,12 +287,12 @@ export function AccountPage() {
     }
 
     if (!confirmPassword) {
-      setConfirmPasswordError("تأكيد كلمة المرور مطلوب");
+      setConfirmPasswordError("طھط£ظƒظٹط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظ…ط·ظ„ظˆط¨");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setConfirmPasswordError("تأكيد كلمة المرور غير مطابق");
+      setConfirmPasswordError("طھط£ظƒظٹط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط؛ظٹط± ظ…ط·ط§ط¨ظ‚");
       return;
     }
 
@@ -354,8 +320,8 @@ export function AccountPage() {
       setConfirmPassword("");
       setShowPasswordStrengthErrors(false);
       setPasswordStatusTone("success");
-      setPasswordStatus("تم تغيير كلمة المرور. سجل الدخول تاني بالباسورد الجديد.");
-      showSnackbar({ message: "تم تغيير كلمة المرور بنجاح." });
+      setPasswordStatus("طھظ… طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±. ط³ط¬ظ„ ط§ظ„ط¯ط®ظˆظ„ طھط§ظ†ظٹ ط¨ط§ظ„ط¨ط§ط³ظˆط±ط¯ ط§ظ„ط¬ط¯ظٹط¯.");
+      showSnackbar({ message: "طھظ… طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط¨ظ†ط¬ط§ط­." });
       window.setTimeout(() => {
         window.location.assign("/login");
       }, 900);
@@ -363,12 +329,12 @@ export function AccountPage() {
       const responseMessage =
         error instanceof Error
           ? error.message
-          : "تعذر تغيير كلمة المرور. حاول مرة أخرى.";
+          : "طھط¹ط°ط± طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±. ط­ط§ظˆظ„ ظ…ط±ط© ط£ط®ط±ظ‰.";
       const message = translatePasswordChangeError(responseMessage);
       setPasswordStatusTone("error");
       setPasswordStatus(message);
       showSnackbar({
-        message: "تعذر تغيير كلمة المرور.",
+        message: "طھط¹ط°ط± طھط؛ظٹظٹط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±.",
         tone: "danger",
       });
     } finally {
@@ -380,7 +346,7 @@ export function AccountPage() {
     <div className="px-6 py-6">
       <PageTitle
         title={t("page.account")}
-        description="إدارة مختصرة للبروفايل: الصورة، الاسم، الإيميل، وتفاصيل الدخول."
+        description="ط¥ط¯ط§ط±ط© ظ…ط®طھطµط±ط© ظ„ظ„ط¨ط±ظˆظپط§ظٹظ„: ط§ظ„طµظˆط±ط©طŒ ط§ظ„ط§ط³ظ…طŒ ط§ظ„ط¥ظٹظ…ظٹظ„طŒ ظˆطھظپط§طµظٹظ„ ط§ظ„ط¯ط®ظˆظ„."
       />
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[360px_1fr]">
@@ -389,7 +355,7 @@ export function AccountPage() {
             <div className="relative mx-auto size-28 overflow-hidden rounded-xl border bg-background shadow-sm">
               {profileImage ? (
                 <Image
-                  alt="صورة البروفايل"
+                  alt="طµظˆط±ط© ط§ظ„ط¨ط±ظˆظپط§ظٹظ„"
                   className="size-full object-cover"
                   fill
                   sizes="112px"
@@ -402,7 +368,7 @@ export function AccountPage() {
                 </div>
               )}
               <button
-                aria-label="إضافة صورة للبروفايل"
+                aria-label="ط¥ط¶ط§ظپط© طµظˆط±ط© ظ„ظ„ط¨ط±ظˆظپط§ظٹظ„"
                 className="absolute bottom-2 end-2 inline-flex size-9 items-center justify-center rounded-md border bg-background text-primary shadow-sm transition-colors hover:bg-accent"
                 disabled={isUploadingProfileImage}
                 onClick={() => fileInputRef.current?.click()}
@@ -426,19 +392,19 @@ export function AccountPage() {
               variant="outline"
             >
               <Upload className="size-4" />
-              {isUploadingProfileImage ? "جاري الرفع..." : "إضافة صورة"}
+              {isUploadingProfileImage ? "ط¬ط§ط±ظٹ ط§ظ„ط±ظپط¹..." : "ط¥ط¶ط§ظپط© طµظˆط±ط©"}
             </Button>
           </div>
 
           <div className="space-y-3 p-5">
             <InfoRow
               icon={<CalendarDays className="size-4" />}
-              label="تاريخ الانضمام"
+              label="طھط§ط±ظٹط® ط§ظ„ط§ظ†ط¶ظ…ط§ظ…"
               value={t("account.joined.value")}
             />
             <InfoRow
               icon={<Clock3 className="size-4" />}
-              label="آخر تسجيل دخول"
+              label="ط¢ط®ط± طھط³ط¬ظٹظ„ ط¯ط®ظˆظ„"
               value={t("account.lastLogin.value")}
             />
           </div>
@@ -448,7 +414,7 @@ export function AccountPage() {
           <Card className="p-5">
             <form className="grid gap-4" onSubmit={handleSave}>
               <label className="grid gap-2 text-sm font-medium">
-                الاسم
+                ط§ظ„ط§ط³ظ…
                 <div className="relative">
                   <UserRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -460,7 +426,7 @@ export function AccountPage() {
               </label>
 
               <label className="grid gap-2 text-sm font-medium">
-                الإيميل
+                ط§ظ„ط¥ظٹظ…ظٹظ„
                 <div className="relative">
                   <Mail className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -476,7 +442,7 @@ export function AccountPage() {
 
               <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <Button className="sm:w-auto" type="submit">
-                  حفظ التغييرات
+                  ط­ظپط¸ ط§ظ„طھط؛ظٹظٹط±ط§طھ
                 </Button>
                 {status ? (
                   <span className="text-sm text-muted-foreground">{status}</span>
@@ -498,10 +464,10 @@ export function AccountPage() {
               <span>
                 <span className="flex items-center gap-2 text-base font-bold">
                   <LockKeyhole className="size-5 text-primary" />
-                  كلمة المرور
+                  ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±
                 </span>
                 <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                  غيّر كلمة المرور باستخدام كلمة المرور الحالية. بعد الحفظ هتحتاج تسجل دخول من جديد.
+                  ط؛ظٹظ‘ط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط¨ط§ط³طھط®ط¯ط§ظ… ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط©. ط¨ط¹ط¯ ط§ظ„ط­ظپط¸ ظ‡طھط­طھط§ط¬ طھط³ط¬ظ„ ط¯ط®ظˆظ„ ظ…ظ† ط¬ط¯ظٹط¯.
                 </span>
               </span>
               <ChevronDown
@@ -519,7 +485,7 @@ export function AccountPage() {
                 onSubmit={handleSavePassword}
               >
                 <label className="grid gap-2 text-sm font-medium">
-                  كلمة المرور الحالية
+                  ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط­ط§ظ„ظٹط©
                   <div className="relative">
                     <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -576,7 +542,7 @@ export function AccountPage() {
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium">
-                  كلمة المرور الجديدة
+                  ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯ط©
                   <div className="relative">
                     <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -604,8 +570,8 @@ export function AccountPage() {
                     <button
                       aria-label={
                         passwordVisible
-                          ? "إخفاء كلمة المرور"
-                          : "إظهار كلمة المرور"
+                          ? "ط¥ط®ظپط§ط، ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±"
+                          : "ط¥ط¸ظ‡ط§ط± ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±"
                       }
                       className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={!currentPassword}
@@ -628,7 +594,7 @@ export function AccountPage() {
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium">
-                  تأكيد كلمة المرور
+                  طھط£ظƒظٹط¯ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط±
                   <div className="relative">
                     <KeyRound className="absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -698,8 +664,8 @@ export function AccountPage() {
                   type="submit"
                 >
                   {isSavingPassword
-                    ? "جاري الحفظ..."
-                    : "حفظ كلمة المرور الجديدة"}
+                    ? "ط¬ط§ط±ظٹ ط§ظ„ط­ظپط¸..."
+                    : "ط­ظپط¸ ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ط§ظ„ط¬ط¯ظٹط¯ط©"}
                 </Button>
               </form>
             ) : null}

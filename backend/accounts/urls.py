@@ -1,13 +1,6 @@
 from django.urls import path
 
-from .views import (
-    ChangePasswordView,
-    CheckEmailView,
-    CheckPhoneView,
-    CheckUsernameView,
-    CurrentUserView,
-    CourierListCreateView,
-    CourierLoginView,
+from .auth_views import (
     ForgotPasswordView,
     LoginView,
     LogoutView,
@@ -16,6 +9,14 @@ from .views import (
     ResetPasswordView,
     SignupView,
     VerifyRegistrationOTPView,
+)
+from .courier_views import CourierListCreateView, CourierLoginView
+from .profile_views import (
+    ChangePasswordView,
+    CheckEmailView,
+    CheckPhoneView,
+    CheckUsernameView,
+    CurrentUserView,
 )
 
 urlpatterns = [

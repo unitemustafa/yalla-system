@@ -73,8 +73,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   }) {
     return _guard(
       () => _signup(
@@ -105,6 +105,32 @@ class AuthRepositoryImpl implements AuthRepository {
     return _guard(
       () => _resendVerificationCode(email),
       'Could not send a new verification code.',
+    );
+  }
+
+  @override
+  Future<ApiResult<bool>> requestPasswordReset(String email) {
+    return _guard(
+      () => _requestPasswordReset(email),
+      'Could not request password reset.',
+    );
+  }
+
+  @override
+  Future<ApiResult<bool>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) {
+    return _guard(
+      () => _resetPassword(
+        email: email,
+        code: code,
+        password: password,
+        passwordConfirmation: passwordConfirmation,
+      ),
+      'Could not reset your password.',
     );
   }
 
@@ -359,6 +385,57 @@ class AuthRepositoryImpl implements AuthRepository {
         ValidationFailure('Email is required.'),
       );
     }
+    return true;
+  }
+
+  Future<bool> _requestPasswordReset(String email) async {
+    if (_normalizeEmail(email).isEmpty) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Email is required.'),
+      );
+    }
+    return true;
+  }
+
+  Future<bool> _resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final normalizedEmail = _normalizeEmail(email);
+    final normalizedCode = code.trim();
+    if (normalizedEmail.isEmpty ||
+        !RegExp(r'^\d{6}$').hasMatch(normalizedCode)) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Enter the 6-digit verification code.'),
+      );
+    }
+    if (password != passwordConfirmation) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Passwords do not match.'),
+      );
+    }
+    if (password.isEmpty) {
+      throw const _AuthRepositoryException(
+        ValidationFailure('Password is required.'),
+      );
+    }
+
+    final accounts = await _loadAccounts();
+    final index = accounts.indexWhere(
+      (account) => _normalizeEmail(account.user.email) == normalizedEmail,
+    );
+    if (index < 0) {
+      return true;
+    }
+
+    final updatedAccounts = [...accounts];
+    updatedAccounts[index] = accounts[index].copyWith(
+      passwordDigest: _passwordDigest(normalizedEmail, password),
+    );
+    await _saveAccounts(updatedAccounts);
+    await _clearSession();
     return true;
   }
 

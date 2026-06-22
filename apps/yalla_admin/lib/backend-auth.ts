@@ -1,8 +1,13 @@
-export type DashboardUser = {
+﻿export type DashboardUser = {
   id?: string;
   email: string;
   name: string;
   role: string;
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  phone?: string;
+  avatarUrl?: string | null;
 };
 
 type BackendUser = {
@@ -13,13 +18,11 @@ type BackendUser = {
   last_name?: string;
   lastName?: string;
   username?: string;
+  phone?: string;
   role?: string;
-<<<<<<< HEAD
-=======
   user_type?: string;
   avatar_url?: string | null;
   avatarUrl?: string | null;
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
 };
 
 export type BackendLoginResponse = {
@@ -74,29 +77,8 @@ export function backendAuthUrl(path: string) {
 }
 
 export function isAllowedDashboardRole(role: string | undefined) {
-<<<<<<< HEAD
-  const normalizedRole = role?.trim().toLowerCase();
-
-  if (!normalizedRole) {
-    return false;
-  }
-
-  const roles = (process.env.DASHBOARD_ALLOWED_ROLES || fallbackAllowedRoles)
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  return roles.includes(normalizedRole);
-}
-
-export function normalizeDashboardUser(user: BackendUser | undefined) {
-  if (!user?.email || !user.role) {
-    return null;
-  }
-
-=======
   const normalized = role?.trim().toLowerCase();
-  const allowedRoles = (process.env.DASHBOARD_ALLOWED_ROLES || "admin")
+  const allowedRoles = (process.env.DASHBOARD_ALLOWED_ROLES || fallbackAllowedRoles)
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
@@ -106,7 +88,6 @@ export function normalizeDashboardUser(user: BackendUser | undefined) {
 
 export function normalizeDashboardUser(user: BackendUser | undefined) {
   if (!user?.email) return null;
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
   const firstName = user.first_name ?? user.firstName ?? "";
   const lastName = user.last_name ?? user.lastName ?? "";
   const role = user.role ?? user.user_type ?? "";
@@ -119,16 +100,12 @@ export function normalizeDashboardUser(user: BackendUser | undefined) {
     id: user.id === undefined ? undefined : String(user.id),
     email: user.email,
     name,
-<<<<<<< HEAD
-    role: user.role,
-=======
     firstName,
     lastName,
     username: user.username ?? "",
     phone: user.phone ?? "",
     role,
     avatarUrl: user.avatar_url ?? user.avatarUrl ?? null,
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
   } satisfies DashboardUser;
 }
 
@@ -161,12 +138,7 @@ export function extractBackendErrorMessage(data: unknown, fallback: string) {
   }
 
   const record = data as Record<string, unknown>;
-<<<<<<< HEAD
-  const directMessage = record.message ?? record.detail;
-
-=======
   const directMessage = record.message ?? record.detail ?? record.error;
->>>>>>> 56ecfc2 (link dashboard order, items,auth api with backend)
   if (typeof directMessage === "string" && directMessage.trim()) {
     return directMessage;
   }

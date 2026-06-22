@@ -101,6 +101,12 @@ DATABASES = {
         "PASSWORD": config("POSTGRES_PASSWORD"),
         "HOST": config("POSTGRES_HOST", default="localhost"),
         "PORT": config("POSTGRES_PORT", default="5432"),
+        "TEST": {
+            "NAME": config("POSTGRES_TEST_DB", default="test_yalla_db"),
+            "MIRROR": None,
+            "CHARSET": None,
+            "COLLATION": None,
+        },
     }
 }
 

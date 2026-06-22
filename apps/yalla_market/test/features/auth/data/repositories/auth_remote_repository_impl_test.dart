@@ -101,6 +101,7 @@ void main() {
           username: 'mustafa_ali',
           email: 'mustafa@example.com',
           password: 'Password123!',
+          phone: '',
         );
 
         result.when(
