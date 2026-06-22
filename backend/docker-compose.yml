@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16
+    container_name: yalla_postgres
+    environment:
+      POSTGRES_DB: yalla_db
+      POSTGRES_USER: yalla_user
+      POSTGRES_PASSWORD: yalla_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yalla_user -d yalla_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    container_name: yalla_backend
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: yalla_db
+      POSTGRES_USER: yalla_user
+      POSTGRES_PASSWORD: yalla_password
+      POSTGRES_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
