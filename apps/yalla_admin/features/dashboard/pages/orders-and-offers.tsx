@@ -49,6 +49,10 @@ import { cn } from "@/lib/utils";
 import { useSnackbar } from "../snackbar";
 import { dashboardUsers, type DashboardUser } from "../users/default-dashboard-users";
 import { deliveryZones } from "../reference-data";
+import {
+  dashboardOrders,
+  type DashboardOrder,
+} from "../static-data";
 
 const currency = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
@@ -614,19 +618,6 @@ function AddonEditPanel({
   );
 }
 
-type DashboardOrder = {
-  index: string;
-  number: string;
-  customer: string;
-  phone: string;
-  type: string;
-  status: string;
-  total: number;
-  date: string;
-  time: string;
-  payment: string;
-};
-
 type OrderFilters = {
   search: string;
   status: string;
@@ -842,10 +833,12 @@ function MobileDateFilters({
 }
 
 export function OrdersPage() {
-  const [orders, setOrders] = useState<DashboardOrder[]>([]);
+  const [orders] = useState<DashboardOrder[]>(() =>
+    dashboardOrders.map((order) => ({ ...order })),
+  );
   const [filters, setFilters] = useState<OrderFilters>(defaultOrderFilters);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loading] = useState(false);
+  const [error] = useState("");
   const [activeDate, setActiveDate] = useState<DateRangeKey>("today");
   const [customRange, setCustomRange] = useState({ start: "", end: "" });
   const [currentPage, setCurrentPage] = useState(1);
@@ -898,43 +891,6 @@ export function OrdersPage() {
       setCustomRange({ start: date, end: date });
     }
   }
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadOrders() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await fetch("/api/dashboard/orders");
-
-        if (!response.ok) {
-          throw new Error("Failed to load orders");
-        }
-
-        const data = (await response.json()) as { orders: DashboardOrder[] };
-
-        if (alive) {
-          setOrders(data.orders);
-        }
-      } catch {
-        if (alive) {
-          setError("تعذر تحميل الطلبات. حاول تحديث الصفحة.");
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadOrders();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   return (
     <div className="px-6 py-8">
@@ -1146,7 +1102,6 @@ export function OrdersPage() {
 }
 
 export function CreateOrderPage() {
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const orderFormRef = useRef<HTMLFormElement>(null);
   const activeSeedItems = useMemo(() => itemRows.filter((item) => item.active), []);
@@ -1157,7 +1112,6 @@ export function CreateOrderPage() {
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [orderProductsOpen, setOrderProductsOpen] = useState(true);
   const [orderProductSearchOpen, setOrderProductSearchOpen] = useState(false);
-  const orderType = "delivery";
   const [activeOrderPanel, setActiveOrderPanel] =
     useState<"delivery" | "summary">("delivery");
   const [discountPercent, setDiscountPercent] = useState("0");
@@ -1256,32 +1210,12 @@ export function CreateOrderPage() {
     setOrderLines((currentLines) => currentLines.filter((line) => line.id !== lineId));
   }
 
-  function resetOrderForm() {
-    setCustomer("");
-    setPhone("");
-    setCustomerPickerOpen(false);
-    setOrderProductsOpen(true);
-    setOrderProductSearchOpen(false);
-    setActiveOrderPanel("delivery");
-    setDiscountPercent("0");
-    setNote("");
-    setOrderLines(
-      initialItem ? [{ id: `${initialItem.id}-line`, itemId: initialItem.id, quantity: 1 }] : [],
-    );
-    orderFormRef.current?.reset();
-  }
-
   async function saveOrder(resetAfterSave: boolean) {
     if (savingOrder) return;
 
     const formData = new FormData(orderFormRef.current ?? undefined);
     const submittedCustomer = String(formData.get("customer") ?? customer).trim();
     const submittedPhone = String(formData.get("phone") ?? phone).trim();
-    const submittedPayment = "cash";
-    const submittedDiscountRate = Math.min(
-      Math.max(Number.parseFloat(String(formData.get("discount") ?? discountPercent)) || 0, 0),
-      100,
-    );
     const submittedLines = orderLines.map((line) => {
       const quantity = Number(formData.get(`quantity-${line.id}`));
 
@@ -1290,16 +1224,6 @@ export function CreateOrderPage() {
         quantity: Math.max(1, Math.min(Number.isFinite(quantity) ? quantity : line.quantity, 99)),
       };
     });
-    const submittedSubtotal = submittedLines.reduce(
-      (total, line) => total + itemPrice(productsById.get(line.itemId)) * line.quantity,
-      0,
-    );
-    const submittedDiscount = submittedSubtotal * (submittedDiscountRate / 100);
-    const submittedTaxableAmount = Math.max(submittedSubtotal - submittedDiscount, 0);
-    const submittedVat = submittedTaxableAmount * 0.15;
-    const submittedDeliveryFee = orderType === "delivery" && submittedLines.length ? 25 : 0;
-    const submittedTotal = submittedTaxableAmount + submittedVat + submittedDeliveryFee;
-
     if (!submittedCustomer || !submittedPhone || !submittedLines.length) {
       showSnackbar({
         message: "اختار عميل مسجل وأضف منتج واحد على الأقل قبل الحفظ.",
@@ -1309,45 +1233,13 @@ export function CreateOrderPage() {
     }
 
     setSavingOrder(true);
+    void resetAfterSave;
 
-    try {
-      const response = await fetch("/api/dashboard/orders", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          customer: submittedCustomer,
-          phone: submittedPhone,
-          type: orderType,
-          status: "pending",
-          payment: submittedPayment,
-          total: Number(submittedTotal.toFixed(2)),
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create order");
-      }
-
-      const data = (await response.json()) as { order: DashboardOrder };
-
-      showSnackbar({
-        message: `تم حفظ الطلب ${data.order.number}.`,
-        tone: "success",
-      });
-
-      if (resetAfterSave) {
-        resetOrderForm();
-      } else {
-        router.push("/orders");
-      }
-    } catch {
-      showSnackbar({
-        message: "تعذر حفظ الطلب. حاول مرة أخرى.",
-        tone: "danger",
-      });
-    } finally {
-      setSavingOrder(false);
-    }
+    showSnackbar({
+      message: "إنشاء الطلبات غير مربوط بالـ backend حاليًا.",
+      tone: "danger",
+    });
+    setSavingOrder(false);
   }
 
   function selectCustomer(nextCustomer: DashboardUser) {
@@ -1844,7 +1736,6 @@ function CustomerSearchModal({
 }
 
 export function CreateOrderPageLegacy() {
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const orderFormRef = useRef<HTMLFormElement>(null);
   const [savingOrder, setSavingOrder] = useState(false);
@@ -1871,43 +1762,15 @@ export function CreateOrderPageLegacy() {
 
     setSavingOrder(true);
 
-    try {
-      const response = await fetch("/api/dashboard/orders", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          customer: typeof rawCustomer === "string" ? rawCustomer : "",
-          phone: typeof rawPhone === "string" ? rawPhone : "",
-          type: typeof rawType === "string" ? rawType : "delivery",
-          payment: "cash",
-          total: 0,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create order");
-      }
-
-      const data = (await response.json()) as { order: DashboardOrder };
-
-      showSnackbar({
-        message: `Order ${data.order.number} saved.`,
-        tone: "success",
-      });
-
-      if (resetAfterSave) {
-        orderFormRef.current?.reset();
-      } else {
-        router.push("/orders");
-      }
-    } catch {
-      showSnackbar({
-        message: "Could not save the order. Please try again.",
-        tone: "danger",
-      });
-    } finally {
-      setSavingOrder(false);
-    }
+    void rawCustomer;
+    void rawPhone;
+    void rawType;
+    void resetAfterSave;
+    showSnackbar({
+      message: "Order creation is not connected to the backend yet.",
+      tone: "danger",
+    });
+    setSavingOrder(false);
   }
 
   return (

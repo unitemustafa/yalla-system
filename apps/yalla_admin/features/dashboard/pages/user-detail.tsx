@@ -13,7 +13,7 @@ import {
 import type { DashboardUser } from "../users/default-dashboard-users";
 import { DashboardImage } from "../dashboard-image";
 import { Badge, Card, PageTitle } from "../primitives";
-import type { DashboardOrder } from "@/lib/dashboard-store";
+import type { DashboardOrder } from "@/features/dashboard/static-data";
 
 const currency = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,

@@ -1,12 +1,6 @@
 import type { Metadata } from "next";
-import { Cairo } from "next/font/google";
+import { AppProviders } from "@/features/auth/providers";
 import "./globals.css";
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  variable: "--font-cairo",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Yalla Admin",
@@ -242,12 +236,14 @@ export default function RootLayout({
       lang="ar-EG-u-nu-latn"
       dir="rtl"
       suppressHydrationWarning
-      className={`${cairo.variable} antialiased font-sans`}
+      className="antialiased font-sans"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <AppProviders>{children}</AppProviders>
+      </body>
     </html>
   );
 }

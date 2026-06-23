@@ -1,182 +1,62 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+export const AUTH_COOKIE_NAMES = {
+  accessToken: "yalla_access_token",
+  refreshToken: "yalla_refresh_token",
+  user: "yalla_auth_user",
+  remember: "yalla_remember",
+} as const;
 
-import {
-  getDashboardAccountEmail,
-  isDashboardAccountEmail,
-} from "@/lib/account-email";
-
-export const authCookieName = "yalla-session";
-export const authCookieMaxAge = 60 * 60 * 8;
-export const rememberedAuthCookieMaxAge = 60 * 60 * 24 * 30;
-
-const fallbackSessionSecret = "dev-session-secret-change-me";
-const fallbackDemoPassword = "01266666610";
-
-const demoAdmin = {
-  email: "dashboard@admin.com",
-  name: "Mohamed Abdeljalel",
-  role: "manager",
-};
-
-const mutableAuthState = globalThis as typeof globalThis & {
-  __yallaDemoPassword?: string;
-};
-
-type SessionPayload = {
-  sub: string;
+export type AuthUser = {
+  id: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  name: string;
+  phone: string;
   role: string;
-  exp: number;
 };
 
-if (
-  process.env.NODE_ENV === "production" &&
-  !process.env.SESSION_SECRET?.trim()
-) {
-  throw new Error(
-    "SESSION_SECRET is required in production. Set SESSION_SECRET to a strong random value.",
+export type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+export type AuthSession = AuthTokens & {
+  user: AuthUser;
+};
+
+export function isSafeNextPath(value: string | null | undefined) {
+  return Boolean(
+    value &&
+      value.startsWith("/") &&
+      !value.startsWith("//") &&
+      !value.includes("\\"),
   );
 }
 
-function getSessionSecret() {
-  const secret = process.env.SESSION_SECRET?.trim();
-
-  if (secret) {
-    return secret;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "SESSION_SECRET is required in production. Set SESSION_SECRET to a strong random value.",
-    );
-  }
-
-  return fallbackSessionSecret;
-}
-
-function getDemoPassword() {
-  if (mutableAuthState.__yallaDemoPassword) {
-    return mutableAuthState.__yallaDemoPassword;
-  }
-
-  const password = process.env.DASHBOARD_DEMO_PASSWORD?.trim();
-
-  if (password) {
-    return password;
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "DASHBOARD_DEMO_PASSWORD is required for demo dashboard login.",
-    );
-  }
-
-  return fallbackDemoPassword;
-}
-
-export function updateDemoPassword(password: string) {
-  mutableAuthState.__yallaDemoPassword = password;
-}
-
-function encodeJson(value: SessionPayload) {
-  return Buffer.from(JSON.stringify(value)).toString("base64url");
-}
-
-function sign(value: string) {
-  return createHmac("sha256", getSessionSecret())
-    .update(value)
-    .digest("base64url");
-}
-
-function signaturesMatch(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-
-  return (
-    leftBuffer.length === rightBuffer.length &&
-    timingSafeEqual(leftBuffer, rightBuffer)
-  );
-}
-
-export function validateDemoCredentials(email: string, password: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-
-  // Demo-only auth: this dashboard has no real backend user database yet.
-  if (
-    normalizedEmail !== demoAdmin.email &&
-    !isDashboardAccountEmail(normalizedEmail)
-  ) {
-    return null;
-  }
-
-  if (password !== getDemoPassword()) {
-    return null;
-  }
-
-  return {
-    email:
-      normalizedEmail === demoAdmin.email
-        ? demoAdmin.email
-        : getDashboardAccountEmail(),
-    name: demoAdmin.name,
-    role: demoAdmin.role,
-  };
-}
-
-export function isDemoAdminEmail(email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  return normalizedEmail === demoAdmin.email || isDashboardAccountEmail(normalizedEmail);
-}
-
-export function createSessionToken(user: {
-  email: string;
-  name: string;
-  role: string;
-}, maxAge = authCookieMaxAge) {
-  const payload = encodeJson({
-    sub: user.email,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    exp: Math.floor(Date.now() / 1000) + maxAge,
-  });
-
-  return `${payload}.${sign(payload)}`;
-}
-
-export function readSessionToken(token: string | undefined) {
-  if (!token) {
-    return null;
-  }
-
-  const [payload, signature] = token.split(".");
-
-  if (!payload || !signature || !signaturesMatch(signature, sign(payload))) {
-    return null;
-  }
+export function jwtExpiresAt(token: string | null | undefined) {
+  if (!token) return null;
 
   try {
-    const session = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8"),
-    ) as SessionPayload;
+    const payload = token.split(".")[1];
+    if (!payload) return null;
 
-    if (!session.exp || session.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const decoded = JSON.parse(atob(padded)) as { exp?: unknown };
 
-    return session;
+    return typeof decoded.exp === "number" ? decoded.exp * 1000 : null;
   } catch {
     return null;
   }
 }
 
-export function authCookieSettings(maxAge = authCookieMaxAge) {
-  return {
-    httpOnly: true,
-    maxAge,
-    path: "/",
-    sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
-  };
+export function isAccessTokenUsable(
+  token: string | null | undefined,
+  bufferMs = 0,
+) {
+  const expiresAt = jwtExpiresAt(token);
+  return Boolean(expiresAt && expiresAt > Date.now() + bufferMs);
 }
+

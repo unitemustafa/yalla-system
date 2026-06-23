@@ -30,6 +30,7 @@ import {
 import {
   addonRows,
   categoryRows,
+  itemRows,
   type AddonRow,
   type CategoryRow,
   type ItemRow,
@@ -1032,52 +1033,6 @@ function stockCombinations(
   );
 }
 
-function serializeVariantDetails({
-  customFields,
-  fields,
-  form,
-  removedFieldIds,
-  selectedVariants,
-  variantDetails,
-}: {
-  customFields: VariantField[];
-  fields: VariantField[];
-  form: ProductForm;
-  removedFieldIds: string[];
-  selectedVariants: Record<string, string[]>;
-  variantDetails: VariantDetails;
-}) {
-  const priceEntries = variantCombinations(fields, selectedVariants, "ar");
-  const stockEntries = stockCombinations(fields, selectedVariants, "ar");
-
-  return JSON.stringify(
-    {
-      ...Object.fromEntries(
-        [...priceEntries, ...stockEntries].map(({ key }) => {
-          const detail = variantDetailFor(variantDetails, key, form);
-          const isStockEntry = key.startsWith("stock|");
-
-          return [
-            key,
-            {
-              price: isStockEntry ? "" : detail.price.trim(),
-              discount: isStockEntry ? "" : detail.discount.trim(),
-              stock: isStockEntry ? detail.stock.trim() : "",
-              available: isStockEntry
-                ? isStockAvailable(detail.stock)
-                : detail.available,
-            },
-          ];
-        }),
-      ),
-      [customVariantFieldsStorageKey]: {
-        fields: customFields,
-        removedFieldIds,
-      },
-    },
-  );
-}
-
 function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 10000)}`;
 }
@@ -1255,75 +1210,45 @@ export function CreateItemPage() {
       return;
     }
 
-    let alive = true;
+    // Loading the selected static demo record is the purpose of this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSaveError("");
+    const item = itemRows.find((currentItem) => currentItem.id === editItemId);
 
-    async function loadEditableItem() {
-      setSaveError("");
-
-      try {
-        const response = await fetch("/api/dashboard/items");
-
-        if (!response.ok) {
-          throw new Error("Failed to load product");
-        }
-
-        const data = (await response.json()) as { items: ItemRow[] };
-        const item = data.items.find(
-          (currentItem) => currentItem.id === editItemId,
-        );
-
-        if (!alive) {
-          return;
-        }
-
-        if (!item) {
-          setSaveError(
-            "\u062a\u0639\u0630\u0631 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c.",
-          );
-          return;
-        }
-
-        const nextForm = productFormFromItem(item);
-        setForm(nextForm);
-        setSelectedLocationMode(locationModeFromItem(item));
-        setSelectedShop(item.shopName?.trim() || t.allShops);
-        setSelectedVariants(cloneSelections(nextForm.category));
-        setVariantDetails(parseVariantDetails(item.variantDetails));
-        setVisibilityMode(item.visibilityMode === "regions" ? "regions" : "general");
-        setVisibleRegionSlugs(item.regionSlugs ?? []);
-        setCustomVariantFields({
-          [nextForm.category]: parseCustomVariantFields(item.variantDetails),
-        });
-        setRemovedVariantFields({
-          [nextForm.category]: parseRemovedVariantFields(item.variantDetails),
-        });
-        setEditProductCode(item.code ?? item.id);
-        setProductImages(
-          item.image
-            ? [
-                {
-                  id: `existing-${item.id}`,
-                  name: "\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629",
-                  url: item.image,
-                },
-              ]
-            : [],
-        );
-        setSelectedImageIndex(0);
-      } catch {
-        if (alive) {
-          setSaveError(
-            "\u062a\u0639\u0630\u0631 \u062a\u062d\u0645\u064a\u0644 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0646\u062a\u062c.",
-          );
-        }
-      }
+    if (!item) {
+      setSaveError(
+        "\u062a\u0639\u0630\u0631 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u0645\u0646\u062a\u062c.",
+      );
+      return;
     }
 
-    loadEditableItem();
-
-    return () => {
-      alive = false;
-    };
+    const nextForm = productFormFromItem(item);
+    setForm(nextForm);
+    setSelectedLocationMode(locationModeFromItem(item));
+    setSelectedShop(item.shopName?.trim() || t.allShops);
+    setSelectedVariants(cloneSelections(nextForm.category));
+    setVariantDetails(parseVariantDetails(item.variantDetails));
+    setVisibilityMode(item.visibilityMode === "regions" ? "regions" : "general");
+    setVisibleRegionSlugs(item.regionSlugs ?? []);
+    setCustomVariantFields({
+      [nextForm.category]: parseCustomVariantFields(item.variantDetails),
+    });
+    setRemovedVariantFields({
+      [nextForm.category]: parseRemovedVariantFields(item.variantDetails),
+    });
+    setEditProductCode(item.code ?? item.id);
+    setProductImages(
+      item.image
+        ? [
+            {
+              id: `existing-${item.id}`,
+              name: "\u0627\u0644\u0635\u0648\u0631\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629",
+              url: item.image,
+            },
+          ]
+        : [],
+    );
+    setSelectedImageIndex(0);
   }, [editItemId, t.allShops]);
 
   const activeCategory = categoryConfig(form.category);
@@ -1456,11 +1381,6 @@ export function CreateItemPage() {
     selectedLocationMode === "shop"
       ? `${selectedRegion} / ${selectedShop}`
       : selectedRegion;
-  const activeCustomVariantFields = (
-    customVariantFields[form.category] ?? []
-  ).filter(
-    (field) => !(removedVariantFields[form.category] ?? []).includes(field.id),
-  );
   const productName = form.name.trim() || t.productFallback;
   const productDescription =
     form.description.trim() || t.descriptionPlaceholder;
@@ -1616,32 +1536,6 @@ export function CreateItemPage() {
       return [...currentImages, ...nextImages];
     });
     event.target.value = "";
-  }
-
-  async function uploadProductImage(image: ProductImage) {
-    if (!image.file) {
-      return image.url;
-    }
-
-    const formData = new FormData();
-    formData.append("file", image.file);
-
-    const response = await fetch("/api/dashboard/uploads", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to upload product image");
-    }
-
-    const data = (await response.json()) as { url?: unknown };
-
-    if (typeof data.url !== "string") {
-      throw new Error("Upload response did not include an image URL");
-    }
-
-    return data.url;
   }
 
   function removeProductImage(index: number) {
@@ -1913,59 +1807,12 @@ export function CreateItemPage() {
     setSaving(true);
     setSaveError("");
 
-    try {
-      const imageUrl = selectedProductImage
-        ? await uploadProductImage(selectedProductImage)
-        : undefined;
-      const endpoint = editItemId
-        ? `/api/dashboard/items/${encodeURIComponent(editItemId)}`
-        : "/api/dashboard/items";
-      const response = await fetch(endpoint, {
-        method: editItemId ? "PATCH" : "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          image: imageUrl,
-          name: productName,
-          description: productDescription,
-          category: activeCategory.label[language],
-          subcategory: selectedSecondaryCategoryName,
-          shopName:
-            selectedLocationMode === "shop" && selectedShop !== t.allShops
-              ? selectedShop
-              : "",
-          calories: form.stock ? `Stock: ${form.stock}` : "",
-          price: form.price,
-          variantDetails: serializeVariantDetails({
-            customFields: activeCustomVariantFields,
-            fields: activeFields,
-            form,
-            removedFieldIds: removedVariantFields[form.category] ?? [],
-            selectedVariants,
-            variantDetails,
-          }),
-          visibilityMode,
-          regionSlugs: visibilityMode === "regions" ? visibleRegionSlugs : [],
-          regionNames: visibilityMode === "regions" ? visibleRegionNames : [],
-          featured: form.featured,
-          active: form.available,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save product");
-      }
-
-      const data = (await response.json()) as {
-        item: { code?: string; id: string };
-      };
-
-      setCreatedCode(data.item.code ?? data.item.id);
-      setConfirmationOpen(true);
-    } catch {
-      setSaveError(t.saveError);
-    } finally {
-      setSaving(false);
-    }
+    setCreatedCode(
+      editProductCode || `DEMO-${Date.now().toString(36).toUpperCase()}`,
+    );
+    setSaveError("الحفظ غير مربوط بالـ backend؛ هذه معاينة محلية فقط.");
+    setConfirmationOpen(true);
+    setSaving(false);
   }
 
   return (

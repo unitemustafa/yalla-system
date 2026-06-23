@@ -6,22 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "prisma generate",
     "lint": "eslint",
-    "smoke": "node tests/smoke.js",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "next": "16.2.6",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
+    "react-cookie": "^8.1.2",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
     "shadcn": "^4.7.0",
@@ -36,7 +32,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
-    "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

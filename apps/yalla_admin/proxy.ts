@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { authCookieName, readSessionToken } from "@/lib/auth";
+import { AUTH_COOKIE_NAMES } from "@/lib/auth";
 
 const protectedPrefixes = [
   "/account",
@@ -27,13 +27,16 @@ function safeNextPath(request: NextRequest) {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = readSessionToken(request.cookies.get(authCookieName)?.value);
+  const hasSession = Boolean(
+    request.cookies.get(AUTH_COOKIE_NAMES.accessToken)?.value ||
+      request.cookies.get(AUTH_COOKIE_NAMES.refreshToken)?.value,
+  );
 
-  if (pathname === "/login" && session) {
+  if (pathname === "/login" && hasSession) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  if (!isProtectedPath(pathname) || session) {
+  if (!isProtectedPath(pathname) || hasSession) {
     return NextResponse.next();
   }
 

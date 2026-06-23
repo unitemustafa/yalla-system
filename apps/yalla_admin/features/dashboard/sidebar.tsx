@@ -27,6 +27,7 @@ import { currentUser } from "./profile-data";
 import { branchOptions } from "./reference-data";
 import type { PageKey } from "./types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth/auth-provider";
 
 type ThemeChoice = "light" | "dark" | "system";
 type FloatingNavState = {
@@ -83,6 +84,7 @@ export function Sidebar({
   onCloseMobile: () => void;
   onToggleCollapsed: () => void;
 }) {
+  const { logout: endSession } = useAuth();
   const { isGroupOpen, toggleGroup } = useSidebarGroups();
   const { direction, language, pageTitle, t } = useDashboardI18n();
   const { customization } = useDashboardCustomization();
@@ -161,7 +163,7 @@ export function Sidebar({
     setProfileMenuOpen(false);
     onCloseMobile();
 
-    await fetch("/api/auth/logout", { method: "POST" });
+    await endSession();
     window.location.href = "/login";
   }
 

@@ -51,7 +51,5 @@ next-env.d.ts
 /.data/
 
 # local database
-/prisma/dev.db
-/prisma/dev.db-*
 dev-server.err.log
 dev-server.out.log 

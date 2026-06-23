@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Banknote,
@@ -24,7 +23,7 @@ import { Badge, Card } from "../primitives";
 import { useSnackbar } from "../snackbar";
 import { dashboardUsers } from "../users/default-dashboard-users";
 import { cn } from "@/lib/utils";
-import type { DashboardOrder } from "@/lib/dashboard-store";
+import type { DashboardOrder } from "@/features/dashboard/static-data";
 
 const currency = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
@@ -463,7 +462,6 @@ function StatusTimeline({
 }
 
 export function OrderDetailPage({ order }: { order: DashboardOrder }) {
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [currentStatus, setCurrentStatus] = useState(() =>
     normalizeOrderStatus(order.status),
@@ -496,41 +494,12 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
       return;
     }
 
-    const previousStatus = currentStatus;
     setCurrentStatus(nextStatus);
     setSavingStatus(true);
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/orders/${encodeURIComponent(order.number)}`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ status: nextStatus }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update order status");
-      }
-
-      const data = (await response.json()) as { order?: DashboardOrder };
-      const savedStatus = data.order?.status
-        ? normalizeOrderStatus(data.order.status)
-        : nextStatus;
-
-      setCurrentStatus(savedStatus);
-      router.refresh();
-      showSnackbar({ message: `تم تحديث حالة الطلب إلى ${savedStatus}.` });
-    } catch {
-      setCurrentStatus(previousStatus);
-      showSnackbar({
-        message: "تعذر تحديث حالة الطلب. حاول مرة أخرى.",
-        tone: "danger",
-      });
-    } finally {
-      setSavingStatus(false);
-    }
+    showSnackbar({
+      message: "تم تحديث العرض التجريبي فقط؛ الطلبات غير مربوطة بالـ backend.",
+    });
+    setSavingStatus(false);
   }
 
   return (

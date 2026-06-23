@@ -25,7 +25,9 @@ import {
   getInitialLoginSplashVisibility,
   markLoginSplashSeen,
 } from "@/features/auth/login-splash";
-import type { LoginDashboardSnapshot } from "@/lib/login-dashboard-snapshot";
+import { useAuth } from "@/features/auth/auth-provider";
+import type { LoginDashboardSnapshot } from "@/features/dashboard/static-data";
+import { isSafeNextPath } from "@/lib/auth";
 
 const productImages = [
   "https://bucket.ammenu.com/yalla-market/categoriesthumbnails/1775090694513-5coutf286d4.webp",
@@ -39,6 +41,7 @@ function LoginPageContent({
   snapshot: LoginDashboardSnapshot;
 }) {
   const router = useRouter();
+  const { login } = useAuth();
   const [showSplash, setShowSplash] = useState(
     getInitialLoginSplashVisibility,
   );
@@ -62,28 +65,24 @@ function LoginPageContent({
     setPending(true);
 
     const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: formData.get("email"),
-        password: formData.get("password"),
+    try {
+      await login({
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
         remember: formData.get("remember") === "on",
-      }),
-    });
-
-    setPending(false);
-
-    if (!response.ok) {
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
+      });
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "تعذر تسجيل الدخول. حاول مرة أخرى.",
+      );
+      setPending(false);
       return;
     }
 
     const nextPath = new URLSearchParams(window.location.search).get("next");
-    const destination =
-      nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
-        ? nextPath
-        : "/dashboard";
+    const destination = isSafeNextPath(nextPath) ? nextPath! : "/dashboard";
 
     router.replace(destination);
     router.refresh();
@@ -275,6 +274,15 @@ function LoginPageContent({
                     )}
                   </button>
                 </span>
+              </label>
+
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  name="remember"
+                  type="checkbox"
+                  className="size-4 rounded border-border accent-primary"
+                />
+                تذكّر تسجيل الدخول على هذا الجهاز
               </label>
 
               {error ? (

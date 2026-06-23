@@ -71,3 +71,11 @@ apps/yalla_home/android/app/debug/
 apps/yalla_home/android/app/profile/
 apps/yalla_home/android/app/release/
 apps/yalla_home/android/release/
+
+.venv/
+backend/.venv/
+backend/venv/
+.headroom-venv/
+.serena/
+.github/*
+.vscode/

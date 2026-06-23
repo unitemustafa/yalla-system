@@ -5,9 +5,7 @@ import {
   dashboardUsers,
   findDashboardUser,
 } from "@/features/dashboard/users/default-dashboard-users";
-import { listOrders } from "@/lib/dashboard-store";
-
-export const dynamic = "force-dynamic";
+import { dashboardOrders } from "@/features/dashboard/static-data";
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -31,10 +29,9 @@ export default async function CustomerDetailRoute({
     notFound();
   }
 
-  const orders = await listOrders();
   const userPhone = normalizePhone(user.phone);
   const userName = user.name.trim().toLowerCase();
-  const userOrders = orders.filter((order) => {
+  const userOrders = dashboardOrders.filter((order) => {
     const orderPhone = normalizePhone(order.phone);
 
     return (

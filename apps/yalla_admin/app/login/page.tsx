@@ -1,10 +1,6 @@
 import { LoginPage } from "@/features/auth/login-page";
-import { getLoginDashboardSnapshot } from "@/lib/login-dashboard-snapshot";
+import { loginDashboardSnapshot } from "@/features/dashboard/static-data";
 
-export const dynamic = "force-dynamic";
-
-export default async function LoginRoute() {
-  const snapshot = await getLoginDashboardSnapshot();
-
-  return <LoginPage snapshot={snapshot} />;
+export default function LoginRoute() {
+  return <LoginPage snapshot={loginDashboardSnapshot} />;
 }

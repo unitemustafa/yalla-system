@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { OrderDetailPage } from "@/features/dashboard/pages/order-detail";
-import { listOrders } from "@/lib/dashboard-store";
-
-export const dynamic = "force-dynamic";
+import { dashboardOrders } from "@/features/dashboard/static-data";
 
 export default async function OrderDetailRoute({
   params,
@@ -11,8 +9,9 @@ export default async function OrderDetailRoute({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const orders = await listOrders();
-  const order = orders.find((currentOrder) => currentOrder.number === orderId);
+  const order = dashboardOrders.find(
+    (currentOrder) => currentOrder.number === orderId,
+  );
 
   if (!order) {
     notFound();

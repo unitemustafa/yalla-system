@@ -19,7 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 
-import type { ItemRow } from "../data";
+import { itemRows, type ItemRow } from "../data";
 import { DashboardImage } from "../dashboard-image";
 import {
   ActionMenu,
@@ -628,11 +628,13 @@ function ItemsMobileCards({
 export function ItemsPage() {
   const { openRow, toggleRow } = useItemTableState();
   const { showSnackbar } = useSnackbar();
-  const [rows, setRows] = useState<ItemRow[]>([]);
+  const [rows, setRows] = useState<ItemRow[]>(() =>
+    itemRows.map(normalizeItemRow),
+  );
   const [filters, setFilters] = useState<ItemFilters>(defaultFilters);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(() => new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const visibleRows = useMemo(
@@ -676,43 +678,6 @@ export function ItemsPage() {
   }, [pagedRows, selectedRows]);
   const deleteRow = rows.find((row) => row.id === deleteId);
 
-  useEffect(() => {
-    let alive = true;
-
-    async function loadItems() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await fetch("/api/dashboard/items");
-
-        if (!response.ok) {
-          throw new Error("Failed to load items");
-        }
-
-        const data = (await response.json()) as { items: ItemRow[] };
-
-        if (alive) {
-          setRows(data.items.map(normalizeItemRow));
-        }
-      } catch {
-        if (alive) {
-          setError("تعذر تحميل المنتجات. حاول تحديث الصفحة.");
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadItems();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   function toggleAllRows() {
     setSelectedRows((currentRows) =>
       pagedRows.every((row) => currentRows.has(row.index))
@@ -737,82 +702,37 @@ export function ItemsPage() {
     });
   }
 
-  async function toggleActive(row: ItemRow, active: boolean) {
-    const previousRows = rows;
-
+  function toggleActive(row: ItemRow, active: boolean) {
     setRows((currentRows) =>
       currentRows.map((currentRow) =>
         currentRow.id === row.id ? { ...currentRow, active } : currentRow,
       ),
     );
     setError("");
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(row.id)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update item");
-      }
-
-      const data = (await response.json()) as { item: ItemRow };
-      const updatedItem = normalizeItemRow(data.item);
-
-      setRows((currentRows) =>
-        currentRows.map((currentRow) =>
-          currentRow.id === updatedItem.id ? updatedItem : currentRow,
-        ),
-      );
-      showSnackbar({
-        message: active ? "تم تفعيل المنتج." : "تم إيقاف المنتج.",
-      });
-    } catch {
-      setRows(previousRows);
-      setError("تعذر تحديث حالة المنتج.");
-      showSnackbar({
-        message: "تعذر تحديث حالة المنتج.",
-        tone: "danger",
-      });
-    }
+    showSnackbar({
+      message: "تم تحديث العرض التجريبي فقط؛ حفظ المنتجات غير مربوط بالـ backend.",
+    });
   }
 
-  async function duplicateRow(row: ItemRow) {
+  function duplicateRow(row: ItemRow) {
     setError("");
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(row.id)}/duplicate`,
-        { method: "POST" },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to duplicate item");
-      }
-
-      const data = (await response.json()) as { item: ItemRow };
-      setRows((currentRows) => [normalizeItemRow(data.item), ...currentRows]);
-      showSnackbar({ message: "تم نسخ المنتج بنجاح." });
-    } catch {
-      setError("تعذر نسخ المنتج.");
-      showSnackbar({
-        message: "تعذر نسخ المنتج.",
-        tone: "danger",
-      });
-    }
+    const duplicate = {
+      ...row,
+      id: `${row.id}-copy-${Date.now()}`,
+      index: `copy-${Date.now()}`,
+      name: `${row.name} (نسخة)`,
+    };
+    setRows((currentRows) => [duplicate, ...currentRows]);
+    showSnackbar({
+      message: "تم إنشاء نسخة تجريبية؛ الحفظ غير مربوط بالـ backend.",
+    });
   }
 
-  async function confirmDelete() {
+  function confirmDelete() {
     if (!deleteRow) {
       return;
     }
 
-    const previousRows = rows;
     const deletedItemName = deleteRow.name;
 
     setRows((currentRows) => currentRows.filter((row) => row.id !== deleteRow.id));
@@ -824,27 +744,10 @@ export function ItemsPage() {
     setDeleteId(null);
     setError("");
 
-    try {
-      const response = await fetch(
-        `/api/dashboard/items/${encodeURIComponent(deleteRow.id)}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete item");
-      }
-      showSnackbar({
-        message: `تم حذف ${deletedItemName}.`,
-        tone: "danger",
-      });
-    } catch {
-      setRows(previousRows);
-      setError("تعذر حذف المنتج.");
-      showSnackbar({
-        message: "تعذر حذف المنتج.",
-        tone: "danger",
-      });
-    }
+    showSnackbar({
+      message: `تم حذف ${deletedItemName} من العرض التجريبي فقط.`,
+      tone: "danger",
+    });
   }
 
   return (
