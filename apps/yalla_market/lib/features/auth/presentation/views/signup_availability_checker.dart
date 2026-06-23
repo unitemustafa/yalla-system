@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/snackbars/custom_snackbar.dart';
 import '../../../../core/utils/validators.dart';
 import '../cubit/auth_cubit.dart';
@@ -105,7 +106,7 @@ class SignupAvailabilityChecker {
 
     if (email.isEmpty || validationMessage != null || !canCheckEmail()) return;
 
-    _emailLookupDebounce = Timer(const Duration(milliseconds: 450), () {
+    _emailLookupDebounce = Timer(const Duration(milliseconds: 250), () {
       final ctx = _context;
       if (ctx == null || !ctx.mounted) return;
       // ignore: discarded_futures
@@ -153,13 +154,15 @@ class SignupAvailabilityChecker {
     }
 
     isCheckingEmail = true;
-    emailAvailabilityMessage = 'Checking email...';
+    emailAvailabilityMessage = _copy(context, 'بنفحص الإيميل...', 'Checking email...');
     onStateChanged();
 
     try {
       final isAvailable = await context.read<AuthCubit>().isEmailAvailable(
         email,
       );
+
+      if (!context.mounted) return false;
 
       if (email != emailController.text.trim().toLowerCase()) {
         return false;
@@ -169,23 +172,45 @@ class SignupAvailabilityChecker {
       isEmailAvailable = isAvailable;
       _lastCheckedEmail = email;
       emailAvailabilityMessage = isAvailable
-          ? 'Email is available.'
-          : 'This email is already registered.';
+          ? _copy(context, 'الإيميل متاح.', 'Email is available.')
+          : _copy(
+              context,
+              'الإيميل ده مستخدم بالفعل.',
+              'This email is already registered.',
+            );
       onStateChanged();
+      if (isAvailable) schedulePhoneCheck();
 
       return isAvailable;
     } catch (_) {
+      if (!context.mounted) {
+        isCheckingEmail = false;
+        isEmailAvailable = null;
+        _lastCheckedEmail = null;
+        emailAvailabilityMessage = null;
+        onStateChanged();
+        return showWarningOnError;
+      }
+
       isCheckingEmail = false;
       isEmailAvailable = null;
       _lastCheckedEmail = null;
-      emailAvailabilityMessage = 'Could not check email right now.';
+      emailAvailabilityMessage = _copy(
+        context,
+        'مش قادرين نفحص الإيميل دلوقتي.',
+        'Could not check email right now.',
+      );
       onStateChanged();
 
       if (showWarningOnError && context.mounted) {
         CustomSnackBar.showWarning(
           context: context,
-          title: 'Email check skipped',
-          message: 'We will verify it while creating your account.',
+          title: _copy(context, 'فحص الإيميل متأجل', 'Email check skipped'),
+          message: _copy(
+            context,
+            'هنراجعه وإحنا بننشئ الحساب.',
+            'We will verify it while creating your account.',
+          ),
         );
       }
 
@@ -208,7 +233,7 @@ class SignupAvailabilityChecker {
 
     if (validationMessage != null || !canCheckPhone()) return;
 
-    _phoneLookupDebounce = Timer(const Duration(milliseconds: 450), () {
+    _phoneLookupDebounce = Timer(const Duration(milliseconds: 250), () {
       final ctx = _context;
       if (ctx == null || !ctx.mounted) return;
       // ignore: discarded_futures
@@ -259,13 +284,19 @@ class SignupAvailabilityChecker {
     final phone = phoneForLookup();
 
     isCheckingPhone = true;
-    phoneAvailabilityMessage = 'Checking phone number...';
+    phoneAvailabilityMessage = _copy(
+      context,
+      'بنفحص رقم الموبايل...',
+      'Checking phone number...',
+    );
     onStateChanged();
 
     try {
       final isAvailable = await context.read<AuthCubit>().isPhoneAvailable(
         phone,
       );
+
+      if (!context.mounted) return false;
 
       if (phone != phoneForLookup()) {
         return false;
@@ -275,23 +306,44 @@ class SignupAvailabilityChecker {
       isPhoneAvailable = isAvailable;
       _lastCheckedPhone = phone;
       phoneAvailabilityMessage = isAvailable
-          ? 'Phone number is available.'
-          : 'This phone number is already registered.';
+          ? _copy(context, 'رقم الموبايل متاح.', 'Phone number is available.')
+          : _copy(
+              context,
+              'رقم الموبايل ده مستخدم بالفعل.',
+              'This phone number is already registered.',
+            );
       onStateChanged();
 
       return isAvailable;
     } catch (_) {
+      if (!context.mounted) {
+        isCheckingPhone = false;
+        isPhoneAvailable = null;
+        _lastCheckedPhone = null;
+        phoneAvailabilityMessage = null;
+        onStateChanged();
+        return showWarningOnError;
+      }
+
       isCheckingPhone = false;
       isPhoneAvailable = null;
       _lastCheckedPhone = null;
-      phoneAvailabilityMessage = 'Could not check phone number right now.';
+      phoneAvailabilityMessage = _copy(
+        context,
+        'مش قادرين نفحص رقم الموبايل دلوقتي.',
+        'Could not check phone number right now.',
+      );
       onStateChanged();
 
       if (showWarningOnError && context.mounted) {
         CustomSnackBar.showWarning(
           context: context,
-          title: 'Phone check skipped',
-          message: 'We will verify it while creating your account.',
+          title: _copy(context, 'فحص الرقم متأجل', 'Phone check skipped'),
+          message: _copy(
+            context,
+            'هنراجعه وإحنا بننشئ الحساب.',
+            'We will verify it while creating your account.',
+          ),
         );
       }
 
@@ -315,7 +367,7 @@ class SignupAvailabilityChecker {
 
     if (username.isEmpty || validationMessage != null) return;
 
-    _usernameLookupDebounce = Timer(const Duration(milliseconds: 450), () {
+    _usernameLookupDebounce = Timer(const Duration(milliseconds: 250), () {
       final ctx = _context;
       if (ctx == null || !ctx.mounted) return;
       // ignore: discarded_futures
@@ -370,13 +422,19 @@ class SignupAvailabilityChecker {
     }
 
     isCheckingUsername = true;
-    usernameAvailabilityMessage = 'Checking username...';
+    usernameAvailabilityMessage = _copy(
+      context,
+      'بنفحص اسم المستخدم...',
+      'Checking username...',
+    );
     onStateChanged();
 
     try {
       final isAvailable = await context.read<AuthCubit>().isUsernameAvailable(
         username,
       );
+
+      if (!context.mounted) return false;
 
       if (username != usernameController.text.trim()) {
         return false;
@@ -386,27 +444,57 @@ class SignupAvailabilityChecker {
       isUsernameAvailable = isAvailable;
       _lastCheckedUsername = username;
       usernameAvailabilityMessage = isAvailable
-          ? 'Username is available.'
-          : 'This username is already taken.';
+          ? _copy(context, 'اسم المستخدم متاح.', 'Username is available.')
+          : _copy(
+              context,
+              'اسم المستخدم ده مستخدم بالفعل.',
+              'This username is already taken.',
+            );
       onStateChanged();
+      if (isAvailable) scheduleEmailCheck();
 
       return isAvailable;
     } catch (_) {
+      if (!context.mounted) {
+        isCheckingUsername = false;
+        isUsernameAvailable = null;
+        _lastCheckedUsername = null;
+        usernameAvailabilityMessage = null;
+        onStateChanged();
+        return showWarningOnError;
+      }
+
       isCheckingUsername = false;
       isUsernameAvailable = null;
       _lastCheckedUsername = null;
-      usernameAvailabilityMessage = 'Could not check username right now.';
+      usernameAvailabilityMessage = _copy(
+        context,
+        'مش قادرين نفحص اسم المستخدم دلوقتي.',
+        'Could not check username right now.',
+      );
       onStateChanged();
 
       if (showWarningOnError && context.mounted) {
         CustomSnackBar.showWarning(
           context: context,
-          title: 'Username check skipped',
-          message: 'We will verify it while creating your account.',
+          title: _copy(
+            context,
+            'فحص اسم المستخدم متأجل',
+            'Username check skipped',
+          ),
+          message: _copy(
+            context,
+            'هنراجعه وإحنا بننشئ الحساب.',
+            'We will verify it while creating your account.',
+          ),
         );
       }
 
       return showWarningOnError;
     }
+  }
+
+  String _copy(BuildContext context, String ar, String en) {
+    return context.isArabicLanguage ? ar : en;
   }
 }

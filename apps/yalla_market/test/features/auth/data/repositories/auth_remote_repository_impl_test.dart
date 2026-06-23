@@ -12,6 +12,11 @@ void main() {
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
         expect(request.path, '/auth/login');
+        expect(request.data, {
+          'identifier': 'm@example.com',
+          'password': 'Password123!',
+          'rememberMe': true,
+        });
         return _sessionPayload;
       });
       final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -31,6 +36,7 @@ void main() {
       );
       expect((await tokenStore.read())?.refreshToken, 'refresh-token');
       expect((await tokenStore.read())?.isSessionOnly, isFalse);
+      expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
     });
 
     test(
@@ -40,6 +46,11 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/login');
+          expect(request.data, {
+            'identifier': 'm@example.com',
+            'password': 'Password123!',
+            'rememberMe': false,
+          });
           return _sessionPayload;
         });
         final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
@@ -58,6 +69,7 @@ void main() {
         );
         expect((await tokenStore.read())?.refreshToken, 'refresh-token');
         expect((await tokenStore.read())?.isSessionOnly, isTrue);
+        expect((await tokenStore.read())?.sessionExpiresAt, isNotNull);
       },
     );
 
@@ -75,6 +87,7 @@ void main() {
         final apiClient = FakeApiClient((request) {
           expect(request.method, 'POST');
           expect(request.path, '/auth/signup');
+          expect(request.data, containsPair('username', 'mustafa_ali'));
           return {
             'email': 'mustafa@example.com',
             'message': 'Verification email sent',
@@ -85,8 +98,10 @@ void main() {
         final result = await repository.signup(
           firstName: 'Mustafa',
           lastName: 'Ali',
+          username: 'mustafa_ali',
           email: 'mustafa@example.com',
           password: 'Password123!',
+          phone: '',
         );
 
         result.when(
@@ -133,7 +148,7 @@ void main() {
       },
     );
 
-    test('verifyEmail posts the code and stores session-only tokens', () async {
+    test('verifyEmail posts the code without storing tokens', () async {
       final tokenStore = InMemoryTokenStore();
       final apiClient = FakeApiClient((request) {
         expect(request.method, 'POST');
@@ -151,11 +166,37 @@ void main() {
       result.when(
         success: (session) {
           expect(session.user.email, 'm@example.com');
-          expect(session.accessToken, 'access-token');
+          expect(session.accessToken, isNull);
         },
         failure: (failure) => fail(failure.message),
       );
-      expect((await tokenStore.read())?.isSessionOnly, isTrue);
+      expect(await tokenStore.read(), isNull);
+    });
+
+    test('logout posts stored refresh token and clears token store', () async {
+      final tokenStore = InMemoryTokenStore();
+      await tokenStore.save(
+        StoredAuthTokens(
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: DateTime.now().add(const Duration(hours: 1)),
+        ),
+      );
+      final apiClient = FakeApiClient((request) {
+        expect(request.method, 'POST');
+        expect(request.path, '/auth/logout');
+        expect(request.data, {'refreshToken': 'refresh-token'});
+        return {'message': 'Logout successful.'};
+      });
+      final repository = AuthRemoteRepositoryImpl(apiClient, tokenStore);
+
+      final result = await repository.logout();
+
+      result.when(
+        success: (loggedOut) => expect(loggedOut, isTrue),
+        failure: (failure) => fail(failure.message),
+      );
+      expect(await tokenStore.read(), isNull);
     });
   });
 }

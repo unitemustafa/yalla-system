@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yalla_market/features/store/data/repositories/product_remote_repository_impl.dart';
 
@@ -43,6 +44,31 @@ void main() {
         failure: (failure) => fail(failure.message),
       );
     });
+
+    test(
+      'falls back to demo products when remote catalog endpoint is missing',
+      () async {
+        final apiClient = FakeApiClient((request) {
+          throw DioException(
+            requestOptions: RequestOptions(path: request.path),
+            response: Response<dynamic>(
+              requestOptions: RequestOptions(path: request.path),
+              statusCode: 404,
+              data: '<!DOCTYPE html><html><head><title>Page not found</title>',
+            ),
+            type: DioExceptionType.badResponse,
+          );
+        });
+        final repository = ProductRemoteRepositoryImpl(apiClient);
+
+        final result = await repository.getProducts(citySlug: 'general');
+
+        result.when(
+          success: (products) => expect(products, isNotEmpty),
+          failure: (failure) => fail(failure.message),
+        );
+      },
+    );
 
     test('searches products with the selected city query parameter', () async {
       final apiClient = FakeApiClient((request) {

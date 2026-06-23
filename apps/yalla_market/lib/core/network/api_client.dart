@@ -82,10 +82,15 @@ class ApiClient {
     try {
       final tokens = await _tokenStore.read();
       if (tokens != null) {
+        if (tokens.isExpired) {
+          await _expireSession();
+          throw StateError('Session expired.');
+        }
         final refreshed = tokens.expiresSoon && !_isRefreshRequest(options)
             ? await _refreshTokens(tokens)
             : tokens;
         options.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
+        _synchronizeLogoutRefreshToken(options, refreshed);
       }
     } catch (error) {
       await _expireSession();
@@ -127,6 +132,7 @@ class ApiClient {
       final request = error.requestOptions;
       request.extra['authRetried'] = true;
       request.headers['Authorization'] = 'Bearer ${refreshed.accessToken}';
+      _synchronizeLogoutRefreshToken(request, refreshed);
       final retryResponse = await _dio.fetch<Object?>(request);
       handler.resolve(retryResponse);
     } catch (_) {
@@ -142,10 +148,14 @@ class ApiClient {
       options: Options(extra: const {'skipAuth': true}),
     );
     final payload = _unwrap<Map<String, dynamic>>(response.data);
-    final next = _tokensFromJson(
-      payload,
-      fallbackRefreshToken: current.refreshToken,
-    ).copyWith(isSessionOnly: current.isSessionOnly);
+    final next =
+        _tokensFromJson(
+          payload,
+          fallbackRefreshToken: current.refreshToken,
+        ).copyWith(
+          isSessionOnly: current.isSessionOnly,
+          sessionExpiresAt: current.sessionExpiresAt,
+        );
     await _tokenStore.save(next);
     return next;
   }
@@ -153,6 +163,19 @@ class ApiClient {
   bool _isRefreshRequest(RequestOptions options) {
     return options.path.endsWith(ApiEndpoints.refreshToken) ||
         options.extra['skipAuth'] == true;
+  }
+
+  void _synchronizeLogoutRefreshToken(
+    RequestOptions options,
+    StoredAuthTokens tokens,
+  ) {
+    if (!options.path.endsWith('/auth/logout')) return;
+    final data = options.data;
+    if (data is Map<String, dynamic>) {
+      data['refreshToken'] = tokens.refreshToken;
+    } else if (data is Map) {
+      data['refreshToken'] = tokens.refreshToken;
+    }
   }
 
   Future<void> _expireSession() async {

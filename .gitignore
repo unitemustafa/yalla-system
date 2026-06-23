@@ -26,21 +26,23 @@ apps/yalla_admin/playwright-report/
 apps/yalla_admin/blob-report/
 apps/yalla_admin/.data/
 apps/yalla_admin/.env*
+apps/yalla_admin/public/uploads/
 apps/yalla_admin/prisma/dev.db
 apps/yalla_admin/prisma/dev.db-*
 apps/yalla_admin/dev-server.*.log
 apps/yalla_admin/*.tsbuildinfo
 apps/yalla_admin/next-env.d.ts
 
-# Shared API backend
-apps/api/node_modules/
-apps/api/dist/
-apps/api/build/
-apps/api/coverage/
-apps/api/.env*
-apps/api/.data/*
-!apps/api/.data/.gitkeep
-apps/api/*.tsbuildinfo
+# Django backend
+backend/.env*
+backend/.venv/
+backend/venv/
+
+backend/db.sqlite3
+backend/dev.sqlite3
+backend/legacy-postgres-import.json
+backend/media/
+backend/staticfiles/
 
 # Flutter apps
 apps/*/.dart_tool/
@@ -72,6 +74,7 @@ apps/yalla_home/android/app/profile/
 apps/yalla_home/android/app/release/
 apps/yalla_home/android/release/
 
+<<<<<<< HEAD
 .venv/
 backend/.venv/
 backend/venv/
@@ -79,3 +82,12 @@ backend/venv/
 .serena/
 .github/*
 .vscode/
+=======
+# Python virtual environment
+backend/venv/
+.headroom-venv/
+venv/
+.env
+__pycache__/
+*.pyc
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8

@@ -10,6 +10,7 @@ import {
 } from "./i18n";
 import { useDashboardCustomization } from "./customization";
 import { DashboardOfflineBanner } from "./offline-banner";
+import { SessionExpiryGuard } from "./session-expiry-guard";
 import { SnackbarProvider } from "./snackbar";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <DashboardAutoTranslate>
       <div className="min-h-screen w-full bg-background text-foreground">
+        <SessionExpiryGuard />
         <DashboardOfflineBanner />
         {mobileNavOpen ? (
           <button

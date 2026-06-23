@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/routing/app_routes.dart';
+import '../../../auth/data/courier_auth_service.dart';
 
 class SplashView extends StatefulWidget {
   const SplashView({super.key});
@@ -23,7 +22,6 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
   late final Animation<double> _titleOpacity;
   late final Animation<Offset> _titleSlide;
   late final Animation<double> _loadingOpacity;
-  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -72,15 +70,26 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
 
     _entranceController.forward();
     _activityController.repeat();
-    _navigationTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
-    });
+    _restoreSessionAndNavigate();
+  }
+
+  Future<void> _restoreSessionAndNavigate() async {
+    final minimumSplashTime = Future<void>.delayed(
+      const Duration(milliseconds: 1500),
+    );
+    final session = await CourierAuthService.instance.restoreSession().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
+    await minimumSplashTime;
+    if (!mounted) return;
+    Navigator.of(context).pushReplacementNamed(
+      session == null ? AppRoutes.login : AppRoutes.dashboard,
+    );
   }
 
   @override
   void dispose() {
-    _navigationTimer?.cancel();
     _activityController.dispose();
     _entranceController.dispose();
     super.dispose();

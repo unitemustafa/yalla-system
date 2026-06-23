@@ -21,6 +21,7 @@ import {
 
 import { Badge, Card } from "../primitives";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 import { dashboardUsers } from "../users/default-dashboard-users";
 import { cn } from "@/lib/utils";
 import type { DashboardOrder } from "@/features/dashboard/static-data";
@@ -496,10 +497,45 @@ export function OrderDetailPage({ order }: { order: DashboardOrder }) {
 
     setCurrentStatus(nextStatus);
     setSavingStatus(true);
+<<<<<<< HEAD
     showSnackbar({
       message: "تم تحديث العرض التجريبي فقط؛ الطلبات غير مربوطة بالـ backend.",
     });
     setSavingStatus(false);
+=======
+
+    try {
+      const response = await dashboardFetch(
+        `orders/${encodeURIComponent(order.number)}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: nextStatus }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update order status");
+      }
+
+      const data = (await response.json()) as { order?: DashboardOrder };
+      const savedStatus = data.order?.status
+        ? normalizeOrderStatus(data.order.status)
+        : nextStatus;
+
+      setCurrentStatus(savedStatus);
+      router.refresh();
+      showSnackbar({ message: `تم تحديث حالة الطلب إلى ${savedStatus}.` });
+    } catch {
+      setCurrentStatus(previousStatus);
+      showSnackbar({
+        message: "تعذر تحديث حالة الطلب. حاول مرة أخرى.",
+        tone: "danger",
+      });
+    } finally {
+      setSavingStatus(false);
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   return (

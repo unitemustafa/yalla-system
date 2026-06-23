@@ -49,3 +49,31 @@ class OneTimePassword(models.Model):
         indexes = [
             models.Index(fields=["user", "purpose", "created_at"]),
         ]
+
+
+class CourierProfile(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        BUSY = "busy", "Busy"
+        OFFLINE = "offline", "Offline"
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="courier_profile",
+    )
+    photo_url = models.TextField(blank=True)
+    vehicle = models.CharField(max_length=120, blank=True)
+    plate_number = models.CharField(max_length=60, blank=True)
+    zone = models.CharField(max_length=150, blank=True)
+    max_active_orders = models.PositiveSmallIntegerField(default=3)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Courier profile for {self.user}"

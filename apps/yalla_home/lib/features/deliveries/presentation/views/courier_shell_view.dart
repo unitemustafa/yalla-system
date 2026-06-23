@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/icons/app_icons.dart';
 import '../../../../core/routing/app_routes.dart';
+import '../../../auth/data/courier_auth_service.dart';
 import '../../data/demo_courier_orders.dart';
 import '../../domain/courier_order.dart';
 import '../widgets/delivery_confirmation_sheet.dart';
@@ -57,7 +58,9 @@ class _CourierShellViewState extends State<CourierShellView> {
     });
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await CourierAuthService.instance.logout();
+    if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.login,

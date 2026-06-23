@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   ArrowUpDown,
   AlertCircle,
@@ -40,7 +40,9 @@ import {
   SelectBox,
 } from "../primitives";
 import { deliveryZones } from "@/features/dashboard/reference-data";
+import { removeInputWhitespace } from "@/lib/input-sanitizers";
 import { cn } from "@/lib/utils";
+import { dashboardFetch } from "@/lib/client-api";
 
 const deliveryListPageSize = 10;
 import { useSnackbar } from "../snackbar";
@@ -581,7 +583,7 @@ function CourierDetailsDrawer({
                     onChange={(event) =>
                       setPasswordDraft((current) => ({
                         ...current,
-                        password: event.target.value,
+                        password: removeInputWhitespace(event.target.value),
                       }))
                     }
                     placeholder="••••••"
@@ -595,7 +597,9 @@ function CourierDetailsDrawer({
                     onChange={(event) =>
                       setPasswordDraft((current) => ({
                         ...current,
-                        confirmPassword: event.target.value,
+                        confirmPassword: removeInputWhitespace(
+                          event.target.value,
+                        ),
                       }))
                     }
                     placeholder="••••••"
@@ -1132,24 +1136,6 @@ function createCourierDraft(): CourierDraft {
   };
 }
 
-function createCourierFromDraft(draft: CourierDraft): Courier {
-  return {
-    id: `COURIER-${Date.now()}`,
-    name: draft.name.trim() || "مندوب جديد",
-    phone: draft.phone.trim() || "+201000000000",
-    email: draft.email.trim() || "courier@yalla.market",
-    photoUrl: draft.photoUrl,
-    vehicle: draft.vehicle.trim() || "غير محدد",
-    plateNumber: draft.plateNumber.trim() || "بدون لوحة",
-    zone: draft.zone,
-    performance: "100%",
-    status: "متاح",
-    activeOrders: [],
-    deliveredOrders: [],
-    notDeliveredOrders: [],
-  };
-}
-
 function CourierPhotoPicker({
   value,
   onChange,
@@ -1225,17 +1211,32 @@ function CourierDrawer({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (courier: Courier) => void;
+  onCreate: (draft: CourierDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<CourierDraft>(createCourierDraft);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   function updateDraft(field: keyof CourierDraft, value: string | null) {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
-  function submitCourier(event: React.FormEvent<HTMLFormElement>) {
+  async function submitCourier(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onCreate(createCourierFromDraft(draft));
+    setSubmitting(true);
+    setError("");
+
+    try {
+      await onCreate(draft);
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "تعذر إنشاء حساب المندوب.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -1263,6 +1264,7 @@ function CourierDrawer({
           />
           <Field label="الاسم">
             <Input
+              required
               value={draft.name}
               onChange={(event) => updateDraft("name", event.target.value)}
               placeholder="الاسم"
@@ -1270,6 +1272,7 @@ function CourierDrawer({
           </Field>
           <Field label="رقم الموبايل">
             <Input
+              required
               dir="ltr"
               value={draft.phone}
               onChange={(event) => updateDraft("phone", event.target.value)}
@@ -1278,17 +1281,27 @@ function CourierDrawer({
           </Field>
           <Field label="البريد الإلكتروني">
             <Input
+              required
+              type="email"
               dir="ltr"
               value={draft.email}
-              onChange={(event) => updateDraft("email", event.target.value)}
+              onChange={(event) =>
+                updateDraft("email", removeInputWhitespace(event.target.value))
+              }
               placeholder="courier@example.com"
             />
           </Field>
           <Field label="كلمة المرور">
             <Input
+              required
               type="password"
               value={draft.password}
-              onChange={(event) => updateDraft("password", event.target.value)}
+              onChange={(event) =>
+                updateDraft(
+                  "password",
+                  removeInputWhitespace(event.target.value),
+                )
+              }
               placeholder="••••••"
             />
           </Field>
@@ -1326,9 +1339,18 @@ function CourierDrawer({
               inputMode="numeric"
             />
           </Field>
-          <Button type="submit" className="w-full sm:col-span-2">
+          {error ? (
+            <p className="text-sm font-semibold text-destructive sm:col-span-2" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <Button
+            type="submit"
+            className="w-full sm:col-span-2"
+            disabled={submitting}
+          >
             <Plus className="size-4" />
-            إضافة مندوب
+            {submitting ? "جارٍ إنشاء الحساب..." : "إضافة مندوب"}
           </Button>
         </form>
         </div>
@@ -1446,9 +1468,59 @@ export function CouriersPage() {
 
   const { showSnackbar } = useSnackbar();
 
-  function addCourier(courier: Courier) {
+  useEffect(() => {
+    let cancelled = false;
+
+    void dashboardFetch("couriers", { cache: "no-store" })
+      .then(async (response) => {
+        const data = (await response.json().catch(() => null)) as
+          | { couriers?: Courier[]; message?: string }
+          | null;
+        if (!response.ok) {
+          throw new Error(data?.message || "تعذر تحميل حسابات المناديب.");
+        }
+        if (!cancelled && Array.isArray(data?.couriers)) {
+          setCourierRows(data.couriers);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          showSnackbar({
+            message:
+              error instanceof Error
+                ? error.message
+                : "تعذر تحميل حسابات المناديب.",
+            tone: "danger",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSnackbar]);
+
+  async function addCourier(draft: CourierDraft) {
+    const response = await dashboardFetch("couriers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...draft,
+        maxActiveOrders: Number.parseInt(draft.maxActiveOrders, 10) || 3,
+      }),
+    });
+    const data = (await response.json().catch(() => null)) as
+      | { courier?: Courier; message?: string }
+      | null;
+
+    if (!response.ok || !data?.courier) {
+      throw new Error(data?.message || "تعذر إنشاء حساب المندوب.");
+    }
+
+    const courier = data.courier;
     setCourierRows((current) => [courier, ...current]);
     setDrawerOpen(false);
+    showSnackbar({ message: `تم إنشاء حساب المندوب ${courier.name} بنجاح.` });
   }
 
   function updateCourierPhoto(courierId: string, photoUrl: string | null) {

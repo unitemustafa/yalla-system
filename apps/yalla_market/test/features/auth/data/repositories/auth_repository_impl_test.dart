@@ -59,11 +59,52 @@ void main() {
       },
     );
 
+    test('allows login with username or phone identifier', () async {
+      final usernameResult = await repository.login(
+        email: 'market_admin',
+        password: '01266666610',
+      );
+      usernameResult.when(
+        success: (session) => expect(session.user.email, 'market@admin.com'),
+        failure: (failure) => fail(failure.message),
+      );
+
+      final phoneResult = await repository.login(
+        email: '01266666610',
+        password: '01266666610',
+      );
+      phoneResult.when(
+        success: (session) => expect(session.user.username, 'market_admin'),
+        failure: (failure) => fail(failure.message),
+      );
+
+      await repository.signup(
+        firstName: 'Mustafa',
+        lastName: 'Ali',
+        email: 'phone-login@example.com',
+        phone: '+201001234567',
+        password: 'Secret123!',
+      );
+
+      for (final identifier in ['01001234567', '1001234567']) {
+        final egyptianPhoneResult = await repository.login(
+          email: identifier,
+          password: 'Secret123!',
+        );
+        egyptianPhoneResult.when(
+          success: (session) =>
+              expect(session.user.email, 'phone-login@example.com'),
+          failure: (failure) => fail(failure.message),
+        );
+      }
+    });
+
     test('persists signed up users and validates their password', () async {
       await repository.signup(
         firstName: 'Mustafa',
         lastName: 'Ali',
         email: 'mustafa@example.com',
+        phone: '+201000000000',
         password: 'Secret123!',
       );
       await repository.logout();
@@ -107,9 +148,7 @@ void main() {
         failure: (failure) => fail(failure.message),
       );
 
-      final phoneResult = await repository.isPhoneRegistered(
-        '+20 100 000 0000',
-      );
+      final phoneResult = await repository.isPhoneRegistered('01000000000');
       phoneResult.when(
         success: (isRegistered) => expect(isRegistered, isTrue),
         failure: (failure) => fail(failure.message),

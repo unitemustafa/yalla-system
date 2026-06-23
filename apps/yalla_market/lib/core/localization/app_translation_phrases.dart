@@ -115,6 +115,18 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Account unavailable': 'الحساب غير متاح',
     'Account was not deleted': 'الحساب ما اتحذفش',
     'Account, orders and preferences': 'الحساب والطلبات والتفضيلات',
+    'Invalid email or password.':
+        'الإيميل/اسم المستخدم/رقم الموبايل أو كلمة السر غير صحيحين.',
+    'Invalid login credentials.':
+        'الإيميل/اسم المستخدم/رقم الموبايل أو كلمة السر غير صحيحين.',
+    'Login identifier and password are required.':
+        'اكتب الإيميل أو اليوزر أو رقم الموبايل وكلمة السر.',
+    'No account found with this email.':
+        'الإيميل ده مش مسجل عندنا. راجع الإيميل أو اعمل حساب جديد.',
+    'Password reset unavailable': 'استرجاع كلمة السر غير متاح',
+    'Session expired': 'انتهت الجلسة',
+    'Your session has expired. Please sign in again. To keep your session longer, turn on Remember Me when signing in.':
+        'انتهت الجلسة، برجاء إعادة تسجيل الدخول. للحفاظ على الجلسة لمدة أطول، فعّل خيار افتكرني عند تسجيل الدخول.',
     'Activation phone': 'رقم التفعيل',
     'Agreement required': 'الموافقة مطلوبة',
     'App Preferences': 'تفضيلات التطبيق',
@@ -505,11 +517,27 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'English': 'الإنجليزية',
     'English interface': 'واجهة باللغة الإنجليزية',
     'Enter a valid email address': 'اكتب إيميل صحيح',
+    'Email, username, or phone': 'الإيميل أو اليوزر أو رقم الموبايل',
+    'Enter a valid email, username, or phone.':
+        'اكتب إيميل أو يوزر أو رقم موبايل صحيح.',
     'Enter a valid phone number': 'اكتب رقم موبايل صحيح',
     'Enter your password first.': 'اكتب كلمة السر الأول.',
     'Email check skipped': 'تخطينا فحص الإيميل',
     'Email is already registered.': 'الإيميل ده مستخدم بالفعل.',
     'Email is available.': 'الإيميل متاح.',
+    'Email verified': 'تم تأكيد الإيميل',
+    'Your account is verified. Sign in to continue.':
+        'حسابك اتأكد. سجل دخولك عشان تكمل.',
+    'Account is not active.': 'الحساب مش متفعل.',
+    'This account cannot access this app.':
+        'الحساب ده مش مسموح له يستخدم التطبيق ده.',
+    'Email or phone is required.': 'اكتب الإيميل أو رقم الموبايل.',
+    'Enter a valid email.': 'اكتب إيميل صحيح.',
+    'Server error.': 'مشكلة في السيرفر.',
+    'Email and password are required.': 'اكتب الإيميل وكلمة السر.',
+    'Could not verify your email.': 'مش قادرين نأكد الإيميل دلوقتي.',
+    'Enter the 6-digit verification code.':
+        'اكتب كود التأكيد المكوّن من 6 أرقام.',
     'Email unavailable': 'الإيميل غير متاح',
     'Expired': 'منتهي',
     'Faster handling for eligible orders.': 'تجهيز أسرع للطلبات المؤهلة.',
@@ -535,6 +563,10 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'Name is too short': 'الاسم قصير جدًا',
     'No local user session.': 'مفيش جلسة مستخدم محفوظة.',
     'No products available': 'مفيش منتجات متاحة',
+    'Products could not load': 'المنتجات محملتش',
+    'Please check your connection and try again.':
+        'راجع اتصالك بالإنترنت وحاول تاني.',
+    'Could not load products.': 'مش قادرين نحمّل المنتجات دلوقتي.',
     'Not set': 'غير محدد',
     'Pakistan': 'باكستان',
     'Password is required.': 'كلمة السر مطلوبة.',
@@ -579,6 +611,8 @@ const Map<String, Map<String, String>> _translationPhrases = {
     'This cannot be undone. Enter your account password to confirm permanent deletion.':
         'الإجراء ده نهائي. اكتب كلمة سر الحساب لتأكيد الحذف.',
     'This field is required': 'الخانة دي مطلوبة',
+    'Your session ended because Remember Me was off. Turn it on to stay signed in for 30 days when you close the app.':
+        'الجلسة انتهت عشان افتكرني مكانتش متفعّلة. فعّلها عشان تفضل مسجل دخول لمدة 30 يوم حتى لو قفلت التطبيق.',
     'This information appears on your يلا ماركت profile.':
         'المعلومة دي بتظهر في بروفايلك على يلا ماركت.',
     'This helps personalize your shopping experience.':

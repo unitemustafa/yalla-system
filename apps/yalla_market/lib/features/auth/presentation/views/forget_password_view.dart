@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:yalla_market/core/icons/app_icons.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -6,6 +10,7 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/presentation/widgets/buttons/app_action_button.dart';
 import '../../../../core/routing/app_routes.dart';
 import '../../../../core/utils/validators.dart';
+import '../cubit/auth_cubit.dart';
 import '../widgets/auth_top_bar.dart';
 import '../widgets/custom_text_field.dart';
 
@@ -19,27 +24,81 @@ class ForgetPasswordView extends StatefulWidget {
 class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
+  Timer? _emailLookupDebounce;
+  bool _isCheckingEmail = false;
+  bool? _isEmailRegistered;
+  String? _lastCheckedEmail;
+
+  bool get _canSubmit =>
+      !_isCheckingEmail &&
+      _isEmailRegistered == true &&
+      _lastCheckedEmail == _normalizedEmail;
+
+  String get _normalizedEmail => _emailController.text.trim().toLowerCase();
 
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
+    _emailController.addListener(_scheduleEmailCheck);
   }
 
   @override
   void dispose() {
+    _emailLookupDebounce?.cancel();
+    _emailController.removeListener(_scheduleEmailCheck);
     _emailController.dispose();
     super.dispose();
   }
 
   void _onSubmit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.pushNamed(
-        context,
-        AppRoutes.passwordResetSent,
-        arguments: _emailController.text.trim(),
-      );
+    if (!_canSubmit || !(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.pushNamed(
+      context,
+      AppRoutes.passwordResetSent,
+      arguments: _emailController.text.trim(),
+    );
+  }
+
+  void _scheduleEmailCheck() {
+    _emailLookupDebounce?.cancel();
+    final email = _normalizedEmail;
+
+    setState(() {
+      _isCheckingEmail = false;
+      _isEmailRegistered = null;
+      _lastCheckedEmail = null;
+    });
+
+    if (Validators.email(email) != null) return;
+
+    _emailLookupDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      unawaited(_checkEmailRegistration(email));
+    });
+  }
+
+  Future<void> _checkEmailRegistration(String email) async {
+    setState(() => _isCheckingEmail = true);
+    final result = await context.read<AuthCubit>().isEmailRegistered(email);
+    if (!mounted || email != _normalizedEmail) return;
+    setState(() {
+      _isCheckingEmail = false;
+      _isEmailRegistered = result;
+      _lastCheckedEmail = email;
+    });
+    _formKey.currentState?.validate();
+  }
+
+  String? _validateEmail(String? value) {
+    final validationMessage = Validators.email(value);
+    if (validationMessage != null) return validationMessage;
+
+    if (_lastCheckedEmail == _normalizedEmail && _isEmailRegistered == false) {
+      return context.tr('No account found with this email.');
     }
+
+    return null;
   }
 
   @override
@@ -81,7 +140,11 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
                               labelText: AppStrings.email,
                               prefixIcon: AppIcons.direct_right,
                               keyboardType: TextInputType.emailAddress,
-                              validator: Validators.email,
+                              validator: _validateEmail,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                              ],
+                              suffix: _buildEmailStatusSuffix(isDarkMode),
                             ),
                             const SizedBox(height: 14),
                             _buildSubmitButton(),
@@ -174,6 +237,43 @@ class _ForgetPasswordViewState extends State<ForgetPasswordView> {
   }
 
   Widget _buildSubmitButton() {
-    return AppActionButton(label: AppStrings.submit, onPressed: _onSubmit);
+    return AppActionButton(
+      label: AppStrings.submit,
+      isLoading: _isCheckingEmail,
+      onPressed: _canSubmit ? _onSubmit : null,
+    );
+  }
+
+  Widget? _buildEmailStatusSuffix(bool isDarkMode) {
+    if (_isCheckingEmail) {
+      final progressColor = isDarkMode
+          ? Colors.white.withValues(alpha: 0.62)
+          : Colors.black.withValues(alpha: 0.42);
+      return Padding(
+        padding: const EdgeInsets.all(14),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+          ),
+        ),
+      );
+    }
+
+    if (_isEmailRegistered == true) {
+      return const Icon(
+        AppIcons.tick_circle,
+        size: 23,
+        color: AppColors.success,
+      );
+    }
+
+    if (_isEmailRegistered == false) {
+      return const Icon(AppIcons.danger, size: 23, color: AppColors.error);
+    }
+
+    return null;
   }
 }

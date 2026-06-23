@@ -88,7 +88,7 @@ class BrandCard extends StatelessWidget {
                             brand,
                             textAlign: TextAlign.start,
                             maxLines: 2,
-                            overflow: TextOverflow.fade,
+                            overflow: TextOverflow.ellipsis,
                             softWrap: true,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
@@ -103,6 +103,7 @@ class BrandCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       context.tr(productCount),
+                      maxLines: 1,
                       style: Theme.of(
                         context,
                       ).textTheme.labelMedium!.apply(color: Colors.grey),

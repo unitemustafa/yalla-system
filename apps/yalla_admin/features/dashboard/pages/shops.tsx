@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { MapPin, Plus, Store, X } from "lucide-react";
@@ -29,33 +29,33 @@ type ShopRow = {
 const initialShopRows: ShopRow[] = [
   {
     id: "shop-fish-market",
-    name: "أسماك الطازج",
-    category: "مطاعم",
-    branch: "التل الكبير",
+    name: "ط£ط³ظ…ط§ظƒ ط§ظ„ط·ط§ط²ط¬",
+    category: "ظ…ط·ط§ط¹ظ…",
+    branch: "ط§ظ„طھظ„ ط§ظ„ظƒط¨ظٹط±",
     products: "18",
     active: true,
   },
   {
     id: "shop-green-basket",
-    name: "سلة الخضار",
-    category: "الطازج",
-    branch: "التل الكبير",
+    name: "ط³ظ„ط© ط§ظ„ط®ط¶ط§ط±",
+    category: "ط§ظ„ط·ط§ط²ط¬",
+    branch: "ط§ظ„طھظ„ ط§ظ„ظƒط¨ظٹط±",
     products: "24",
     active: true,
   },
   {
     id: "shop-family-market",
-    name: "ماركت العائلة",
-    category: "التسوق",
-    branch: "كل الفروع",
+    name: "ظ…ط§ط±ظƒطھ ط§ظ„ط¹ط§ط¦ظ„ط©",
+    category: "ط§ظ„طھط³ظˆظ‚",
+    branch: "ظƒظ„ ط§ظ„ظپط±ظˆط¹",
     products: "42",
     active: true,
   },
   {
     id: "shop-bakery",
-    name: "مخبوزات الصباح",
-    category: "الأكل",
-    branch: "التل الكبير",
+    name: "ظ…ط®ط¨ظˆط²ط§طھ ط§ظ„طµط¨ط§ط­",
+    category: "ط§ظ„ط£ظƒظ„",
+    branch: "ط§ظ„طھظ„ ط§ظ„ظƒط¨ظٹط±",
     products: "11",
     active: false,
   },
@@ -118,40 +118,40 @@ function AddShopDrawer({
           type="button"
           onClick={onClose}
           className="absolute left-4 top-4 z-10 inline-flex size-8 items-center justify-center rounded-full border bg-background shadow-sm hover:bg-accent"
-          aria-label="إغلاق"
+          aria-label="ط¥ط؛ظ„ط§ظ‚"
         >
           <X className="size-4" />
         </button>
 
         <div className="border-b bg-muted/20 px-6 py-5 pe-14">
           <h2 id="add-shop-title" className="text-xl font-semibold leading-7">
-            إضافة محل
+            ط¥ط¶ط§ظپط© ظ…ط­ظ„
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            أضف بيانات المحل التي ستظهر في قائمة المحلات وربط المنتجات.
+            ط£ط¶ظپ ط¨ظٹط§ظ†ط§طھ ط§ظ„ظ…ط­ظ„ ط§ظ„طھظٹ ط³طھط¸ظ‡ط± ظپظٹ ظ‚ط§ط¦ظ…ط© ط§ظ„ظ…ط­ظ„ط§طھ ظˆط±ط¨ط· ط§ظ„ظ…ظ†طھط¬ط§طھ.
           </p>
         </div>
 
         <form onSubmit={submitShop}>
           <div className="grid gap-4 p-6 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium sm:col-span-2">
-              اسم المحل *
+              ط§ط³ظ… ط§ظ„ظ…ط­ظ„ *
               <Input
                 autoFocus
                 dir="rtl"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="مثلا: خضار البلد"
+                placeholder="ظ…ط«ظ„ط§: ط®ط¶ط§ط± ط§ظ„ط¨ظ„ط¯"
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
-              التصنيف *
+              ط§ظ„طھطµظ†ظٹظپ *
               <AppSelect
                 dir="rtl"
                 value={category}
                 onValueChange={setCategory}
-                placeholder="اختر التصنيف"
-                ariaLabel="اختيار التصنيف"
+                placeholder="ط§ط®طھط± ط§ظ„طھطµظ†ظٹظپ"
+                ariaLabel="ط§ط®طھظٹط§ط± ط§ظ„طھطµظ†ظٹظپ"
                 side="top"
                 contentClassName="max-h-44"
                 options={categoryRows.map((row) => ({
@@ -161,13 +161,13 @@ function AddShopDrawer({
               />
             </label>
             <label className="grid gap-2 text-sm font-medium">
-              الفرع / المنطقة *
+              ط§ظ„ظپط±ط¹ / ط§ظ„ظ…ظ†ط·ظ‚ط© *
               <AppSelect
                 dir="rtl"
                 value={branch}
                 onValueChange={setBranch}
-                placeholder="اختر المنطقة"
-                ariaLabel="اختيار المنطقة"
+                placeholder="ط§ط®طھط± ط§ظ„ظ…ظ†ط·ظ‚ط©"
+                ariaLabel="ط§ط®طھظٹط§ط± ط§ظ„ظ…ظ†ط·ظ‚ط©"
                 side="top"
                 contentClassName="max-h-44"
                 options={deliveryZones.map((zone) => ({
@@ -180,11 +180,11 @@ function AddShopDrawer({
 
           <div className="flex justify-end gap-2 border-t border-border/70 px-6 py-4">
             <Button type="button" variant="outline" onClick={onClose}>
-              إلغاء
+              ط¥ظ„ط؛ط§ط،
             </Button>
             <Button type="submit" disabled={!canSave}>
               <Plus className="size-4" />
-              حفظ المحل
+              ط­ظپط¸ ط§ظ„ظ…ط­ظ„
             </Button>
           </div>
         </form>
@@ -205,12 +205,12 @@ export function ShopsPage() {
   return (
     <div className="px-6 py-6">
       <PageTitle
-        title="المحلات"
-        description="إدارة المحلات التي تظهر داخل تطبيق العملاء وربطها بالمنتجات والفئات."
+        title="ط§ظ„ظ…ط­ظ„ط§طھ"
+        description="ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط­ظ„ط§طھ ط§ظ„طھظٹ طھط¸ظ‡ط± ط¯ط§ط®ظ„ طھط·ط¨ظٹظ‚ ط§ظ„ط¹ظ…ظ„ط§ط، ظˆط±ط¨ط·ظ‡ط§ ط¨ط§ظ„ظ…ظ†طھط¬ط§طھ ظˆط§ظ„ظپط¦ط§طھ."
         actions={
           <Button size="sm" onClick={() => setAddShopOpen(true)}>
             <Plus className="size-4" />
-            إضافة محل
+            ط¥ط¶ط§ظپط© ظ…ط­ظ„
           </Button>
         }
       />
@@ -222,7 +222,7 @@ export function ShopsPage() {
               <Store className="size-5" />
             </span>
             <div>
-              <p className="text-xs text-muted-foreground">إجمالي المحلات</p>
+              <p className="text-xs text-muted-foreground">ط¥ط¬ظ…ط§ظ„ظٹ ط§ظ„ظ…ط­ظ„ط§طھ</p>
               <p className="mt-1 text-xl font-bold">{shops.length}</p>
             </div>
           </div>
@@ -233,7 +233,7 @@ export function ShopsPage() {
               <Store className="size-5" />
             </span>
             <div>
-              <p className="text-xs text-muted-foreground">محلات نشطة</p>
+              <p className="text-xs text-muted-foreground">ظ…ط­ظ„ط§طھ ظ†ط´ط·ط©</p>
               <p className="mt-1 text-xl font-bold">
                 {shops.filter((shop) => shop.active).length}
               </p>
@@ -246,7 +246,7 @@ export function ShopsPage() {
               <MapPin className="size-5" />
             </span>
             <div>
-              <p className="text-xs text-muted-foreground">الفروع المغطاة</p>
+              <p className="text-xs text-muted-foreground">ط§ظ„ظپط±ظˆط¹ ط§ظ„ظ…ط؛ط·ط§ط©</p>
               <p className="mt-1 text-xl font-bold">2</p>
             </div>
           </div>
@@ -255,9 +255,9 @@ export function ShopsPage() {
 
       <Card className="mt-6">
         <div className="border-b px-6 py-4">
-          <h2 className="text-base font-semibold">كل المحلات</h2>
+          <h2 className="text-base font-semibold">ظƒظ„ ط§ظ„ظ…ط­ظ„ط§طھ</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            راجع حالة كل محل وعدد المنتجات المرتبطة به.
+            ط±ط§ط¬ط¹ ط­ط§ظ„ط© ظƒظ„ ظ…ط­ظ„ ظˆط¹ط¯ط¯ ط§ظ„ظ…ظ†طھط¬ط§طھ ط§ظ„ظ…ط±طھط¨ط·ط© ط¨ظ‡.
           </p>
         </div>
         <div className="p-6">
@@ -265,12 +265,12 @@ export function ShopsPage() {
             minWidth={760}
             columnWidths={[240, 160, 170, 120, 90]}
             headers={[
-              "اسم المحل",
-              "التصنيف",
-              "الفرع",
-              "المنتجات",
+              "ط§ط³ظ… ط§ظ„ظ…ط­ظ„",
+              "ط§ظ„طھطµظ†ظٹظپ",
+              "ط§ظ„ظپط±ط¹",
+              "ط§ظ„ظ…ظ†طھط¬ط§طھ",
               <span key="status" className="block text-center">
-                الحالة
+                ط§ظ„ط­ط§ظ„ط©
               </span>,
             ]}
             rows={pagedShops.map((shop) => [
@@ -288,7 +288,7 @@ export function ShopsPage() {
             ])}
           />
           <Pagination
-            text={`عرض ${pagedShops.length} من ${shops.length} نتيجة`}
+            text={`ط¹ط±ط¶ ${pagedShops.length} ظ…ظ† ${shops.length} ظ†طھظٹط¬ط©`}
             pages={`${safeCurrentPage} / ${totalPages}`}
             previousDisabled={safeCurrentPage === 1}
             nextDisabled={safeCurrentPage === totalPages}

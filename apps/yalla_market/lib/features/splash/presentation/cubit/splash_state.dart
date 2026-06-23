@@ -10,9 +10,15 @@ final class SplashLoading extends SplashState {
 }
 
 final class SplashNavigateTo extends SplashState {
-  const SplashNavigateTo(this.route, {this.session, this.city});
+  const SplashNavigateTo(
+    this.route, {
+    this.session,
+    this.city,
+    this.showSessionExpiredNotice = false,
+  });
 
   final String route;
+  final bool showSessionExpiredNotice;
 
   /// Non-null when a session was successfully restored; pass to [AuthCubit.hydrate].
   final AuthSession? session;

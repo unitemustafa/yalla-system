@@ -37,7 +37,7 @@ class _SignupViewState extends State<SignupView> {
       isoCode: 'EG',
       dialCode: '+20',
       minDigits: 10,
-      maxDigits: 11,
+      maxDigits: 10,
     ),
     PhoneCountry(
       name: 'United States',
@@ -170,25 +170,24 @@ class _SignupViewState extends State<SignupView> {
       return;
     }
 
+    final usernameAvailable = await _checker.ensureUsernameAvailable(context);
+    if (!mounted || !usernameAvailable) return;
+
     final emailAvailable = await _checker.ensureEmailAvailable(context);
-    if (!mounted) return;
+    if (!mounted || !emailAvailable) return;
 
     final phoneAvailable = await _checker.ensurePhoneAvailable(context);
-    if (!mounted) return;
-
-    final usernameAvailable = await _checker.ensureUsernameAvailable(context);
-
-    if (!mounted) return;
+    if (!mounted || !phoneAvailable) return;
 
     if (emailAvailable && phoneAvailable && usernameAvailable) {
-      final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+      final phone = _phoneForLookup();
       final username = _usernameController.text.trim();
       context.read<AuthCubit>().signup(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
-        username: username.isEmpty ? null : username,
+        username: username,
         email: _emailController.text.trim(),
-        phone: '${_selectedCountry.dialCode}$digits',
+        phone: phone,
         password: _passwordController.text,
       );
     }
@@ -261,7 +260,7 @@ class _SignupViewState extends State<SignupView> {
           CustomSnackBar.showError(
             context: context,
             title: _signupErrorTitle(state.message),
-            message: state.message,
+            message: context.tr(state.message),
           );
         }
       },
@@ -312,6 +311,11 @@ class _SignupViewState extends State<SignupView> {
                                     });
                                   },
                                   validator: _validatePassword,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.deny(
+                                      RegExp(r'\s'),
+                                    ),
+                                  ],
                                 ),
                                 PasswordStrengthMeter(
                                   controller: _passwordController,
@@ -345,7 +349,7 @@ class _SignupViewState extends State<SignupView> {
     final email = value?.trim().toLowerCase() ?? '';
     if (_checker.lastCheckedEmail == email &&
         _checker.isEmailAvailable == false) {
-      return 'This email is already registered.';
+      return context.tr('This email is already registered.');
     }
 
     return null;
@@ -372,7 +376,7 @@ class _SignupViewState extends State<SignupView> {
     final phone = _phoneForLookup(value);
     if (_checker.lastCheckedPhone == phone &&
         _checker.isPhoneAvailable == false) {
-      return 'This phone number is already registered.';
+      return context.tr('This phone number is already registered.');
     }
 
     return null;
@@ -386,11 +390,15 @@ class _SignupViewState extends State<SignupView> {
     }
 
     final digits = phone.replaceAll(RegExp(r'\D'), '');
-    final isValidLength =
-        digits.length >= _selectedCountry.minDigits &&
-        digits.length <= _selectedCountry.maxDigits;
+    final normalizedDigits = _nationalPhoneDigits(digits);
+    final isValidLength = normalizedDigits.length == _selectedCountry.maxDigits;
 
     if (!isValidLength) {
+      return AppTranslations.current.invalidPhone;
+    }
+
+    if (_selectedCountry.isoCode == 'EG' &&
+        !RegExp(r'^1[0125]\d{8}$').hasMatch(normalizedDigits)) {
       return AppTranslations.current.invalidPhone;
     }
 
@@ -398,30 +406,44 @@ class _SignupViewState extends State<SignupView> {
   }
 
   String _phoneForLookup([String? value]) {
-    final digits = (value ?? _phoneController.text).replaceAll(
+    final rawDigits = (value ?? _phoneController.text).replaceAll(
       RegExp(r'\D'),
       '',
     );
+    final digits = _nationalPhoneDigits(rawDigits);
     return digits.isEmpty ? '' : '${_selectedCountry.dialCode}$digits';
   }
 
-  bool _canCheckEmailAvailability() {
-    if (_firstNameController.text.trim().isEmpty ||
-        _lastNameController.text.trim().isEmpty) {
-      return false;
+  String _nationalPhoneDigits(String digits) {
+    final countryCode = _selectedCountry.dialCode.replaceAll(RegExp(r'\D'), '');
+    var nationalDigits = digits;
+
+    if (countryCode.isNotEmpty &&
+        nationalDigits.length > _selectedCountry.maxDigits &&
+        nationalDigits.startsWith(countryCode)) {
+      nationalDigits = nationalDigits.substring(countryCode.length);
     }
 
-    final username = _usernameController.text.trim();
-    if (_validateUsername(username) != null) return false;
-    if (username.isEmpty) return true;
+    if (_selectedCountry.isoCode == 'EG' &&
+        nationalDigits.length == 11 &&
+        nationalDigits.startsWith('0')) {
+      nationalDigits = nationalDigits.substring(1);
+    }
 
-    return _checker.lastCheckedUsername == username &&
+    return nationalDigits;
+  }
+
+  bool _canCheckEmailAvailability() {
+    final username = _usernameController.text.trim();
+    return _validateUsername(username) == null &&
+        _checker.lastCheckedUsername == username &&
         _checker.isUsernameAvailable == true;
   }
 
   bool _canCheckPhoneAvailability() {
     final email = _emailController.text.trim().toLowerCase();
     return _canCheckEmailAvailability() &&
+        Validators.email(email) == null &&
         _checker.lastCheckedEmail == email &&
         _checker.isEmailAvailable == true;
   }
@@ -429,7 +451,7 @@ class _SignupViewState extends State<SignupView> {
   String? _validateUsername(String? value) {
     final username = value?.trim() ?? '';
 
-    if (username.isEmpty) return null;
+    if (username.isEmpty) return AppTranslations.current.fieldRequired;
 
     if (username.length < 3) {
       return context.isArabicLanguage
@@ -443,10 +465,10 @@ class _SignupViewState extends State<SignupView> {
           : 'Username is too long';
     }
 
-    if (!RegExp(r'^[a-zA-Z._]+$').hasMatch(username)) {
+    if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(username)) {
       return context.isArabicLanguage
-          ? 'استخدم حروف إنجليزي ونقطة وشرطة سفلية فقط'
-          : 'Use English letters, dots, and underscores only';
+          ? 'استخدم حروف إنجليزي وأرقام ونقطة وشرطة سفلية فقط'
+          : 'Use English letters, numbers, dots, and underscores only';
     }
 
     if (!RegExp(r'[a-zA-Z]').hasMatch(username)) {

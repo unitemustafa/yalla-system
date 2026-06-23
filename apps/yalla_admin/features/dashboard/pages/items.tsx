@@ -34,6 +34,7 @@ import {
 import { deliveryZones } from "../reference-data";
 import { useItemTableState } from "../hooks";
 import { useSnackbar } from "../snackbar";
+import { dashboardFetch } from "@/lib/client-api";
 import { cn } from "@/lib/utils";
 
 type ItemFilters = {
@@ -678,6 +679,46 @@ export function ItemsPage() {
   }, [pagedRows, selectedRows]);
   const deleteRow = rows.find((row) => row.id === deleteId);
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    let alive = true;
+
+    async function loadItems() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await dashboardFetch("items");
+
+        if (!response.ok) {
+          throw new Error("Failed to load items");
+        }
+
+        const data = (await response.json()) as { items: ItemRow[] };
+
+        if (alive) {
+          setRows(data.items.map(normalizeItemRow));
+        }
+      } catch {
+        if (alive) {
+          setError("تعذر تحميل المنتجات. حاول تحديث الصفحة.");
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadItems();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   function toggleAllRows() {
     setSelectedRows((currentRows) =>
       pagedRows.every((row) => currentRows.has(row.index))
@@ -709,13 +750,51 @@ export function ItemsPage() {
       ),
     );
     setError("");
+<<<<<<< HEAD
     showSnackbar({
       message: "تم تحديث العرض التجريبي فقط؛ حفظ المنتجات غير مربوط بالـ backend.",
     });
+=======
+
+    try {
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(row.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update item");
+      }
+
+      const data = (await response.json()) as { item: ItemRow };
+      const updatedItem = normalizeItemRow(data.item);
+
+      setRows((currentRows) =>
+        currentRows.map((currentRow) =>
+          currentRow.id === updatedItem.id ? updatedItem : currentRow,
+        ),
+      );
+      showSnackbar({
+        message: active ? "تم تفعيل المنتج." : "تم إيقاف المنتج.",
+      });
+    } catch {
+      setRows(previousRows);
+      setError("تعذر تحديث حالة المنتج.");
+      showSnackbar({
+        message: "تعذر تحديث حالة المنتج.",
+        tone: "danger",
+      });
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   function duplicateRow(row: ItemRow) {
     setError("");
+<<<<<<< HEAD
     const duplicate = {
       ...row,
       id: `${row.id}-copy-${Date.now()}`,
@@ -726,6 +805,29 @@ export function ItemsPage() {
     showSnackbar({
       message: "تم إنشاء نسخة تجريبية؛ الحفظ غير مربوط بالـ backend.",
     });
+=======
+
+    try {
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(row.id)}/duplicate`,
+        { method: "POST" },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to duplicate item");
+      }
+
+      const data = (await response.json()) as { item: ItemRow };
+      setRows((currentRows) => [normalizeItemRow(data.item), ...currentRows]);
+      showSnackbar({ message: "تم نسخ المنتج بنجاح." });
+    } catch {
+      setError("تعذر نسخ المنتج.");
+      showSnackbar({
+        message: "تعذر نسخ المنتج.",
+        tone: "danger",
+      });
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   function confirmDelete() {
@@ -744,10 +846,34 @@ export function ItemsPage() {
     setDeleteId(null);
     setError("");
 
+<<<<<<< HEAD
     showSnackbar({
       message: `تم حذف ${deletedItemName} من العرض التجريبي فقط.`,
       tone: "danger",
     });
+=======
+    try {
+      const response = await dashboardFetch(
+        `items/${encodeURIComponent(deleteRow.id)}`,
+        { method: "DELETE" },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete item");
+      }
+      showSnackbar({
+        message: `تم حذف ${deletedItemName}.`,
+        tone: "danger",
+      });
+    } catch {
+      setRows(previousRows);
+      setError("تعذر حذف المنتج.");
+      showSnackbar({
+        message: "تعذر حذف المنتج.",
+        tone: "danger",
+      });
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   return (

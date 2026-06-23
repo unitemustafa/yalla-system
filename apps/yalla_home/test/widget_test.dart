@@ -20,8 +20,8 @@ void main() {
     expect(find.text('تواصل مع الدعم'), findsOneWidget);
 
     final fields = tester.widgetList<TextFormField>(find.byType(TextFormField));
-    expect(fields.elementAt(0).controller?.text, 'yalla@admin.com');
-    expect(fields.elementAt(1).controller?.text, '01266666610');
+    expect(fields.elementAt(0).controller?.text, isEmpty);
+    expect(fields.elementAt(1).controller?.text, isEmpty);
 
     final rememberMe = tester.widget<Checkbox>(find.byType(Checkbox));
     expect(rememberMe.value, isTrue);

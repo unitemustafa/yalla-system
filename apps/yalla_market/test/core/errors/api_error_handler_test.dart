@@ -35,6 +35,42 @@ void main() {
       expect(failure.message, 'Please sign in again.');
     });
 
+    test('extracts nested validation messages from field errors', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/auth/login'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/auth/login'),
+          statusCode: 400,
+          data: const {
+            'email': ['Enter a valid email.'],
+          },
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+      final failure = ApiErrorHandler.handle(error);
+
+      expect(failure, isA<ValidationFailure>());
+      expect(failure.statusCode, 400);
+      expect(failure.message, 'Enter a valid email.');
+    });
+
+    test('does not surface raw html error pages', () {
+      final error = DioException(
+        requestOptions: RequestOptions(path: '/products'),
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/products'),
+          statusCode: 404,
+          data: '<!DOCTYPE html><html><head><title>Page not found</title>',
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+      final failure = ApiErrorHandler.handle(error);
+
+      expect(failure.message, 'Server error.');
+    });
+
     test('maps non-Dio errors to unknown failure', () {
       final failure = ApiErrorHandler.handle(Exception('boom'));
 

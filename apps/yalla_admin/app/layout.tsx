@@ -1,7 +1,40 @@
 import type { Metadata } from "next";
+<<<<<<< HEAD
 import { AppProviders } from "@/features/auth/providers";
 import "./globals.css";
 
+=======
+import localFont from "next/font/local";
+import "./globals.css";
+
+const cairo = localFont({
+  src: [
+    {
+      path: "../public/fonts/tajawal/Tajawal-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/tajawal/Tajawal-ExtraBold.ttf",
+      weight: "800",
+      style: "normal",
+    },
+  ],
+  variable: "--font-cairo",
+  display: "swap",
+});
+
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
 export const metadata: Metadata = {
   title: "Yalla Admin",
   description: "Yalla Admin dashboard",

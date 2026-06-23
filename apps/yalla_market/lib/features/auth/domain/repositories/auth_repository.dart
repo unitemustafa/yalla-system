@@ -22,8 +22,8 @@ abstract class AuthRepository {
     required String lastName,
     required String email,
     required String password,
+    required String phone,
     String? username,
-    String? phone,
   });
 
   Future<ApiResult<AuthSession>> verifyEmail({
@@ -32,6 +32,15 @@ abstract class AuthRepository {
   });
 
   Future<ApiResult<bool>> resendVerificationCode(String email);
+
+  Future<ApiResult<bool>> requestPasswordReset(String email);
+
+  Future<ApiResult<bool>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String passwordConfirmation,
+  });
 
   Future<ApiResult<AuthUser>> me();
 

@@ -46,6 +46,7 @@ import {
   SelectBox,
 } from "../primitives";
 import { cn } from "@/lib/utils";
+import { dashboardFetch } from "@/lib/client-api";
 import { useSnackbar } from "../snackbar";
 import { dashboardUsers, type DashboardUser } from "../users/default-dashboard-users";
 import { deliveryZones } from "../reference-data";
@@ -892,6 +893,46 @@ export function OrdersPage() {
     }
   }
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    let alive = true;
+
+    async function loadOrders() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await dashboardFetch("orders");
+
+        if (!response.ok) {
+          throw new Error("Failed to load orders");
+        }
+
+        const data = (await response.json()) as { orders: DashboardOrder[] };
+
+        if (alive) {
+          setOrders(data.orders);
+        }
+      } catch {
+        if (alive) {
+          setError("تعذر تحميل الطلبات. حاول تحديث الصفحة.");
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadOrders();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   return (
     <div className="px-6 py-8">
       <PageTitle
@@ -1235,11 +1276,52 @@ export function CreateOrderPage() {
     setSavingOrder(true);
     void resetAfterSave;
 
+<<<<<<< HEAD
     showSnackbar({
       message: "إنشاء الطلبات غير مربوط بالـ backend حاليًا.",
       tone: "danger",
     });
     setSavingOrder(false);
+=======
+    try {
+      const response = await dashboardFetch("orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customer: submittedCustomer,
+          phone: submittedPhone,
+          type: orderType,
+          status: "pending",
+          payment: submittedPayment,
+          total: Number(submittedTotal.toFixed(2)),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create order");
+      }
+
+      const data = (await response.json()) as { order: DashboardOrder };
+
+      showSnackbar({
+        message: `تم حفظ الطلب ${data.order.number}.`,
+        tone: "success",
+      });
+
+      if (resetAfterSave) {
+        resetOrderForm();
+      } else {
+        router.push("/orders");
+      }
+    } catch {
+      showSnackbar({
+        message: "تعذر حفظ الطلب. حاول مرة أخرى.",
+        tone: "danger",
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   function selectCustomer(nextCustomer: DashboardUser) {
@@ -1762,6 +1844,7 @@ export function CreateOrderPageLegacy() {
 
     setSavingOrder(true);
 
+<<<<<<< HEAD
     void rawCustomer;
     void rawPhone;
     void rawType;
@@ -1771,6 +1854,45 @@ export function CreateOrderPageLegacy() {
       tone: "danger",
     });
     setSavingOrder(false);
+=======
+    try {
+      const response = await dashboardFetch("orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customer: typeof rawCustomer === "string" ? rawCustomer : "",
+          phone: typeof rawPhone === "string" ? rawPhone : "",
+          type: typeof rawType === "string" ? rawType : "delivery",
+          payment: "cash",
+          total: 0,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create order");
+      }
+
+      const data = (await response.json()) as { order: DashboardOrder };
+
+      showSnackbar({
+        message: `Order ${data.order.number} saved.`,
+        tone: "success",
+      });
+
+      if (resetAfterSave) {
+        orderFormRef.current?.reset();
+      } else {
+        router.push("/orders");
+      }
+    } catch {
+      showSnackbar({
+        message: "Could not save the order. Please try again.",
+        tone: "danger",
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
   }
 
   return (

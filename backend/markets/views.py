@@ -42,7 +42,7 @@ class HomeView(APIView):
 
         products = (
             Product.objects.filter(market_id__in=market_ids)
-            .select_related("category__classification", "market__classification")
+            .select_related("category", "market")
             .prefetch_related(
                 Prefetch(
                     "variants",
@@ -58,17 +58,14 @@ class HomeView(APIView):
                 start_time__lte=now,
                 end_time__gte=now,
             )
-            .select_related("market__classification")
+            .select_related("market")
             .prefetch_related(
                 Prefetch(
                     "products",
                     queryset=Product.objects.filter(
                         market_id__in=market_ids,
                     )
-                    .select_related(
-                        "category__classification",
-                        "market__classification",
-                    )
+                    .select_related("category", "market")
                     .prefetch_related("variants"),
                 )
             )
@@ -82,10 +79,6 @@ class HomeView(APIView):
             .order_by("name")
         )
 
-        serializer_context = {
-            "request": request,
-            "eligible_market_ids": market_ids,
-        }
         return Response(
             {
                 "location": {
@@ -97,17 +90,15 @@ class HomeView(APIView):
                 "offers": HomeOfferSerializer(
                     offers,
                     many=True,
-                    context=serializer_context,
                 ).data,
                 "market_classifications": HomeMarketClassificationSerializer(
                     classifications,
                     many=True,
-                    context=serializer_context,
+                    context={"eligible_market_ids": market_ids},
                 ).data,
                 "products": HomeProductSerializer(
                     products,
                     many=True,
-                    context=serializer_context,
                 ).data,
             },
             status=status.HTTP_200_OK,

@@ -1,10 +1,8 @@
 import 'package:get_it/get_it.dart';
 
-import '../../../core/config/app_environment.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_store.dart';
 import '../../../features/auth/data/repositories/auth_remote_repository_impl.dart';
-import '../../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../../features/auth/domain/repositories/auth_repository.dart';
 import '../../../features/auth/domain/usecases/auth_usecases.dart';
 import '../../../features/auth/presentation/cubit/auth_cubit.dart';
@@ -12,9 +10,7 @@ import '../../../features/auth/presentation/cubit/auth_cubit.dart';
 void registerAuthDependencies(GetIt sl) {
   if (!sl.isRegistered<AuthRepository>()) {
     sl.registerLazySingleton<AuthRepository>(
-      () => AppEnvironment.useDemoRepositories
-          ? AuthRepositoryImpl()
-          : AuthRemoteRepositoryImpl(sl<ApiClient>(), sl<TokenStore>()),
+      () => AuthRemoteRepositoryImpl(sl<ApiClient>(), sl<TokenStore>()),
     );
   }
   if (!sl.isRegistered<RestoreSavedSessionUseCase>()) {
@@ -51,6 +47,14 @@ void registerAuthDependencies(GetIt sl) {
       () => ResendVerificationCodeUseCase(sl<AuthRepository>()),
     );
   }
+  if (!sl.isRegistered<RequestPasswordResetUseCase>()) {
+    sl.registerLazySingleton(
+      () => RequestPasswordResetUseCase(sl<AuthRepository>()),
+    );
+  }
+  if (!sl.isRegistered<ResetPasswordUseCase>()) {
+    sl.registerLazySingleton(() => ResetPasswordUseCase(sl<AuthRepository>()));
+  }
   if (!sl.isRegistered<RefreshProfileUseCase>()) {
     sl.registerLazySingleton(() => RefreshProfileUseCase(sl<AuthRepository>()));
   }
@@ -76,6 +80,8 @@ void registerAuthDependencies(GetIt sl) {
         signup: sl<SignupUseCase>(),
         verifyEmail: sl<VerifyEmailUseCase>(),
         resendVerificationCode: sl<ResendVerificationCodeUseCase>(),
+        requestPasswordReset: sl<RequestPasswordResetUseCase>(),
+        resetPassword: sl<ResetPasswordUseCase>(),
         refreshProfile: sl<RefreshProfileUseCase>(),
         updateProfile: sl<UpdateProfileUseCase>(),
         logout: sl<LogoutUseCase>(),

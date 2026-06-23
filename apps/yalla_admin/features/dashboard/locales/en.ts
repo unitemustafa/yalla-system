@@ -58,6 +58,7 @@ export const en = {
   "nav.deliveryZones": "Delivery zones",
   "nav.couriers": "Couriers",
   "nav.customers": "Users",
+  "nav.memberships": "Memberships",
   "nav.chat": "Chat",
   "page.overview": "Dashboard",
   "page.items": "Products",

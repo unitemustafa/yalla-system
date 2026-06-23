@@ -1,5 +1,7 @@
 "use client";
 
+import { clearClientAuth } from "@/lib/client-api";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -163,7 +165,11 @@ export function Sidebar({
     setProfileMenuOpen(false);
     onCloseMobile();
 
+<<<<<<< HEAD
     await endSession();
+=======
+    clearClientAuth();
+>>>>>>> ddcd1d89cdee7f9089a4a648a3aec410ab2923a8
     window.location.href = "/login";
   }
 
@@ -183,7 +189,10 @@ export function Sidebar({
     if (firstChildPage === "offers") return t("nav.offers");
     if (firstChildPage === "delivery-zone") return t("nav.delivery");
 
-    return item.soon ? t("nav.chat") : item.label;
+    if (item.label === "العضويات") return t("nav.memberships");
+    if (item.label === "الشات") return t("nav.chat");
+
+    return item.label;
   }
 
   function navChildLabel(page: PageKey) {

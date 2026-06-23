@@ -6,11 +6,23 @@ mobile, desktop, and web clients call `API_BASE_URL/api/v1`, where
 
 ## Response Envelope
 
-All successful responses are wrapped in `data`.
+Successful responses may be wrapped in `data`.
 
 ```json
 {
   "data": {}
+}
+```
+
+The app also accepts direct JSON payloads for backend compatibility. The local
+Django backend currently returns auth payloads directly, for example:
+
+```json
+{
+  "accessToken": "jwt-access-token",
+  "refreshToken": "jwt-refresh-token",
+  "expiresIn": 900,
+  "user": {}
 }
 ```
 
@@ -48,6 +60,7 @@ Token payloads should include an ISO-8601 expiry value.
 ```
 
 The app can also accept `expiresIn` in seconds if `expiresAt` is not available.
+The local Django backend uses `expiresIn`.
 
 ### POST `/auth/signup`
 
@@ -106,6 +119,8 @@ When email verification is required before sign in, tokens may be omitted:
 ```
 
 The app will show the email verification screen after either successful shape.
+The local Django backend returns `email` directly plus `dev_otp` while `DEBUG`
+is enabled.
 
 ### POST `/auth/verify-email`
 
@@ -121,6 +136,8 @@ Request:
 Response: same as login, including `user` and tokens. The app stores these
 tokens for the current app session unless the customer later signs in with
 `rememberMe`.
+
+The local Django backend accepts `code` as an alias for `otp`.
 
 ### POST `/auth/resend-verification`
 
@@ -210,6 +227,9 @@ Response:
   }
 }
 ```
+
+The app also accepts `{ "user": {} }`, which is what the local Django backend
+returns.
 
 ### PATCH `/auth/me`
 
